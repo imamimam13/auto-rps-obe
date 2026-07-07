@@ -224,7 +224,7 @@ services:
     restart: unless-stopped
 
   auto-rps-obe-backend:
-    image: imamimam13/auto-rps-obe-backend:latest
+    build: ./backend
     ports:
       - "8000:8000"
     environment:
@@ -237,7 +237,7 @@ services:
     restart: unless-stopped
 
   auto-rps-obe-frontend:
-    image: imamimam13/auto-rps-obe-frontend:latest
+    build: ./frontend
     ports:
       - "5173:5173"
     depends_on:
