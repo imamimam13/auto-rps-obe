@@ -287,6 +287,7 @@ async def export_rps(
     
     os.makedirs(settings.EXPORT_DIR, exist_ok=True)
     filename = f"RPS_{rps.kode}_{rps.semester}_{rps.tahun_akademik}"
+    filename = filename.replace("/", "-").replace("\\", "-")
     
     if export_format == "docx":
         filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.docx")
