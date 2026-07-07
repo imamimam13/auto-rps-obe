@@ -12,6 +12,7 @@ export default function RPSDetail() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editJson, setEditJson] = useState('')
+  const [fixing, setFixing] = useState(false)
 
   useEffect(() => {
     if (id) loadData()
@@ -87,6 +88,53 @@ export default function RPSDetail() {
       } else {
         toast.error(e.response?.data?.detail || 'Gagal memperbarui RPS')
       }
+    }
+  }
+
+  async function handleAutoFix() {
+    if (!rps || !rps.obe_validation_result) return
+    setFixing(true)
+    try {
+      const feedbackList: string[] = []
+      const validationResult = rps.obe_validation_result
+      if (validationResult.issues) {
+        validationResult.issues.forEach((i: any) => {
+          feedbackList.push(`Pada bagian ${i.bagian}: ${i.deskripsi}. Saran: ${i.saran || ''}`)
+        })
+      }
+      if (validationResult.suggestions) {
+        validationResult.suggestions.forEach((s: any) => {
+          feedbackList.push(`Pada bagian ${s.bagian}: ${s.rekomendasi}`)
+        })
+      }
+      
+      const feedback = feedbackList.join('\n')
+      
+      toast.loading('AI sedang menganalisis & memperbaiki RPS...', { id: 'autofix' })
+      const reviewRes = await api.post('/api/v1/generate/review', {
+        rps_data: {
+          identitas: rps.identitas,
+          cpmk: rps.cpmk,
+          sub_cpmk: rps.sub_cpmk,
+          rencana_pembelajaran: rps.rencana_pembelajaran,
+          metode_pembelajaran: rps.metode_pembelajaran,
+          media_pembelajaran: rps.media_pembelajaran,
+          penilaian: rps.penilaian,
+          referensi: rps.referensi,
+        },
+        feedback: feedback
+      })
+      
+      const improvedData = reviewRes.data.data
+      
+      await api.put(`/api/v1/rps/${id}`, improvedData)
+      toast.success('RPS berhasil diperbaiki secara otomatis oleh AI!', { id: 'autofix' })
+      
+      handleValidate()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal memperbaiki RPS', { id: 'autofix' })
+    } finally {
+      setFixing(false)
     }
   }
 
@@ -180,6 +228,94 @@ export default function RPSDetail() {
           </div>
         )}
       </div>
+
+      {/* OBE Validation Result Card */}
+      {rps.obe_validated && rps.obe_validation_result && (
+        <div className="macos-card p-5 space-y-4 border border-blue-100 bg-blue-50/10">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-macos-blue" />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Hasil Validasi Kurikulum OBE</h3>
+                <p className="text-[11px] text-gray-400 mt-0.5">Analisis keselarasan konstruktif kurikulum oleh AI.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-bold px-3 py-1.5 rounded-apple-lg ${
+                rps.obe_score >= 75 ? 'bg-green-50 text-green-600' : rps.obe_score >= 50 ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'
+              }`}>
+                Skor: {rps.obe_score}/100
+              </span>
+              {rps.status === 'draft' && (
+                <button
+                  onClick={handleAutoFix}
+                  disabled={fixing}
+                  className="macos-button flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+                >
+                  {fixing ? (
+                    <>Memperbaiki...</>
+                  ) : (
+                    <><Sparkles className="w-3.5 h-3.5" /> Perbaiki dengan AI</>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            {/* Issues */}
+            {rps.obe_validation_result.issues?.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-gray-700">Masalah / Kesenjangan ({rps.obe_validation_result.issues.length})</h4>
+                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                  {rps.obe_validation_result.issues.map((issue: any, idx: number) => (
+                    <div key={idx} className={`p-2.5 rounded-apple-md text-xs space-y-1 ${
+                      issue.severity === 'high' ? 'bg-red-50/70 text-red-700' : 'bg-yellow-50/70 text-yellow-700'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold capitalize">{issue.bagian}</span>
+                        <span className={`font-mono text-[9px] uppercase px-1 rounded ${
+                          issue.severity === 'high' ? 'bg-red-200 text-red-800' : 'bg-yellow-200 text-yellow-800'
+                        }`}>{issue.severity}</span>
+                      </div>
+                      <p className="text-gray-600">{issue.deskripsi}</p>
+                      {issue.saran && <p className="font-medium text-macos-blue mt-1">Saran: {issue.saran}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-gray-700">Masalah / Kesenjangan</h4>
+                <p className="text-xs text-gray-400 italic">Tidak ditemukan masalah keselarasan OBE.</p>
+              </div>
+            )}
+
+            {/* Suggestions */}
+            {rps.obe_validation_result.suggestions?.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-gray-700">Saran Perbaikan ({rps.obe_validation_result.suggestions.length})</h4>
+                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                  {rps.obe_validation_result.suggestions.map((s: any, idx: number) => (
+                    <div key={idx} className="p-2.5 bg-blue-50/50 rounded-apple-md text-xs text-blue-700 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold capitalize">{s.bagian}</span>
+                        <span className="font-mono text-[9px] uppercase px-1 rounded bg-blue-100 text-blue-800">{s.prioritas}</span>
+                      </div>
+                      <p className="text-gray-600">{s.rekomendasi}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-gray-700">Saran Perbaikan</h4>
+                <p className="text-xs text-gray-400 italic">Tidak ada saran perbaikan tambahan.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* CPMK */}
       {rps.cpmk?.length > 0 && (
