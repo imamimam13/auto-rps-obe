@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckSquare, Search, AlertCircle, CheckCircle, BarChart3, TrendingUp } from 'lucide-react'
+import { CheckSquare, Search, AlertCircle, CheckCircle, BarChart3, TrendingUp, Sparkles } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -10,6 +10,7 @@ export default function OBEAnalyzer() {
   const [selectedRps, setSelectedRps] = useState<any>(null)
   const [validating, setValidating] = useState(false)
   const [validationResult, setValidationResult] = useState<any>(null)
+  const [fixing, setFixing] = useState(false)
 
   useEffect(() => {
     loadRPS()
@@ -39,6 +40,55 @@ export default function OBEAnalyzer() {
       toast.error(e.response?.data?.detail || 'Gagal validasi')
     } finally {
       setValidating(false)
+    }
+  }
+
+  async function handleAutoFix() {
+    if (!selectedRps || !validationResult) return
+    setFixing(true)
+    try {
+      const rpsRes = await api.get(`/api/v1/rps/${selectedRps.id}`)
+      const fullRps = rpsRes.data
+      
+      const feedbackList: string[] = []
+      if (validationResult.issues) {
+        validationResult.issues.forEach((i: any) => {
+          feedbackList.push(`Pada bagian ${i.bagian}: ${i.deskripsi}. Saran: ${i.saran || ''}`)
+        })
+      }
+      if (validationResult.suggestions) {
+        validationResult.suggestions.forEach((s: any) => {
+          feedbackList.push(`Pada bagian ${s.bagian}: ${s.rekomendasi}`)
+        })
+      }
+      
+      const feedback = feedbackList.join('\n')
+      
+      toast.loading('AI sedang menganalisis & memperbaiki RPS...', { id: 'autofix' })
+      const reviewRes = await api.post('/api/v1/generate/review', {
+        rps_data: {
+          identitas: fullRps.identitas,
+          cpmk: fullRps.cpmk,
+          sub_cpmk: fullRps.sub_cpmk,
+          rencana_pembelajaran: fullRps.rencana_pembelajaran,
+          metode_pembelajaran: fullRps.metode_pembelajaran,
+          media_pembelajaran: fullRps.media_pembelajaran,
+          penilaian: fullRps.penilaian,
+          referensi: fullRps.referensi,
+        },
+        feedback: feedback
+      })
+      
+      const improvedData = reviewRes.data.data
+      
+      await api.put(`/api/v1/rps/${selectedRps.id}`, improvedData)
+      toast.success('RPS berhasil diperbaiki secara otomatis oleh AI!', { id: 'autofix' })
+      
+      handleValidate(selectedRps.id)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal memperbaiki RPS', { id: 'autofix' })
+    } finally {
+      setFixing(false)
     }
   }
 
@@ -103,12 +153,27 @@ export default function OBEAnalyzer() {
               {validationResult && (
                 <div className="space-y-4 animate-slide-up">
                   {/* Score */}
-                  <div className="macos-card p-5 text-center">
-                    <p className="text-xs text-gray-500 mb-1">Skor OBE</p>
-                    <p className={`text-4xl font-bold ${validationResult.score >= 75 ? 'text-green-500' : validationResult.score >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                      {validationResult.score}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">dari 100</p>
+                  <div className="macos-card p-5 text-center space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Skor OBE</p>
+                      <p className={`text-4xl font-bold ${validationResult.score >= 75 ? 'text-green-500' : validationResult.score >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                        {validationResult.score}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">dari 100</p>
+                    </div>
+                    {selectedRps.status === 'draft' && (
+                      <button
+                        onClick={handleAutoFix}
+                        disabled={fixing}
+                        className="macos-button w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:from-purple-600 hover:to-indigo-600 text-xs py-2.5 rounded-apple-lg font-medium"
+                      >
+                        {fixing ? (
+                          <>Memperbaiki...</>
+                        ) : (
+                          <><Sparkles className="w-4 h-4" /> Perbaiki Otomatis dengan AI</>
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* Detail Scores */}
