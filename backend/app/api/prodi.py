@@ -198,34 +198,51 @@ Keluarkan hasil HANYA dalam format array JSON valid berikut:
     try:
         response = await ollama_service.generate(
             prompt=prompt,
-            system_prompt="Anda hanya mengeluarkan format array JSON CPL valid.",
+            system_prompt="Anda wajib mengeluarkan output JSON dalam bentuk array (daftar) dari objek CPL.",
             temperature=0.3,
         )
         cpl_json = extract_json(response)
         
-        # Ensure it is a list
-        if not isinstance(cpl_json, list):
-            # Try to get list from keys if nested
-            if isinstance(cpl_json, dict):
-                found_list = False
-                for k, v in cpl_json.items():
-                    if isinstance(v, list):
-                        cpl_json = v
-                        found_list = True
-                        break
-                if not found_list:
-                    # Fallback: if it is a flat mapping of "CPL_CODE": "Description text"
-                    list_from_dict = []
-                    for k, v in cpl_json.items():
-                        if isinstance(v, str):
-                            list_from_dict.append({"kode": k, "deskripsi": v})
-                    if list_from_dict:
-                        cpl_json = list_from_dict
+        # Super-flexible JSON format normalize
+        if isinstance(cpl_json, dict):
+            # 1. Look for any list inside the dictionary
+            found_list = None
+            for key, val in cpl_json.items():
+                if isinstance(val, list) and len(val) > 0 and isinstance(val[0], dict):
+                    found_list = val
+                    break
             
-            # If still not a list, raise error
-            if not isinstance(cpl_json, list):
-                raise ValueError("Format respon AI bukan array.")
-                
+            if found_list:
+                cpl_json = found_list
+            else:
+                # 2. Check if it's nested under standard keys like "cpl", "cpl_prodi", "data", "results"
+                for possible_key in ["cpl", "capaian_pembelajaran", "cpl_prodi", "data", "results"]:
+                    if possible_key in cpl_json and isinstance(cpl_json[possible_key], list):
+                        cpl_json = cpl_json[possible_key]
+                        break
+                        
+            # 3. If it's a flat dictionary "CPL-CODE": "Description text"
+            if isinstance(cpl_json, dict):
+                list_from_dict = []
+                for k, v in cpl_json.items():
+                    if isinstance(v, str):
+                        list_from_dict.append({"kode": k, "deskripsi": v})
+                    elif isinstance(v, dict):
+                        # Nested dict like {"CPL-1": {"deskripsi": "..."}}
+                        item_dict = {"kode": k}
+                        for ik, iv in v.items():
+                            if ik in ["deskripsi", "description", "content", "pernyataan"]:
+                                item_dict["deskripsi"] = iv
+                                break
+                        if "deskripsi" not in item_dict and v.values():
+                            item_dict["deskripsi"] = list(v.values())[0]
+                        list_from_dict.append(item_dict)
+                if list_from_dict:
+                    cpl_json = list_from_dict
+
+        if not isinstance(cpl_json, list):
+            raise ValueError("Respon AI tidak berupa format array/daftar JSON valid.")
+            
         # Validate elements with synonym fallback
         validated_cpl = []
         for item in cpl_json:
