@@ -17,6 +17,7 @@ export default function ProdiDetail() {
   const [loading, setLoading] = useState(true)
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkGenerating, setBulkGenerating] = useState(false)
+  const [mappingCpl, setMappingCpl] = useState(false)
   const [bulkConfig, setBulkConfig] = useState({
     tahun_akademik: '2025/2026',
     semester: '',
@@ -69,6 +70,21 @@ export default function ProdiDetail() {
       toast.error(typeof msg === 'object' ? JSON.stringify(msg) : msg)
     } finally {
       setBulkGenerating(false)
+    }
+  }
+
+  async function handleMapCPL() {
+    if (!prodi) return
+    setMappingCpl(true)
+    const toastId = toast.loading('Memetakan CPL ke semua Mata Kuliah dengan AI...')
+    try {
+      await api.post(`/api/v1/prodi/${prodi.id}/map-cpl-ai`)
+      toast.success('Berhasil memetakan CPL ke semua Mata Kuliah!', { id: toastId })
+      loadData()
+    } catch (e: any) {
+      toast.error('Gagal memetakan CPL: ' + (e.response?.data?.detail || e.message), { id: toastId })
+    } finally {
+      setMappingCpl(false)
     }
   }
 
@@ -128,6 +144,71 @@ export default function ProdiDetail() {
           </div>
         ) : (
           <p className="text-sm text-gray-400 italic">Belum ada CPL</p>
+        )}
+      </div>
+
+      {/* Matriks CPL vs Mata Kuliah */}
+      <div className="macos-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Matriks Kurikulum (CPL vs Mata Kuliah)</h3>
+            <p className="text-[10px] text-gray-400 mt-0.5">Pemetaan kontribusi Mata Kuliah terhadap Capaian Pembelajaran Lulusan (CPL).</p>
+          </div>
+          {prodi.capaian_pembelajaran_lulusan?.length > 0 && mkList.length > 0 && (
+            <button
+              onClick={handleMapCPL}
+              disabled={mappingCpl}
+              className="macos-button-ghost flex items-center gap-1.5 text-xs text-macos-blue font-medium px-2.5 py-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {mappingCpl ? 'Memetakan...' : 'Petakan CPL dengan AI'}
+            </button>
+          )}
+        </div>
+        {prodi.capaian_pembelajaran_lulusan?.length > 0 && mkList.length > 0 ? (
+          <div className="overflow-x-auto border border-gray-100 rounded-apple-lg">
+            <table className="min-w-full divide-y divide-gray-150 text-xs">
+              <thead>
+                <tr className="bg-gray-50/50">
+                  <th className="px-4 py-2.5 text-left font-semibold text-gray-700 w-[220px] truncate border-r border-gray-100">Mata Kuliah</th>
+                  {prodi.capaian_pembelajaran_lulusan.map((cpl: any) => (
+                    <th key={cpl.kode} className="px-2 py-2.5 text-center font-semibold text-gray-700 border-r border-gray-100 last:border-r-0" title={cpl.deskripsi}>
+                      {cpl.kode}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {mkList.map((mk) => {
+                  const mappedCodes = new Set(mk.cpl_prodi || [])
+                  return (
+                    <tr key={mk.id} className="hover:bg-gray-50/30 transition-colors">
+                      <td className="px-4 py-2.5 text-gray-900 font-medium truncate max-w-[220px] border-r border-gray-100" title={mk.nama}>
+                        {mk.nama}
+                        <span className="text-[10px] text-gray-400 block font-normal mt-0.5">{mk.kode}</span>
+                      </td>
+                      {prodi.capaian_pembelajaran_lulusan.map((cpl: any) => {
+                        const isMapped = mappedCodes.has(cpl.kode)
+                        return (
+                          <td key={cpl.kode} className="px-2 py-2.5 text-center border-r border-gray-100 last:border-r-0">
+                            {isMapped ? (
+                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-50 text-macos-blue font-bold text-[10px]">
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">Belum ada data CPL atau Mata Kuliah</p>
         )}
       </div>
 

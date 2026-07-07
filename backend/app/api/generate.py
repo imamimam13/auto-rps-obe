@@ -46,11 +46,20 @@ async def generate_rps(
         "deskripsi": mk.deskripsi or "",
     }
     
+    # Filter CPL to only contain mapped ones for this course if available
+    all_cpl = prodi.capaian_pembelajaran_lulusan or []
+    course_cpl_codes = mk.cpl_prodi or []
+    if course_cpl_codes:
+        filtered_cpl = [c for c in all_cpl if c.get("kode") in course_cpl_codes]
+        cpl_to_use = filtered_cpl if filtered_cpl else all_cpl
+    else:
+        cpl_to_use = all_cpl
+
     try:
         rps_data = await rps_generator_service.generate_complete_rps(
             visi_prodi=prodi.visi,
             misi_prodi=prodi.misi,
-            cpl_prodi=prodi.capaian_pembelajaran_lulusan or [],
+            cpl_prodi=cpl_to_use,
             mata_kuliah=mata_kuliah_data,
             semester=data.semester,
             tahun_akademik=data.tahun_akademik,
@@ -111,10 +120,19 @@ async def bulk_generate_rps(
                 "sks_praktik": mk.sks_praktik,
                 "deskripsi": mk.deskripsi or "",
             }
+            # Filter CPL to only contain mapped ones for this course if available
+            all_cpl = prodi.capaian_pembelajaran_lulusan or []
+            course_cpl_codes = mk.cpl_prodi or []
+            if course_cpl_codes:
+                filtered_cpl = [c for c in all_cpl if c.get("kode") in course_cpl_codes]
+                cpl_to_use = filtered_cpl if filtered_cpl else all_cpl
+            else:
+                cpl_to_use = all_cpl
+
             rps_data = await rps_generator_service.generate_complete_rps(
                 visi_prodi=prodi.visi,
                 misi_prodi=prodi.misi,
-                cpl_prodi=prodi.capaian_pembelajaran_lulusan or [],
+                cpl_prodi=cpl_to_use,
                 mata_kuliah=mk_data,
                 semester=mk.semester,
                 tahun_akademik=data.tahun_akademik,

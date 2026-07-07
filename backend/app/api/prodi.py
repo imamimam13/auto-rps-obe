@@ -76,3 +76,78 @@ async def delete_prodi(prodi_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Prodi not found")
     await db.delete(prodi)
     await db.commit()
+
+
+@router.post("/{prodi_id}/map-cpl-ai")
+async def map_cpl_to_mata_kuliah_ai(
+    prodi_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    import json
+    result = await db.execute(select(Prodi).where(Prodi.id == prodi_id))
+    prodi = result.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Prodi not found")
+        
+    cpl_list = prodi.capaian_pembelajaran_lulusan or []
+    if not cpl_list:
+        raise HTTPException(status_code=400, detail="Prodi belum memiliki CPL. Silakan isi CPL prodi terlebih dahulu.")
+        
+    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.prodi_id == prodi_id))
+    mata_kuliah_list = mk_result.scalars().all()
+    if not mata_kuliah_list:
+        raise HTTPException(status_code=404, detail="Tidak ada mata kuliah ditemukan di prodi ini")
+        
+    from app.services.ollama_service import ollama_service
+    from app.services.rps_generator import extract_json
+    
+    mapping_prompt_template = """Anda adalah ahli kurikulum OBE. Petakan CPL (Capaian Pembelajaran Lulusan) mana saja yang relevan dan berkontribusi langsung ke Mata Kuliah berikut:
+
+DAFTAR CPL PRODI:
+{cpl_list_json}
+
+MATA KULIAH:
+- Nama: {nama_mk}
+- Kode: {kode_mk}
+- Deskripsi: {deskripsi_mk}
+
+Pilih kode CPL (misal: "CPL-1", "CPL-2") yang relevan dari daftar di atas. 
+Mata kuliah biasanya berkontribusi ke 1 sampai 4 CPL saja. Jangan pilih terlalu banyak.
+Gunakan HANYA kode CPL yang terdaftar secara resmi di atas. Dilarang keras mengarang kode CPL baru.
+
+Keluarkan respon Anda HANYA dalam format JSON berikut:
+{{
+  "cpl_terkait": ["kode_cpl_1", "kode_cpl_2"]
+}}"""
+
+    mapped_count = 0
+    for mk in mata_kuliah_list:
+        cpl_list_json = json.dumps(cpl_list, indent=2)
+        prompt = mapping_prompt_template.format(
+            cpl_list_json=cpl_list_json,
+            nama_mk=mk.nama,
+            kode_mk=mk.kode,
+            deskripsi_mk=mk.deskripsi or f"Mata kuliah terkait bidang keilmuan {mk.nama} dengan bobot {mk.sks} SKS."
+        )
+        
+        try:
+            response = await ollama_service.generate(
+                prompt=prompt,
+                system_prompt="Anda hanya mengeluarkan format JSON valid.",
+                temperature=0.1,
+            )
+            result_json = extract_json(response)
+            selected_cpls = result_json.get("cpl_terkait", [])
+            
+            # Filter selected CPLs to ensure they exist in the prodi CPL list
+            valid_cpl_codes = {cpl.get("kode") for cpl in cpl_list if cpl.get("kode")}
+            filtered_cpls = [c for c in selected_cpls if c in valid_cpl_codes]
+            
+            mk.cpl_prodi = filtered_cpls
+            db.add(mk)
+            mapped_count += 1
+        except Exception as e:
+            print(f"[MAP CPL MK ERROR] {mk.nama}: {e}")
+            
+    await db.commit()
+    return {"success": True, "total": len(mata_kuliah_list), "mapped": mapped_count}
