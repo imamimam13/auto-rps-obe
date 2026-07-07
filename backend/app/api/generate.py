@@ -13,10 +13,10 @@ router = APIRouter(prefix="/generate", tags=["AI Generation"])
 def handle_ai_error(e: Exception) -> str:
     err_msg = str(e)
     if "connect" in err_msg.lower() or "connection refused" in err_msg.lower() or "timeout" in err_msg.lower():
-        return "Koneksi ke AI Provider gagal. Pastikan server AI (Ollama/LM Studio/9Router) Anda sudah aktif dan URL di Pengaturan sudah benar."
+        return f"Koneksi ke AI Provider gagal. Silakan cek apakah server AI aktif di URL Pengaturan. Detail: {err_msg}"
     elif "404" in err_msg or "not found" in err_msg.lower():
         return f"Model AI tidak ditemukan atau tidak merespon (HTTP 404). Silakan cek nama model di Pengaturan. Detail: {err_msg}"
-    return f"Gagal memproses dengan AI: {err_msg}"
+    return f"Gagal memproses dengan AI. Detail: {err_msg}"
 
 
 @router.post("/rps", response_model=dict)

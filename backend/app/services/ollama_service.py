@@ -100,10 +100,26 @@ class AIService:
             resp.raise_for_status()
             data = resp.json()
             content = data["choices"][0]["message"]["content"]
-            if format == "json":
-                return content
             return content
         except httpx.HTTPStatusError as e:
+            # Fallback: if json_object format is not supported by llama.cpp/model, retry without it
+            if format == "json" and "response_format" in payload:
+                print(f"[AI WARNING] OpenAI-compat JSON mode failed ({e.response.status_code}), retrying without response_format...")
+                del payload["response_format"]
+                try:
+                    resp = await self.client.post(
+                        "/v1/chat/completions",
+                        json=payload,
+                        headers=self._get_headers(),
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    content = data["choices"][0]["message"]["content"]
+                    return content
+                except Exception as retry_err:
+                    print(f"[AI ERROR] Fallback failed: {retry_err}")
+                    raise Exception(f"API error (JSON mode failed, fallback also failed): {str(retry_err)}")
+            
             print(f"[AI HTTP ERROR] {e.response.status_code}: {e.response.text[:500]}")
             raise Exception(f"API error: {e.response.text[:500]}")
         except Exception as e:

@@ -59,7 +59,7 @@ class RPSGeneratorService:
             json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(1))
-            raise ValueError(f"Invalid JSON response from AI: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
     async def generate_cpmk(
         self,
@@ -87,7 +87,7 @@ class RPSGeneratorService:
             result = json.loads(response)
             return result.get("cpmk", result)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
     async def generate_sub_cpmk(
         self,
@@ -108,7 +108,7 @@ class RPSGeneratorService:
             result = json.loads(response)
             return result.get("sub_cpmk", result)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
     async def generate_rencana_mingguan(
         self,
@@ -131,7 +131,7 @@ class RPSGeneratorService:
             result = json.loads(response)
             return result.get("rencana_pembelajaran", result)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
     async def generate_penilaian(
         self,
@@ -152,7 +152,7 @@ class RPSGeneratorService:
             result = json.loads(response)
             return result.get("penilaian", result)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
     async def validate_obe(self, rps_data: Dict[str, Any]) -> Dict[str, Any]:
         prompt = OBE_VALIDATION_PROMPT.format(
@@ -168,7 +168,7 @@ class RPSGeneratorService:
         try:
             return json.loads(response)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
     async def review_and_improve(self, rps_data: Dict[str, Any], feedback: str) -> Dict[str, Any]:
         prompt = RPS_IMPROVE_PROMPT.format(
@@ -185,7 +185,7 @@ class RPSGeneratorService:
         try:
             return json.loads(response)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON: {response[:500]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
 
 
 rps_generator_service = RPSGeneratorService()
