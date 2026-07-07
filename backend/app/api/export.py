@@ -188,14 +188,20 @@ async def export_rps(
     export_format: str = "pdf",
     db: AsyncSession = Depends(get_db),
 ):
+    from app.models import MataKuliah
     result = await db.execute(select(RPS).where(RPS.id == rps_id))
     rps = result.scalar_one_or_none()
     if not rps:
         raise HTTPException(status_code=404, detail="RPS not found")
+        
+    # Ambil deskripsi mata kuliah dari database secara dinamis agar tidak hardcoded
+    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.id == rps.mata_kuliah_id))
+    mk = mk_result.scalar_one_or_none()
+    deskripsi_mk = mk.deskripsi if (mk and mk.deskripsi) else ""
     
     rps_data = {
         "identitas": rps.identitas,
-        "deskripsi_mata_kuliah": "...",
+        "deskripsi_mata_kuliah": deskripsi_mk,
         "cpmk": rps.cpmk,
         "sub_cpmk": rps.sub_cpmk,
         "rencana_pembelajaran": rps.rencana_pembelajaran,
@@ -215,15 +221,34 @@ async def export_rps(
     
     elif export_format == "pdf":
         html_content = RPS_HTML_TEMPLATE.render(data=rps_data)
-        filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.html")
-        with open(filepath, "w") as f:
-            f.write(html_content)
-        return FileResponse(
-            filepath,
-            media_type="text/html",
-            filename=f"{filename}.html",
-            headers={"Content-Disposition": f"attachment; filename={filename}.html"}
-        )
+        
+        try:
+            from xhtml2pdf import pisa
+            pdf_filename = f"{filename}.pdf"
+            filepath = os.path.join(settings.EXPORT_DIR, pdf_filename)
+            with open(filepath, "w+b") as result_file:
+                pisa_status = pisa.CreatePDF(html_content, dest=result_file)
+                if pisa_status.err:
+                    raise Exception("Gagal mengonversi HTML ke PDF")
+            
+            return FileResponse(
+                filepath,
+                media_type="application/pdf",
+                filename=pdf_filename,
+                headers={"Content-Disposition": f"attachment; filename={pdf_filename}"}
+            )
+        except ImportError:
+            # Fallback: jika library xhtml2pdf belum terinstall di server, return file html
+            html_filename = f"{filename}.html"
+            filepath = os.path.join(settings.EXPORT_DIR, html_filename)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            return FileResponse(
+                filepath,
+                media_type="text/html",
+                filename=html_filename,
+                headers={"Content-Disposition": f"attachment; filename={html_filename}"}
+            )
     
     else:
         raise HTTPException(status_code=400, detail=f"Format {export_format} tidak didukung")
