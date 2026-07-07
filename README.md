@@ -204,33 +204,46 @@ screen -dmS frontend npm run dev -- --host 0.0.0.0
 
 ### Cara 3: Via Casa OS Custom App (Dari GitHub)
 
-Cara paling mudah - Casa OS bisa install langsung dari URL GitHub:
+#### Lewat WebUI (Mudah)
 
-1. Buka **Casa OS Dashboard** → **Apps** → **Install Custom App**
-2. Isi form:
-   - **Nama App**: `Auto RPS & OBE AI`
-   - **URL Repo**: `https://github.com/imamimam13/auto-rps-obe`
-   - **Path docker-compose**: `casaos-app/docker-compose.yml`
-   - **Branch**: `main`
-3. Klik **Install**
+1. Buka **Casa OS Dashboard** → **Apps**
+2. Klik tombol **Custom Install** (kanan atas)
+3. Pilih **Import** → **Docker Compose**
+4. Copy paste isi dari [`casaos-app/docker-compose.yml`](https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/casaos-app/docker-compose.yml)
+5. Klik **Submit**
 
-Atau lewat CLI:
+Atau via **Import → Docker CLI**:
 ```bash
-casaos-cli app install -u https://github.com/imamimam13/auto-rps-obe -p casaos-app/docker-compose.yml
+docker run -d \
+  --name auto-rps-obe-db \
+  --network casaos \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=autorps \
+  -v auto_rps_db:/var/lib/postgresql/data \
+  postgres:16-alpine
 ```
 
-Atau clone manual:
+#### Lewat CLI (app-management)
+
 ```bash
-# Masuk ke direktori Casa OS apps
-sudo mkdir -p /var/lib/casaos/apps/auto-rps-obe
-cd /var/lib/casaos/apps/auto-rps-obe
+# Login dulu ke Casa OS via SSH
+ssh user@ip-casaos
 
 # Clone repo
-git clone https://github.com/imamimam13/auto-rps-obe.git .
-# atau copy folder casaos-app
+git clone https://github.com/imamimam13/auto-rps-obe.git
+cd auto-rps-obe/casaos-app
 
-# Jalankan
+# Jalankan docker compose
 docker compose up -d
+```
+
+#### Via Custom AppStore (Lanjutan)
+
+Bisa juga dengan fork [CasaOS-AppStore](https://github.com/IceWhaleTech/CasaOS-AppStore), lalu tambah app ini ke folder `Apps/`:
+```bash
+# Register app store
+casaos-cli app-management register app-store https://github.com/username/casaos-AppStore/archive/main.zip
 ```
 
 **Catatan untuk Casa OS:**
