@@ -11,7 +11,6 @@ from app.core.config import settings
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from weasyprint import HTML
 from jinja2 import Template
 
 router = APIRouter(prefix="/export", tags=["Export"])
@@ -216,9 +215,15 @@ async def export_rps(
     
     elif export_format == "pdf":
         html_content = RPS_HTML_TEMPLATE.render(data=rps_data)
-        filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.pdf")
-        HTML(string=html_content).write_pdf(filepath)
-        return FileResponse(filepath, media_type="application/pdf", filename=f"{filename}.pdf")
+        filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.html")
+        with open(filepath, "w") as f:
+            f.write(html_content)
+        return FileResponse(
+            filepath,
+            media_type="text/html",
+            filename=f"{filename}.html",
+            headers={"Content-Disposition": f"attachment; filename={filename}.html"}
+        )
     
     else:
         raise HTTPException(status_code=400, detail=f"Format {export_format} tidak didukung")
