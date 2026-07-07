@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models import RPS, Prodi, MataKuliah
-from app.schemas import RPSGenerateRequest, OBEValidationRequest, OBEValidationResponse
+from app.schemas import RPSGenerateRequest, BulkGenerateRequest, OBEValidationRequest, OBEValidationResponse
 from app.services.rps_generator import rps_generator_service
 from sqlalchemy import select
 import json
@@ -57,6 +57,84 @@ async def generate_rps(
             status_code=500,
             detail=f"Gagal generate RPS: {str(e)}",
         )
+
+
+@router.post("/bulk-rps", response_model=dict)
+async def bulk_generate_rps(
+    data: BulkGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate RPS for all Mata Kuliah in a Prodi."""
+    prodi_result = await db.execute(select(Prodi).where(Prodi.id == data.prodi_id))
+    prodi = prodi_result.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Prodi not found")
+
+    # Get all mata kuliah for this prodi
+    mk_query = select(MataKuliah).where(MataKuliah.prodi_id == data.prodi_id)
+    if data.semester:
+        mk_query = mk_query.where(MataKuliah.semester == data.semester)
+    mk_result = await db.execute(mk_query)
+    mata_kuliah_list = mk_result.scalars().all()
+
+    if not mata_kuliah_list:
+        raise HTTPException(status_code=404, detail="Tidak ada mata kuliah ditemukan")
+
+    results = []
+    errors = []
+
+    for mk in mata_kuliah_list:
+        try:
+            mk_data = {
+                "kode": mk.kode,
+                "nama": mk.nama,
+                "sks": mk.sks,
+                "sks_teori": mk.sks_teori,
+                "sks_praktik": mk.sks_praktik,
+                "deskripsi": mk.deskripsi or "",
+            }
+            rps_data = await rps_generator_service.generate_complete_rps(
+                visi_prodi=prodi.visi,
+                misi_prodi=prodi.misi,
+                cpl_prodi=prodi.capaian_pembelajaran_lulusan or [],
+                mata_kuliah=mk_data,
+                semester=mk.semester,
+                tahun_akademik=data.tahun_akademik,
+                additional_context=data.additional_context,
+            )
+            
+            # Save to database
+            rps = RPS(
+                kode=f"RPS-{mk.kode}-{mk.semester}",
+                mata_kuliah_id=mk.id,
+                prodi_id=prodi.id,
+                semester=mk.semester,
+                tahun_akademik=data.tahun_akademik,
+                dosen_pengampu=data.dosen_pengampu or [],
+                identitas=rps_data.get("identitas"),
+                cpmk=rps_data.get("cpmk", []),
+                sub_cpmk=rps_data.get("sub_cpmk", []),
+                rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
+                metode_pembelajaran=rps_data.get("metode_pembelajaran", []),
+                media_pembelajaran=rps_data.get("media_pembelajaran", []),
+                penilaian=rps_data.get("penilaian", []),
+                referensi=rps_data.get("referensi", []),
+                status="draft",
+            )
+            db.add(rps)
+            await db.commit()
+            results.append({"mk": mk.nama, "kode": mk.kode, "rps_id": rps.id})
+        except Exception as e:
+            errors.append({"mk": mk.nama, "error": str(e)})
+
+    return {
+        "success": True,
+        "total": len(mata_kuliah_list),
+        "created": len(results),
+        "errors": len(errors),
+        "results": results,
+        "error_detail": errors,
+    }
 
 
 @router.post("/cpmk", response_model=dict)
