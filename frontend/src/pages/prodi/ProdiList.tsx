@@ -120,10 +120,8 @@ export default function ProdiList() {
 
   async function fetchPdfFromUrl() {
     if (!pdfUrl) return
-    const form = new FormData()
-    form.append('url', pdfUrl)
     try {
-      const res = await api.post('/api/v1/upload/pdf-prodi-url', form)
+      const res = await api.post('/api/v1/upload/pdf-prodi-url', { url: pdfUrl })
       setFormData(f => ({ ...f, visi: res.data.visi, misi: res.data.misi }))
       toast.success('Visi & Misi berhasil dibaca dari URL')
     } catch (e: any) {

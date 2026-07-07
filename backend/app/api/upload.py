@@ -1,4 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from pydantic import BaseModel
 import os
 import re
 import httpx
@@ -6,6 +7,10 @@ import tempfile
 from app.core.config import settings
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
+
+
+class PdfUrlRequest(BaseModel):
+    url: str
 
 
 def extract_text_from_pdf(file: UploadFile) -> str:
@@ -124,8 +129,9 @@ async def upload_pdf_prodi(file: UploadFile = File(...)):
 
 
 @router.post("/pdf-url")
-async def upload_pdf_url(url: str = Form(...)):
+async def upload_pdf_url(request: PdfUrlRequest):
     """Download & extract text from a PDF URL."""
+    url = request.url
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="URL tidak valid")
 
@@ -166,8 +172,9 @@ async def upload_pdf_url(url: str = Form(...)):
 
 
 @router.post("/pdf-prodi-url")
-async def upload_pdf_prodi_url(url: str = Form(...)):
+async def upload_pdf_prodi_url(request: PdfUrlRequest):
     """Download PDF from URL & auto-split visi-misi."""
+    url = request.url
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="URL tidak valid")
 
