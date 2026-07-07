@@ -207,20 +207,66 @@ Keluarkan hasil HANYA dalam format array JSON valid berikut:
         if not isinstance(cpl_json, list):
             # Try to get list from keys if nested
             if isinstance(cpl_json, dict):
+                found_list = False
                 for k, v in cpl_json.items():
                     if isinstance(v, list):
                         cpl_json = v
+                        found_list = True
                         break
-            else:
+                if not found_list:
+                    # Fallback: if it is a flat mapping of "CPL_CODE": "Description text"
+                    list_from_dict = []
+                    for k, v in cpl_json.items():
+                        if isinstance(v, str):
+                            list_from_dict.append({"kode": k, "deskripsi": v})
+                    if list_from_dict:
+                        cpl_json = list_from_dict
+            
+            # If still not a list, raise error
+            if not isinstance(cpl_json, list):
                 raise ValueError("Format respon AI bukan array.")
                 
-        # Validate elements have 'kode' and 'deskripsi'
+        # Validate elements with synonym fallback
         validated_cpl = []
         for item in cpl_json:
-            if isinstance(item, dict) and item.get("kode") and item.get("deskripsi"):
+            if not isinstance(item, dict):
+                continue
+                
+            # Find kode key
+            kode_key = None
+            for k in ["kode", "kode_cpl", "cpl_kode", "id", "code"]:
+                if k in item:
+                    kode_key = k
+                    break
+            if not kode_key:
+                for k in item.keys():
+                    if "kode" in k.lower() or "code" in k.lower():
+                        kode_key = k
+                        break
+                        
+            # Find deskripsi key
+            desc_key = None
+            for k in ["deskripsi", "deskripsi_cpl", "cpl_deskripsi", "pernyataan", "statement", "description", "content", "cpl"]:
+                if k in item:
+                    desc_key = k
+                    break
+            if not desc_key:
+                for k in item.keys():
+                    k_lower = k.lower()
+                    if "desk" in k_lower or "desc" in k_lower or "pernyataan" in k_lower or "cpl" in k_lower:
+                        desc_key = k
+                        break
+                        
+            # absolute fallback: use first and second keys
+            if not kode_key and item.keys():
+                kode_key = list(item.keys())[0]
+            if not desc_key and len(item.keys()) > 1:
+                desc_key = list(item.keys())[1]
+                
+            if kode_key and desc_key:
                 validated_cpl.append({
-                    "kode": str(item.get("kode")).strip(),
-                    "deskripsi": str(item.get("deskripsi")).strip()
+                    "kode": str(item.get(kode_key)).strip(),
+                    "deskripsi": str(item.get(desc_key)).strip()
                 })
                 
         if not validated_cpl:
