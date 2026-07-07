@@ -204,53 +204,26 @@ screen -dmS frontend npm run dev -- --host 0.0.0.0
 
 ### Cara 3: Via Casa OS App Catalog (Custom)
 
-Buat file `docker-compose.yml` untuk Casa OS di `/var/lib/casaos/apps/auto-rps-obe/`:
+Sudah tersedia folder `casaos-app/` di repo ini. Cara deploy:
 
-```yaml
-version: '3.8'
-services:
-  auto-rps-obe-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres  
-      POSTGRES_DB: autorps
-    volumes:
-      - auto_rps_db:/var/lib/postgresql/data
-    restart: unless-stopped
+```bash
+# Masuk ke direktori Casa OS apps
+sudo mkdir -p /var/lib/casaos/apps/auto-rps-obe
+cd /var/lib/casaos/apps/auto-rps-obe
 
-  auto-rps-obe-redis:
-    image: redis:7-alpine
-    restart: unless-stopped
+# Clone atau copy file dari repo
+git clone https://github.com/imamimam13/auto-rps-obe.git .
+# atau copy manual folder casaos-app ke sini
 
-  auto-rps-obe-backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@auto-rps-obe-db:5432/autorps
-      REDIS_URL: redis://auto-rps-obe-redis:6379/0
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
-    depends_on:
-      - auto-rps-obe-db
-      - auto-rps-obe-redis
-    restart: unless-stopped
-
-  auto-rps-obe-frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    depends_on:
-      - auto-rps-obe-backend
-    restart: unless-stopped
-
-volumes:
-  auto_rps_db:
+# Install lewat Casa OS App Store
+# atau jalankan manual:
+docker compose up -d
 ```
 
 **Catatan untuk Casa OS:**
 - Ollama harus diinstall di **host** (bukan container) agar bisa akses GPU
 - Install Ollama di Casa OS: `curl -fsSL https://ollama.com/install.sh | sh`
+- Download model: `ollama pull llama3.1:8b`
 - Pastikan port 8000 dan 5173 tidak bertabrakan dengan app lain
 - Untuk akses dari perangkat lain, gunakan IP Casa OS (mis: `http://192.168.1.100:5173`)
 

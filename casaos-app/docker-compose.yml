@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  auto-rps-obe-db:
+    image: postgres:16-alpine
+    container_name: auto-rps-obe-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: autorps
+    volumes:
+      - auto_rps_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - auto-rps-obe-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auto-rps-obe-redis:
+    image: redis:7-alpine
+    container_name: auto-rps-obe-redis
+    restart: unless-stopped
+    networks:
+      - auto-rps-obe-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auto-rps-obe-backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: auto-rps-obe-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@auto-rps-obe-db:5432/autorps
+      REDIS_URL: redis://auto-rps-obe-redis:6379/0
+      OLLAMA_BASE_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      APP_NAME: Auto RPS OBE AI
+      DEBUG: "false"
+    depends_on:
+      auto-rps-obe-db:
+        condition: service_healthy
+      auto-rps-obe-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - auto-rps-obe-network
+    volumes:
+      - auto_rps_exports:/app/exports
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  auto-rps-obe-frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: auto-rps-obe-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - auto-rps-obe-backend
+    restart: unless-stopped
+    networks:
+      - auto-rps-obe-network
+
+volumes:
+  auto_rps_db_data:
+  auto_rps_exports:
+
+networks:
+  auto-rps-obe-network:
+    driver: bridge

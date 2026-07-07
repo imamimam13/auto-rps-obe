@@ -1,0 +1,34 @@
+{
+  "name": "Auto RPS & OBE AI",
+  "version": "1.0.0",
+  "description": "Aplikasi AI untuk menyusun RPS (Rencana Pembelajaran Semester) dan validasi OBE (Outcome-Based Education) secara otomatis. Cocok untuk institusi pendidikan tinggi.",
+  "categories": ["education", "ai", "utilities"],
+  "developer": {
+    "name": "imamimam13",
+    "url": "https://github.com/imamimam13/auto-rps-obe"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imamimam13/auto-rps-obe.git"
+  },
+  "license": "MIT",
+  "icon": "https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/frontend/public/vite.svg",
+  "screenshots": [],
+  "tips": {
+    "before_install": [
+      "Pastikan Ollama sudah terinstall di host Casa OS",
+      "Jalankan: curl -fsSL https://ollama.com/install.sh | sh",
+      "Download model AI: ollama pull llama3.1:8b"
+    ],
+    "after_install": [
+      "Akses frontend di http://[IP-CASA-OS]:5173",
+      "Akses API docs di http://[IP-CASA-OS]:8000/docs",
+      "Backend API di http://[IP-CASA-OS]:8000"
+    ]
+  },
+  "port": "5173",
+  "memory": 2048,
+  "cpu_shares": 1024,
+  "restart_policy": "unless-stopped",
+  "services": ["auto-rps-obe-db", "auto-rps-obe-redis", "auto-rps-obe-backend", "auto-rps-obe-frontend"]
+}
