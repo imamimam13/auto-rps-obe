@@ -18,6 +18,7 @@ export default function ProdiDetail() {
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkGenerating, setBulkGenerating] = useState(false)
   const [mappingCpl, setMappingCpl] = useState(false)
+  const [generatingCpl, setGeneratingCpl] = useState(false)
   const [bulkConfig, setBulkConfig] = useState({
     tahun_akademik: '2025/2026',
     semester: '',
@@ -88,6 +89,22 @@ export default function ProdiDetail() {
     }
   }
 
+  async function handleGenerateCPL() {
+    if (!prodi) return
+    if (!confirm('Apakah Anda yakin ingin merumuskan CPL prodi ini dengan AI? Data CPL lama (jika ada) akan digantikan secara otomatis.')) return
+    setGeneratingCpl(true)
+    const toastId = toast.loading('Merumuskan CPL berdasarkan Visi & Misi dengan AI...')
+    try {
+      await api.post(`/api/v1/prodi/${prodi.id}/generate-cpl-ai`)
+      toast.success('Berhasil merumuskan CPL prodi dengan AI!', { id: toastId })
+      loadData()
+    } catch (e: any) {
+      toast.error('Gagal merumuskan CPL: ' + (e.response?.data?.detail || e.message), { id: toastId })
+    } finally {
+      setGeneratingCpl(false)
+    }
+  }
+
   if (loading || !prodi) return <div className="text-center py-12 text-gray-400">Memuat...</div>
 
   return (
@@ -130,7 +147,17 @@ export default function ProdiDetail() {
 
       {/* CPL */}
       <div className="macos-card p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Capaian Pembelajaran Lulusan (CPL)</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Capaian Pembelajaran Lulusan (CPL)</h3>
+          <button
+            onClick={handleGenerateCPL}
+            disabled={generatingCpl}
+            className="macos-button-ghost flex items-center gap-1.5 text-xs text-macos-blue font-medium px-2.5 py-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {generatingCpl ? 'Generating...' : 'Generate CPL dengan AI'}
+          </button>
+        </div>
         {prodi.capaian_pembelajaran_lulusan?.length > 0 ? (
           <div className="space-y-2">
             {prodi.capaian_pembelajaran_lulusan.map((cpl: any, i: number) => (

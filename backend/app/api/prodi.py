@@ -151,3 +151,89 @@ Keluarkan respon Anda HANYA dalam format JSON berikut:
             
     await db.commit()
     return {"success": True, "total": len(mata_kuliah_list), "mapped": mapped_count}
+
+
+@router.post("/{prodi_id}/generate-cpl-ai")
+async def generate_cpl_from_visi_misi_ai(
+    prodi_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Prodi).where(Prodi.id == prodi_id))
+    prodi = result.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Prodi not found")
+        
+    if not prodi.visi or not prodi.misi:
+        raise HTTPException(status_code=400, detail="Visi dan Misi prodi harus diisi terlebih dahulu.")
+        
+    from app.services.ollama_service import ollama_service
+    from app.services.rps_generator import extract_json
+    
+    prompt = f"""Anda adalah ahli kurikulum KKNI & SN-Dikti Indonesia. Rumuskan draf CPL (Capaian Pembelajaran Lulusan) yang selaras dengan Visi dan Misi program studi berikut:
+
+NAMA PRODI: {prodi.nama}
+VISI PRODI: {prodi.visi}
+MISI PRODI: {prodi.misi}
+
+Susunlah 8 sampai 12 CPL yang mencakup aspek:
+1. Sikap (contoh kode: CPL-S1, CPL-S2, ...)
+2. Keterampilan Umum (contoh kode: CPL-KU1, CPL-KU2, ...)
+3. Keterampilan Khusus (contoh kode: CPL-KK1, CPL-KK2, ...)
+4. Pengetahuan (contoh kode: CPL-P1, CPL-P2, ...)
+
+Setiap CPL harus memiliki kode (contoh: "CPL-S1", "CPL-P1", "CPL-KU1", "CPL-KK1") dan deskripsi kompetensi yang spesifik dan terukur.
+
+Keluarkan hasil HANYA dalam format array JSON valid berikut:
+[
+  {{
+    "kode": "CPL-S1",
+    "deskripsi": "..."
+  }},
+  {{
+    "kode": "CPL-P1",
+    "deskripsi": "..."
+  }}
+]"""
+
+    try:
+        response = await ollama_service.generate(
+            prompt=prompt,
+            system_prompt="Anda hanya mengeluarkan format array JSON CPL valid.",
+            temperature=0.3,
+        )
+        cpl_json = extract_json(response)
+        
+        # Ensure it is a list
+        if not isinstance(cpl_json, list):
+            # Try to get list from keys if nested
+            if isinstance(cpl_json, dict):
+                for k, v in cpl_json.items():
+                    if isinstance(v, list):
+                        cpl_json = v
+                        break
+            else:
+                raise ValueError("Format respon AI bukan array.")
+                
+        # Validate elements have 'kode' and 'deskripsi'
+        validated_cpl = []
+        for item in cpl_json:
+            if isinstance(item, dict) and item.get("kode") and item.get("deskripsi"):
+                validated_cpl.append({
+                    "kode": str(item.get("kode")).strip(),
+                    "deskripsi": str(item.get("deskripsi")).strip()
+                })
+                
+        if not validated_cpl:
+            raise ValueError("Tidak ada CPL valid yang berhasil diekstrak.")
+            
+        prodi.capaian_pembelajaran_lulusan = validated_cpl
+        db.add(prodi)
+        await db.commit()
+        await db.refresh(prodi)
+        
+        return {"success": True, "cpl": validated_cpl}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal merumuskan CPL dengan AI. Detail: {str(e)}"
+        )
