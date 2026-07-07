@@ -9,6 +9,7 @@ export default function RPSDetail() {
   const [rps, setRps] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [validating, setValidating] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     if (id) loadData()
@@ -38,6 +39,23 @@ export default function RPSDetail() {
     }
   }
 
+  async function handleUpdateStatus(newStatus: string) {
+    setUpdatingStatus(true)
+    try {
+      if (newStatus === 'approved') {
+        await api.post(`/api/v1/rps/${id}/approve`)
+      } else {
+        await api.put(`/api/v1/rps/${id}`, { status: newStatus })
+      }
+      toast.success(`Status RPS diperbarui menjadi ${newStatus}`)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal memperbarui status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
   async function handleExport(format: string) {
     try {
       const res = await api.post(`/api/v1/export/${id}?export_format=${format}`, {}, { responseType: 'blob' })
@@ -62,6 +80,33 @@ export default function RPSDetail() {
           <ArrowLeft className="w-4 h-4" /> Kembali
         </Link>
         <div className="flex items-center gap-2">
+          {rps.status === 'draft' && (
+            <button
+              onClick={() => handleUpdateStatus('review')}
+              disabled={updatingStatus}
+              className="macos-button flex items-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+            >
+              Ajukan Review
+            </button>
+          )}
+          {(rps.status === 'draft' || rps.status === 'review') && (
+            <button
+              onClick={() => handleUpdateStatus('approved')}
+              disabled={updatingStatus}
+              className="macos-button flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+            >
+              Setujui (Approve)
+            </button>
+          )}
+          {rps.status === 'approved' && (
+            <button
+              onClick={() => handleUpdateStatus('published')}
+              disabled={updatingStatus}
+              className="macos-button flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+            >
+              Publikasikan
+            </button>
+          )}
           <button onClick={handleValidate} disabled={validating} className="macos-button-ghost flex items-center gap-1.5 text-sm">
             <CheckSquare className="w-4 h-4" /> {validating ? 'Memvalidasi...' : 'Validasi OBE'}
           </button>
@@ -86,6 +131,7 @@ export default function RPSDetail() {
           </div>
           <span className={`ml-auto text-xs font-medium px-3 py-1 rounded-full ${
             rps.status === 'approved' ? 'bg-green-50 text-green-600' : 
+            rps.status === 'published' ? 'bg-blue-50 text-blue-600' : 
             rps.status === 'draft' ? 'bg-gray-50 text-gray-600' : 'bg-yellow-50 text-yellow-600'
           }`}>{rps.status}</span>
         </div>
