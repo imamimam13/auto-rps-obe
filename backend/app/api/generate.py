@@ -1,0 +1,180 @@
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
+from app.models import RPS, Prodi, MataKuliah
+from app.schemas import RPSGenerateRequest, OBEValidationRequest, OBEValidationResponse
+from app.services.rps_generator import rps_generator_service
+from sqlalchemy import select
+import json
+
+router = APIRouter(prefix="/generate", tags=["AI Generation"])
+
+
+@router.post("/rps", response_model=dict)
+async def generate_rps(
+    data: RPSGenerateRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    # Load prodi data
+    prodi_result = await db.execute(select(Prodi).where(Prodi.id == data.prodi_id))
+    prodi = prodi_result.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Prodi not found")
+    
+    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.id == data.mata_kuliah_id))
+    mk = mk_result.scalar_one_or_none()
+    if not mk:
+        raise HTTPException(status_code=404, detail="Mata kuliah not found")
+    
+    # Prepare course data
+    mata_kuliah_data = {
+        "kode": mk.kode,
+        "nama": mk.nama,
+        "sks": mk.sks,
+        "sks_teori": mk.sks_teori,
+        "sks_praktik": mk.sks_praktik,
+        "deskripsi": mk.deskripsi or "",
+    }
+    
+    try:
+        rps_data = await rps_generator_service.generate_complete_rps(
+            visi_prodi=prodi.visi,
+            misi_prodi=prodi.misi,
+            cpl_prodi=prodi.capaian_pembelajaran_lulusan or [],
+            mata_kuliah=mata_kuliah_data,
+            semester=data.semester,
+            tahun_akademik=data.tahun_akademik,
+            additional_context=data.additional_context,
+        )
+        
+        return {
+            "success": True,
+            "data": rps_data,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal generate RPS: {str(e)}",
+        )
+
+
+@router.post("/cpmk", response_model=dict)
+async def generate_cpmk(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    prodi_id = data.get("prodi_id")
+    mk_id = data.get("mata_kuliah_id")
+    
+    prodi_result = await db.execute(select(Prodi).where(Prodi.id == prodi_id))
+    prodi = prodi_result.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Prodi not found")
+    
+    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.id == mk_id))
+    mk = mk_result.scalar_one_or_none()
+    if not mk:
+        raise HTTPException(status_code=404, detail="Mata kuliah not found")
+    
+    try:
+        cpmk = await rps_generator_service.generate_cpmk(
+            visi_prodi=prodi.visi,
+            misi_prodi=prodi.misi,
+            cpl_prodi=prodi.capaian_pembelajaran_lulusan or [],
+            nama_mk=mk.nama,
+            deskripsi_mk=mk.deskripsi or "",
+        )
+        return {"success": True, "data": cpmk}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sub-cpmk", response_model=dict)
+async def generate_sub_cpmk(data: dict):
+    try:
+        result = await rps_generator_service.generate_sub_cpmk(
+            cpmk_list=data.get("cpmk", []),
+            nama_mk=data.get("nama_mk", ""),
+        )
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rencana-mingguan", response_model=dict)
+async def generate_rencana_mingguan(data: dict):
+    try:
+        result = await rps_generator_service.generate_rencana_mingguan(
+            cpmk=data.get("cpmk", []),
+            sub_cpmk=data.get("sub_cpmk", []),
+            sks=data.get("sks", 3),
+        )
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/penilaian", response_model=dict)
+async def generate_penilaian(data: dict):
+    try:
+        result = await rps_generator_service.generate_penilaian(
+            cpmk=data.get("cpmk", []),
+            sub_cpmk=data.get("sub_cpmk", []),
+        )
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/validate-obe", response_model=OBEValidationResponse)
+async def validate_obe(
+    data: OBEValidationRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(RPS).where(RPS.id == data.rps_id))
+    rps = result.scalar_one_or_none()
+    if not rps:
+        raise HTTPException(status_code=404, detail="RPS not found")
+    
+    rps_data = {
+        "identitas": rps.identitas,
+        "cpmk": rps.cpmk,
+        "sub_cpmk": rps.sub_cpmk,
+        "rencana_pembelajaran": rps.rencana_pembelajaran,
+        "metode_pembelajaran": rps.metode_pembelajaran,
+        "media_pembelajaran": rps.media_pembelajaran,
+        "penilaian": rps.penilaian,
+        "referensi": rps.referensi,
+    }
+    
+    try:
+        validation = await rps_generator_service.validate_obe(rps_data)
+        
+        # Save validation result
+        rps.obe_validated = True
+        rps.obe_validation_result = validation
+        rps.obe_score = validation.get("score", 0)
+        await db.commit()
+        
+        return OBEValidationResponse(
+            rps_id=rps.id,
+            validated=validation.get("validated", False),
+            score=validation.get("score", 0),
+            issues=validation.get("issues", []),
+            suggestions=validation.get("suggestions", []),
+            details=validation.get("details", {}),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/review", response_model=dict)
+async def review_rps(data: dict):
+    rps_data = data.get("rps_data", {})
+    feedback = data.get("feedback", "")
+    try:
+        result = await rps_generator_service.review_and_improve(rps_data, feedback)
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

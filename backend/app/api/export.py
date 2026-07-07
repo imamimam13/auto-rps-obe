@@ -1,0 +1,224 @@
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
+from app.models import RPS
+from app.schemas import ExportRequest
+from sqlalchemy import select
+import json
+import os
+from app.core.config import settings
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from weasyprint import HTML
+from jinja2 import Template
+
+router = APIRouter(prefix="/export", tags=["Export"])
+
+
+RPS_HTML_TEMPLATE = Template("""
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>RPS - {{ data.identitas.nama_mata_kuliah }}</title>
+  <style>
+    body { font-family: 'Times New Roman', serif; font-size: 12pt; margin: 2cm; }
+    h1 { text-align: center; font-size: 16pt; margin-bottom: 5px; }
+    h2 { font-size: 14pt; margin-top: 20px; border-bottom: 1px solid #000; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #000; padding: 6px; text-align: left; font-size: 11pt; }
+    th { background: #f0f0f0; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { margin: 0; }
+    .header p { margin: 3px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>RENCANA PEMBELAJARAN SEMESTER (RPS)</h1>
+    <p>{{ data.identitas.prodi }} - {{ data.identitas.fakultas }}</p>
+    <p>Tahun Akademik {{ data.identitas.tahun_akademik }}</p>
+  </div>
+
+  <h2>Identitas Mata Kuliah</h2>
+  <table>
+    <tr><th>Nama MK</th><td>{{ data.identitas.nama_mata_kuliah }}</td></tr>
+    <tr><th>Kode MK</th><td>{{ data.identitas.kode_mata_kuliah }}</td></tr>
+    <tr><th>SKS</th><td>{{ data.identitas.sks }}</td></tr>
+    <tr><th>Semester</th><td>{{ data.identitas.semester }}</td></tr>
+  </table>
+
+  <h2>Deskripsi Mata Kuliah</h2>
+  <p>{{ data.deskripsi_mata_kuliah }}</p>
+
+  <h2>CPMK (Capaian Pembelajaran Mata Kuliah)</h2>
+  <table>
+    <tr><th>Kode</th><th>Deskripsi</th><th>Bobot</th><th>CPL</th></tr>
+    {% for c in data.cpmk %}
+    <tr>
+      <td>{{ c.kode }}</td>
+      <td>{{ c.deskripsi }}</td>
+      <td>{{ c.bobot }}</td>
+      <td>{{ c.cpl_prodi | join(', ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Sub-CPMK</h2>
+  <table>
+    <tr><th>Kode</th><th>CPMK</th><th>Deskripsi</th><th>Indikator</th></tr>
+    {% for s in data.sub_cpmk %}
+    <tr>
+      <td>{{ s.kode }}</td>
+      <td>{{ s.cpmk_kode }}</td>
+      <td>{{ s.deskripsi }}</td>
+      <td>{{ s.indikator | join('; ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Rencana Pembelajaran</h2>
+  <table>
+    <tr><th>Minggu</th><th>Sub-CPMK</th><th>Materi</th><th>Metode</th><th>Media</th></tr>
+    {% for r in data.rencana_pembelajaran %}
+    <tr>
+      <td>{{ r.minggu_ke }}</td>
+      <td>{{ r.sub_cpmk_kode }}</td>
+      <td>{{ r.materi }}</td>
+      <td>{{ r.metode | join(', ') }}</td>
+      <td>{{ r.media | join(', ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Penilaian</h2>
+  <table>
+    <tr><th>Komponen</th><th>Bobot</th><th>Jenis</th></tr>
+    {% for p in data.penilaian %}
+    <tr>
+      <td>{{ p.komponen }}</td>
+      <td>{{ p.bobot }}</td>
+      <td>{{ p.jenis }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Referensi</h2>
+  <ul>
+    {% for ref in data.referensi %}
+    <li>{{ ref.judul }}, {{ ref.pengarang }} ({{ ref.tahun }})</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
+""")
+
+
+def generate_docx(rps_data: dict, output_path: str):
+    doc = Document()
+    style = doc.styles['Normal']
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(12)
+
+    # Header
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run('RENCANA PEMBELAJARAN SEMESTER (RPS)')
+    run.bold = True
+    run.font.size = Pt(16)
+
+    identitas = rps_data.get('identitas', {})
+    
+    # Identitas table
+    doc.add_heading('Identitas Mata Kuliah', level=2)
+    table = doc.add_table(rows=4, cols=2)
+    rows = [
+        ('Nama MK', identitas.get('nama_mata_kuliah', '')),
+        ('Kode MK', identitas.get('kode_mata_kuliah', '')),
+        ('SKS', str(identitas.get('sks', ''))),
+        ('Semester', str(identitas.get('semester', ''))),
+    ]
+    for i, (label, val) in enumerate(rows):
+        table.rows[i].cells[0].text = label
+        table.rows[i].cells[1].text = val
+
+    # CPMK
+    doc.add_heading('CPMK', level=2)
+    cpmk_table = doc.add_table(rows=1, cols=4)
+    for j, h in enumerate(['Kode', 'Deskripsi', 'Bobot', 'CPL']):
+        cpmk_table.rows[0].cells[j].text = h
+    for cpmk in rps_data.get('cpmk', []):
+        row = cpmk_table.add_row()
+        row.cells[0].text = cpmk.get('kode', '')
+        row.cells[1].text = cpmk.get('deskripsi', '')
+        row.cells[2].text = str(cpmk.get('bobot', ''))
+        row.cells[3].text = ', '.join(cpmk.get('cpl_prodi', []))
+
+    # Rencana Pembelajaran
+    doc.add_heading('Rencana Pembelajaran', level=2)
+    rp_table = doc.add_table(rows=1, cols=5)
+    for j, h in enumerate(['Minggu', 'Sub-CPMK', 'Materi', 'Metode', 'Media']):
+        rp_table.rows[0].cells[j].text = h
+    for rp in rps_data.get('rencana_pembelajaran', []):
+        row = rp_table.add_row()
+        row.cells[0].text = str(rp.get('minggu_ke', ''))
+        row.cells[1].text = rp.get('sub_cpmk_kode', '')
+        row.cells[2].text = rp.get('materi', '')
+        row.cells[3].text = ', '.join(rp.get('metode', []))
+        row.cells[4].text = ', '.join(rp.get('media', []))
+
+    # Penilaian
+    doc.add_heading('Penilaian', level=2)
+    pen_table = doc.add_table(rows=1, cols=3)
+    for j, h in enumerate(['Komponen', 'Bobot', 'Jenis']):
+        pen_table.rows[0].cells[j].text = h
+    for p in rps_data.get('penilaian', []):
+        row = pen_table.add_row()
+        row.cells[0].text = p.get('komponen', '')
+        row.cells[1].text = str(p.get('bobot', ''))
+        row.cells[2].text = p.get('jenis', '')
+
+    doc.save(output_path)
+
+
+@router.post("/{rps_id}")
+async def export_rps(
+    rps_id: int,
+    export_format: str = "pdf",
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(RPS).where(RPS.id == rps_id))
+    rps = result.scalar_one_or_none()
+    if not rps:
+        raise HTTPException(status_code=404, detail="RPS not found")
+    
+    rps_data = {
+        "identitas": rps.identitas,
+        "deskripsi_mata_kuliah": "...",
+        "cpmk": rps.cpmk,
+        "sub_cpmk": rps.sub_cpmk,
+        "rencana_pembelajaran": rps.rencana_pembelajaran,
+        "metode_pembelajaran": rps.metode_pembelajaran,
+        "media_pembelajaran": rps.media_pembelajaran,
+        "penilaian": rps.penilaian,
+        "referensi": rps.referensi,
+    }
+    
+    os.makedirs(settings.EXPORT_DIR, exist_ok=True)
+    filename = f"RPS_{rps.kode}_{rps.semester}_{rps.tahun_akademik}"
+    
+    if export_format == "docx":
+        filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.docx")
+        generate_docx(rps_data, filepath)
+        return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{filename}.docx")
+    
+    elif export_format == "pdf":
+        html_content = RPS_HTML_TEMPLATE.render(data=rps_data)
+        filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.pdf")
+        HTML(string=html_content).write_pdf(filepath)
+        return FileResponse(filepath, media_type="application/pdf", filename=f"{filename}.pdf")
+    
+    else:
+        raise HTTPException(status_code=400, detail=f"Format {export_format} tidak didukung")

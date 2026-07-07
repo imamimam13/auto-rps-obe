@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+      'Helvetica Neue', Arial, sans-serif;
+    background-color: #f5f5f7;
+    color: #1d1d1f;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* macOS scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
+}
+
+@layer components {
+  .macos-window {
+    @apply bg-white/80 backdrop-blur-xl rounded-apple-xl shadow-apple border border-white/20;
+  }
+
+  .macos-sidebar {
+    @apply bg-[rgba(236,236,240,0.85)] backdrop-blur-2xl border-r border-white/30;
+  }
+
+  .macos-card {
+    @apply bg-white/70 backdrop-blur-lg rounded-apple-lg shadow-apple 
+           border border-white/40 hover:bg-white/85 
+           transition-all duration-200;
+  }
+
+  .macos-button {
+    @apply px-4 py-2 rounded-apple font-medium text-sm
+           bg-macos-blue text-white
+           hover:bg-blue-600 active:bg-blue-700
+           transition-all duration-150
+           shadow-sm hover:shadow-apple
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .macos-button-ghost {
+    @apply px-4 py-2 rounded-apple font-medium text-sm
+           bg-transparent text-macos-gray-800
+           hover:bg-black/5 active:bg-black/10
+           transition-all duration-150;
+  }
+
+  .macos-input {
+    @apply w-full px-3 py-2 rounded-apple
+           bg-white/60 backdrop-blur-sm
+           border border-gray-200/60
+           text-sm text-gray-900
+           placeholder:text-gray-400
+           focus:outline-none focus:ring-2 focus:ring-macos-blue/30 focus:border-macos-blue
+           transition-all duration-150;
+  }
+
+  .macos-label {
+    @apply block text-xs font-medium text-gray-500 mb-1.5 tracking-wide uppercase;
+  }
+
+  .macos-divider {
+    @apply my-4 border-t border-gray-200/60;
+  }
+
+  .macos-tag {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-macos-blue/10 text-macos-blue;
+  }
+
+  .glass-panel {
+    @apply bg-white/60 backdrop-blur-xl rounded-apple-xl shadow-apple border border-white/20;
+  }
+}
+
+/* macOS Traffic Lights */
+.macos-traffic {
+  @apply flex items-center gap-2 px-4 py-2;
+}
+
+.macos-dot {
+  @apply w-3 h-3 rounded-full transition-all duration-150;
+}
+
+.macos-dot.close {
+  @apply bg-[#ff5f57] hover:brightness-90;
+}
+
+.macos-dot.minimize {
+  @apply bg-[#febc2e] hover:brightness-90;
+}
+
+.macos-dot.maximize {
+  @apply bg-[#28c840] hover:brightness-90;
+}
+
+/* Glass morphism variants */
+.glass-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.glass-dark {
+  background: rgba(30, 30, 32, 0.75);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}

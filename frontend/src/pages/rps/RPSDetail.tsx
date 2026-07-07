@@ -1,0 +1,162 @@
+import { useEffect, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { ArrowLeft, FileText, CheckSquare, Download, Sparkles } from 'lucide-react'
+import api from '@/services/api'
+import toast from 'react-hot-toast'
+
+export default function RPSDetail() {
+  const { id } = useParams()
+  const [rps, setRps] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [validating, setValidating] = useState(false)
+
+  useEffect(() => {
+    if (id) loadData()
+  }, [id])
+
+  async function loadData() {
+    try {
+      const res = await api.get(`/api/v1/rps/${id}`)
+      setRps(res.data)
+    } catch (e) {
+      toast.error('Gagal memuat RPS')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleValidate() {
+    setValidating(true)
+    try {
+      const res = await api.post('/api/v1/generate/validate-obe', { rps_id: Number(id) })
+      toast.success(`Validasi OBE selesai: Skor ${res.data.score}`)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal validasi')
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  async function handleExport(format: string) {
+    try {
+      const res = await api.post(`/api/v1/export/${id}?export_format=${format}`, {}, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `RPS-${id}.${format}`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success(`Export ${format.toUpperCase()} berhasil`)
+    } catch (e) {
+      toast.error('Gagal export')
+    }
+  }
+
+  if (loading || !rps) return <div className="text-center py-12 text-gray-400">Memuat...</div>
+
+  return (
+    <div className="space-y-6 animate-fade-in max-w-5xl">
+      <div className="flex items-center justify-between">
+        <Link to="/rps" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-macos-blue transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Kembali
+        </Link>
+        <div className="flex items-center gap-2">
+          <button onClick={handleValidate} disabled={validating} className="macos-button-ghost flex items-center gap-1.5 text-sm">
+            <CheckSquare className="w-4 h-4" /> {validating ? 'Memvalidasi...' : 'Validasi OBE'}
+          </button>
+          <button onClick={() => handleExport('pdf')} className="macos-button-ghost flex items-center gap-1.5 text-sm">
+            <Download className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={() => handleExport('docx')} className="macos-button-ghost flex items-center gap-1.5 text-sm">
+            <FileText className="w-4 h-4" /> DOCX
+          </button>
+        </div>
+      </div>
+
+      {/* Identitas */}
+      <div className="macos-card p-6">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="p-4 rounded-apple-xl bg-gradient-to-br from-green-500 to-emerald-600">
+            <FileText className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">{rps.kode}</h1>
+            <p className="text-sm text-gray-500">{rps.identitas?.nama_mata_kuliah} · Semester {rps.semester} · {rps.tahun_akademik}</p>
+          </div>
+          <span className={`ml-auto text-xs font-medium px-3 py-1 rounded-full ${
+            rps.status === 'approved' ? 'bg-green-50 text-green-600' : 
+            rps.status === 'draft' ? 'bg-gray-50 text-gray-600' : 'bg-yellow-50 text-yellow-600'
+          }`}>{rps.status}</span>
+        </div>
+        {rps.obe_validated && (
+          <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-apple-lg text-sm text-blue-700">
+            <CheckSquare className="w-4 h-4" /> Validasi OBE: Skor {rps.obe_score}/100
+          </div>
+        )}
+      </div>
+
+      {/* CPMK */}
+      {rps.cpmk?.length > 0 && (
+        <div className="macos-card p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">CPMK ({rps.cpmk.length})</h3>
+          <div className="space-y-2">
+            {rps.cpmk.map((c: any, i: number) => (
+              <div key={i} className="flex items-start gap-3 p-3 bg-gray-50/50 rounded-apple-lg">
+                <span className="text-xs font-mono font-bold text-macos-blue bg-blue-50 px-2 py-0.5 rounded shrink-0">{c.kode}</span>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700">{c.deskripsi}</p>
+                  <p className="text-xs text-gray-400 mt-1">Bobot: {c.bobot} | CPL: {c.cpl_prodi?.join(', ')}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Rencana Pembelajaran */}
+      {rps.rencana_pembelajaran?.length > 0 && (
+        <div className="macos-card p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Rencana Pembelajaran (16 Minggu)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Minggu</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Sub-CPMK</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Materi</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Metode</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rps.rencana_pembelajaran.map((r: any) => (
+                  <tr key={r.minggu_ke} className="border-b border-gray-100 hover:bg-gray-50/50">
+                    <td className="py-2.5 px-3 font-mono text-xs">{r.minggu_ke}</td>
+                    <td className="py-2.5 px-3 text-xs text-gray-500">{r.sub_cpmk_kode}</td>
+                    <td className="py-2.5 px-3 text-gray-700">{r.materi}</td>
+                    <td className="py-2.5 px-3 text-xs text-gray-500">{r.metode?.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Penilaian */}
+      {rps.penilaian?.length > 0 && (
+        <div className="macos-card p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Penilaian</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {rps.penilaian.map((p: any, i: number) => (
+              <div key={i} className="p-3 bg-gray-50/50 rounded-apple-lg">
+                <p className="text-sm font-medium text-gray-900">{p.komponen}</p>
+                <p className="text-xs text-gray-500 mt-1">Bobot: {(p.bobot * 100).toFixed(0)}% · {p.jenis}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
