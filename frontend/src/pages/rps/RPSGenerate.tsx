@@ -81,8 +81,8 @@ export default function RPSGenerate() {
         const pRes = await api.get(`/api/v1/prodi/${res.data.prodi_id}`)
         setProdi(pRes.data)
       }
-    } catch (e) {
-      toast.error('Gagal memuat data mata kuliah')
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal memuat data mata kuliah')
     } finally {
       setLoading(false)
     }
@@ -107,7 +107,12 @@ export default function RPSGenerate() {
       setShowPreview(true)
       toast.success('RPS berhasil di-generate!')
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Gagal generate RPS')
+      const detail = e.response?.data?.detail
+      const msg = Array.isArray(detail)
+        ? detail.map((d: any) => `${d.loc ? d.loc.join('.') + ': ' : ''}${d.msg || JSON.stringify(d)}`).join(', ')
+        : (detail || e.message || 'Gagal generate RPS')
+      toast.error(typeof msg === 'object' ? JSON.stringify(msg) : msg)
+      console.error('Generate RPS Error:', e)
     } finally {
       setGenerating(false)
     }
