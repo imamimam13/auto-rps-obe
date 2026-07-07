@@ -10,6 +10,8 @@ export default function RPSDetail() {
   const [loading, setLoading] = useState(true)
   const [validating, setValidating] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editJson, setEditJson] = useState('')
 
   useEffect(() => {
     if (id) loadData()
@@ -53,6 +55,38 @@ export default function RPSDetail() {
       toast.error(e.response?.data?.detail || 'Gagal memperbarui status')
     } finally {
       setUpdatingStatus(false)
+    }
+  }
+
+  function openEditModal() {
+    if (!rps) return
+    const editableData = {
+      identitas: rps.identitas,
+      cpmk: rps.cpmk,
+      sub_cpmk: rps.sub_cpmk,
+      rencana_pembelajaran: rps.rencana_pembelajaran,
+      metode_pembelajaran: rps.metode_pembelajaran,
+      media_pembelajaran: rps.media_pembelajaran,
+      penilaian: rps.penilaian,
+      referensi: rps.referensi,
+    }
+    setEditJson(JSON.stringify(editableData, null, 2))
+    setShowEditModal(true)
+  }
+
+  async function handleSaveJson() {
+    try {
+      const parsed = JSON.parse(editJson)
+      await api.put(`/api/v1/rps/${id}`, parsed)
+      toast.success('RPS berhasil diperbarui!')
+      setShowEditModal(false)
+      loadData()
+    } catch (e: any) {
+      if (e instanceof SyntaxError) {
+        toast.error('Format JSON tidak valid! Periksa kembali kurung atau koma.')
+      } else {
+        toast.error(e.response?.data?.detail || 'Gagal memperbarui RPS')
+      }
     }
   }
 
@@ -105,6 +139,11 @@ export default function RPSDetail() {
               className="macos-button flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
             >
               Publikasikan
+            </button>
+          )}
+          {rps.status === 'draft' && (
+            <button onClick={openEditModal} className="macos-button-ghost flex items-center gap-1.5 text-sm">
+              <Sparkles className="w-4 h-4 text-purple-500" /> Edit RPS (JSON)
             </button>
           )}
           <button onClick={handleValidate} disabled={validating} className="macos-button-ghost flex items-center gap-1.5 text-sm">
@@ -200,6 +239,49 @@ export default function RPSDetail() {
                 <p className="text-xs text-gray-500 mt-1">Bobot: {(p.bobot * 100).toFixed(0)}% · {p.jenis}</p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {/* Edit JSON Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="macos-card p-6 w-full max-w-3xl h-[85vh] flex flex-col animate-scale-up space-y-4 bg-white/95 shadow-2xl rounded-apple-xl border border-white/20">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Edit Konten RPS (Format JSON)</h3>
+                <p className="text-[11px] text-gray-400 mt-0.5">Ubah isi RPS secara langsung. Pastikan format JSON tetap valid.</p>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xs"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0">
+              <textarea
+                className="w-full h-full p-4 font-mono text-xs bg-gray-50 border border-gray-200 rounded-apple-lg focus:outline-none focus:ring-1 focus:ring-macos-blue resize-none"
+                value={editJson}
+                onChange={(e) => setEditJson(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="macos-button-ghost px-4 py-2 text-xs"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveJson}
+                className="macos-button py-2.5 px-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-medium text-xs rounded-apple-lg"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
           </div>
         </div>
       )}
