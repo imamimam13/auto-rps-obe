@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, CheckSquare, Download, Sparkles } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2 } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 export default function RPSDetail() {
   const { id } = useParams()
   const { isAdmin } = useAuth()
+  const navigate = useNavigate()
   const [rps, setRps] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [validating, setValidating] = useState(false)
@@ -155,6 +156,17 @@ export default function RPSDetail() {
     }
   }
 
+  async function handleDelete() {
+    if (!confirm('Apakah Anda yakin ingin menghapus RPS ini secara permanen?')) return
+    try {
+      await api.delete(`/api/v1/rps/${id}`)
+      toast.success('RPS berhasil dihapus')
+      navigate('/rps')
+    } catch {
+      toast.error('Gagal menghapus RPS')
+    }
+  }
+
   if (loading || !rps) return <div className="text-center py-12 text-gray-400">Memuat...</div>
 
   return (
@@ -205,6 +217,11 @@ export default function RPSDetail() {
           <button onClick={() => handleExport('docx')} className="macos-button-ghost flex items-center gap-1.5 text-sm">
             <FileText className="w-4 h-4" /> DOCX
           </button>
+          {isAdmin && (
+            <button onClick={handleDelete} className="macos-button-ghost flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50">
+              <Trash2 className="w-4 h-4" /> Hapus
+            </button>
+          )}
         </div>
       </div>
 

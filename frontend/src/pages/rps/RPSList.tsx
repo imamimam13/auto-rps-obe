@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles } from 'lucide-react'
+import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2 } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -104,6 +104,17 @@ export default function RPSList() {
     }
   }
 
+  async function handleDelete(id: number) {
+    if (!confirm('Apakah Anda yakin ingin menghapus RPS ini secara permanen?')) return
+    try {
+      await api.delete(`/api/v1/rps/${id}`)
+      toast.success('RPS berhasil dihapus')
+      loadData()
+    } catch {
+      toast.error('Gagal menghapus RPS')
+    }
+  }
+
   const filtered = rpsList.filter((r) => {
     const searchLower = search.toLowerCase()
     const matchKode = r.kode?.toLowerCase().includes(searchLower)
@@ -180,6 +191,11 @@ export default function RPSList() {
                   <button onClick={() => handleExport(rps.id, 'docx')} className="macos-button-ghost px-2.5 py-1.5 text-xs" title="Export DOCX">
                     <FileText className="w-3.5 h-3.5" />
                   </button>
+                  {isAdmin && (
+                    <button onClick={() => handleDelete(rps.id)} className="macos-button-ghost px-2.5 py-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50" title="Hapus RPS">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             )
