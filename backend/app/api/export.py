@@ -34,16 +34,16 @@ RPS_HTML_TEMPLATE = Template("""
 <body>
   <div class="header">
     <h1>RENCANA PEMBELAJARAN SEMESTER (RPS)</h1>
-    <p>{{ data.identitas.prodi }} - {{ data.identitas.fakultas }}</p>
-    <p>Tahun Akademik {{ data.identitas.tahun_akademik }}</p>
+    <p>{{ data.identitas.prodi if data.identitas else '' }} - {{ data.identitas.fakultas if data.identitas else '' }}</p>
+    <p>Tahun Akademik {{ data.identitas.tahun_akademik if data.identitas else '' }}</p>
   </div>
 
   <h2>Identitas Mata Kuliah</h2>
   <table>
-    <tr><th>Nama MK</th><td>{{ data.identitas.nama_mata_kuliah }}</td></tr>
-    <tr><th>Kode MK</th><td>{{ data.identitas.kode_mata_kuliah }}</td></tr>
-    <tr><th>SKS</th><td>{{ data.identitas.sks }}</td></tr>
-    <tr><th>Semester</th><td>{{ data.identitas.semester }}</td></tr>
+    <tr><th>Nama MK</th><td>{{ data.identitas.nama_mata_kuliah if data.identitas else '' }}</td></tr>
+    <tr><th>Kode MK</th><td>{{ data.identitas.kode_mata_kuliah if data.identitas else '' }}</td></tr>
+    <tr><th>SKS</th><td>{{ data.identitas.sks if data.identitas else '' }}</td></tr>
+    <tr><th>Semester</th><td>{{ data.identitas.semester if data.identitas else '' }}</td></tr>
   </table>
 
   <h2>Deskripsi Mata Kuliah</h2>
@@ -53,10 +53,11 @@ RPS_HTML_TEMPLATE = Template("""
   <table>
     <tr><th>Kode</th><th>Deskripsi</th><th>Bobot</th><th>CPL</th></tr>
     {% for c in data.cpmk %}
+    {% if c is mapping %}
     <tr>
-      <td>{{ c.kode }}</td>
-      <td>{{ c.deskripsi }}</td>
-      <td>{{ c.bobot }}</td>
+      <td>{{ c.kode if c.kode else '' }}</td>
+      <td>{{ c.deskripsi if c.deskripsi else '' }}</td>
+      <td>{{ c.bobot if c.bobot else '' }}</td>
       <td>
         {% if c.cpl_prodi is string %}
           {{ c.cpl_prodi }}
@@ -67,6 +68,7 @@ RPS_HTML_TEMPLATE = Template("""
         {% endif %}
       </td>
     </tr>
+    {% endif %}
     {% endfor %}
   </table>
 
@@ -74,10 +76,11 @@ RPS_HTML_TEMPLATE = Template("""
   <table>
     <tr><th>Kode</th><th>CPMK</th><th>Deskripsi</th><th>Indikator</th></tr>
     {% for s in data.sub_cpmk %}
+    {% if s is mapping %}
     <tr>
-      <td>{{ s.kode }}</td>
-      <td>{{ s.cpmk_kode }}</td>
-      <td>{{ s.deskripsi }}</td>
+      <td>{{ s.kode if s.kode else '' }}</td>
+      <td>{{ s.cpmk_kode if s.cpmk_kode else '' }}</td>
+      <td>{{ s.deskripsi if s.deskripsi else '' }}</td>
       <td>
         {% if s.indikator is string %}
           {{ s.indikator }}
@@ -88,6 +91,7 @@ RPS_HTML_TEMPLATE = Template("""
         {% endif %}
       </td>
     </tr>
+    {% endif %}
     {% endfor %}
   </table>
 
@@ -95,10 +99,11 @@ RPS_HTML_TEMPLATE = Template("""
   <table>
     <tr><th>Minggu</th><th>Sub-CPMK</th><th>Materi</th><th>Metode</th><th>Media</th></tr>
     {% for r in data.rencana_pembelajaran %}
+    {% if r is mapping %}
     <tr>
-      <td>{{ r.minggu_ke }}</td>
-      <td>{{ r.sub_cpmk_kode }}</td>
-      <td>{{ r.materi }}</td>
+      <td>{{ r.minggu_ke if r.minggu_ke else '' }}</td>
+      <td>{{ r.sub_cpmk_kode if r.sub_cpmk_kode else '' }}</td>
+      <td>{{ r.materi if r.materi else '' }}</td>
       <td>
         {% if r.metode is string %}
           {{ r.metode }}
@@ -118,6 +123,7 @@ RPS_HTML_TEMPLATE = Template("""
         {% endif %}
       </td>
     </tr>
+    {% endif %}
     {% endfor %}
   </table>
 
@@ -125,11 +131,13 @@ RPS_HTML_TEMPLATE = Template("""
   <table>
     <tr><th>Komponen</th><th>Bobot</th><th>Jenis</th></tr>
     {% for p in data.penilaian %}
+    {% if p is mapping %}
     <tr>
-      <td>{{ p.komponen }}</td>
-      <td>{{ p.bobot }}</td>
-      <td>{{ p.jenis }}</td>
+      <td>{{ p.komponen if p.komponen else '' }}</td>
+      <td>{{ p.bobot if p.bobot else '' }}</td>
+      <td>{{ p.jenis if p.jenis else '' }}</td>
     </tr>
+    {% endif %}
     {% endfor %}
   </table>
 
@@ -137,10 +145,16 @@ RPS_HTML_TEMPLATE = Template("""
   <ul>
     {% for ref in data.referensi %}
     <li>
-      {{ ref.judul if ref.judul else '' }}
-      {{ ', ' + ref.pengarang if ref.pengarang else '' }}
-      {% if ref.tahun %}
-        ({{ ref.tahun }})
+      {% if ref is string %}
+        {{ ref }}
+      {% elif ref is mapping %}
+        {{ ref.judul if ref.judul else '' }}
+        {{ ', ' + ref.pengarang if ref.pengarang else '' }}
+        {% if ref.tahun %}
+          ({{ ref.tahun }})
+        {% endif %}
+      {% else %}
+        {{ ref }}
       {% endif %}
     </li>
     {% endfor %}
@@ -188,6 +202,8 @@ def generate_docx(rps_data: dict, output_path: str):
     for j, h in enumerate(['Kode', 'Deskripsi', 'Bobot', 'CPL']):
         cpmk_table.rows[0].cells[j].text = h
     for cpmk in (rps_data.get('cpmk') or []):
+        if not isinstance(cpmk, dict):
+            continue
         row = cpmk_table.add_row()
         row.cells[0].text = cpmk.get('kode', '') or ''
         row.cells[1].text = cpmk.get('deskripsi', '') or ''
@@ -205,6 +221,8 @@ def generate_docx(rps_data: dict, output_path: str):
     for j, h in enumerate(['Minggu', 'Sub-CPMK', 'Materi', 'Metode', 'Media']):
         rp_table.rows[0].cells[j].text = h
     for rp in (rps_data.get('rencana_pembelajaran') or []):
+        if not isinstance(rp, dict):
+            continue
         row = rp_table.add_row()
         row.cells[0].text = str(rp.get('minggu_ke', '')) or ''
         row.cells[1].text = rp.get('sub_cpmk_kode', '') or ''
@@ -228,6 +246,8 @@ def generate_docx(rps_data: dict, output_path: str):
     for j, h in enumerate(['Komponen', 'Bobot', 'Jenis']):
         pen_table.rows[0].cells[j].text = h
     for p in (rps_data.get('penilaian') or []):
+        if not isinstance(p, dict):
+            continue
         row = pen_table.add_row()
         row.cells[0].text = p.get('komponen', '') or ''
         row.cells[1].text = str(p.get('bobot', '')) or ''
