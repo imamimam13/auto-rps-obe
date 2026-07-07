@@ -9,11 +9,10 @@ class AIService:
         self.base_url = settings.AI_BASE_URL.rstrip("/")
         self.model = settings.AI_MODEL
         self.api_key = settings.AI_API_KEY
-        self.timeout = settings.OLLAMA_TIMEOUT
+        self.timeout = settings.AI_TIMEOUT
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
-            headers={"Content-Type": "application/json"} if self.api_key else {},
         )
 
     def _get_headers(self) -> Dict[str, str]:
