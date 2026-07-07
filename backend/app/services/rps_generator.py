@@ -1,5 +1,6 @@
 import json
 from typing import Dict, Any, List, Optional
+import re
 from app.services.ollama_service import ai_service as ollama_service
 from app.prompts.rps_prompts import (
     RPS_GENERATION_SYSTEM_PROMPT,
@@ -13,6 +14,45 @@ from app.prompts.rps_prompts import (
     RENCANA_MINGGUAN_PROMPT,
     PENILAIAN_GENERATION_PROMPT,
 )
+
+
+def extract_json(text: str) -> Any:
+    """Robustly extract and parse JSON from LLM outputs, handling conversational text and code blocks."""
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+        
+    # 1. Coba cari di dalam markdown code block: ```json ... ``` atau ``` ... ```
+    code_block_match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+    if code_block_match:
+        content = code_block_match.group(1).strip()
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
+            
+    # 2. Coba cari dengan mendeteksi posisi kurung kurawal/siku pertama dan terakhir (untuk menepis percakapan pembuka/penutup)
+    start_idx = -1
+    for i, char in enumerate(text):
+        if char in ('{', '['):
+            start_idx = i
+            break
+    end_idx = -1
+    for i in range(len(text) - 1, -1, -1):
+        if text[i] in ('}', ']'):
+            end_idx = i
+            break
+            
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        candidate = text[start_idx:end_idx + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+            
+    raise ValueError("Respon AI tidak berisi format JSON yang valid.")
 
 
 class RPSGeneratorService:
@@ -52,14 +92,9 @@ class RPSGeneratorService:
         )
         
         try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            # Try to extract JSON from response
-            import re
-            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group(1))
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+            return extract_json(response)
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
     async def generate_cpmk(
         self,
@@ -84,10 +119,10 @@ class RPSGeneratorService:
         )
         
         try:
-            result = json.loads(response)
+            result = extract_json(response)
             return result.get("cpmk", result)
-        except json.JSONDecodeError:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
     async def generate_sub_cpmk(
         self,
@@ -105,10 +140,10 @@ class RPSGeneratorService:
         )
         
         try:
-            result = json.loads(response)
+            result = extract_json(response)
             return result.get("sub_cpmk", result)
-        except json.JSONDecodeError:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
     async def generate_rencana_mingguan(
         self,
@@ -128,10 +163,10 @@ class RPSGeneratorService:
         )
         
         try:
-            result = json.loads(response)
+            result = extract_json(response)
             return result.get("rencana_pembelajaran", result)
-        except json.JSONDecodeError:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
     async def generate_penilaian(
         self,
@@ -149,10 +184,10 @@ class RPSGeneratorService:
         )
         
         try:
-            result = json.loads(response)
+            result = extract_json(response)
             return result.get("penilaian", result)
-        except json.JSONDecodeError:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
     async def validate_obe(self, rps_data: Dict[str, Any]) -> Dict[str, Any]:
         prompt = OBE_VALIDATION_PROMPT.format(
@@ -166,9 +201,9 @@ class RPSGeneratorService:
         )
         
         try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+            return extract_json(response)
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
     async def review_and_improve(self, rps_data: Dict[str, Any], feedback: str) -> Dict[str, Any]:
         prompt = RPS_IMPROVE_PROMPT.format(
@@ -183,9 +218,9 @@ class RPSGeneratorService:
         )
         
         try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Output: {response[:400]}")
+            return extract_json(response)
+        except Exception as e:
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
 
 rps_generator_service = RPSGeneratorService()
