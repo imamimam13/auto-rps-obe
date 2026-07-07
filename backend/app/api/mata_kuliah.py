@@ -85,6 +85,41 @@ async def update_mata_kuliah(mk_id: int, data: MataKuliahUpdate, db: AsyncSessio
     return mk
 
 
+@router.post("/bulk", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def bulk_create_mata_kuliah(
+    data: List[MataKuliahCreate],
+    db: AsyncSession = Depends(get_db),
+):
+    if not data:
+        raise HTTPException(status_code=400, detail="Data kosong")
+    
+    prodi_id = data[0].prodi_id
+    prodi_result = await db.execute(select(Prodi).where(Prodi.id == prodi_id))
+    if not prodi_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Prodi not found")
+    
+    created = []
+    errors = []
+    for item in data:
+        try:
+            mk = MataKuliah(**item.model_dump())
+            db.add(mk)
+            await db.flush()
+            created.append({"kode": item.kode, "nama": item.nama, "id": mk.id})
+        except Exception as e:
+            errors.append({"kode": item.kode, "nama": item.nama, "error": str(e)})
+    
+    await db.commit()
+    return {
+        "success": True,
+        "total": len(data),
+        "created": len(created),
+        "errors": len(errors),
+        "detail": created,
+        "error_detail": errors,
+    }
+
+
 @router.delete("/{mk_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_mata_kuliah(mk_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(MataKuliah).where(MataKuliah.id == mk_id))

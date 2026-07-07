@@ -6,6 +6,7 @@ import ProdiList from '@/pages/prodi/ProdiList'
 import ProdiDetail from '@/pages/prodi/ProdiDetail'
 import MataKuliahList from '@/pages/mata-kuliah/MataKuliahList'
 import MataKuliahDetail from '@/pages/mata-kuliah/MataKuliahDetail'
+import BulkImport from '@/pages/mata-kuliah/BulkImport'
 import RPSList from '@/pages/rps/RPSList'
 import RPSDetail from '@/pages/rps/RPSDetail'
 import RPSGenerate from '@/pages/rps/RPSGenerate'
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/prodi" element={<ProdiList />} />
             <Route path="/prodi/:id" element={<ProdiDetail />} />
             <Route path="/mata-kuliah" element={<MataKuliahList />} />
+            <Route path="/mata-kuliah/bulk-import" element={<BulkImport />} />
             <Route path="/mata-kuliah/:id" element={<MataKuliahDetail />} />
             <Route path="/rps" element={<RPSList />} />
             <Route path="/rps/:id" element={<RPSDetail />} />

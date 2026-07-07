@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, BookOpen, Sparkles, Filter } from 'lucide-react'
+import { Plus, Search, BookOpen, Sparkles, Upload } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -44,6 +44,9 @@ export default function MataKuliahList() {
           <h1 className="text-2xl font-semibold text-gray-900">Mata Kuliah</h1>
           <p className="text-sm text-gray-500 mt-1">Kelola mata kuliah</p>
         </div>
+        <Link to="/mata-kuliah/bulk-import" className="macos-button-ghost flex items-center gap-2 text-sm">
+          <Upload className="w-4 h-4" /> Import Bulk
+        </Link>
       </div>
 
       <div className="flex items-center gap-3">

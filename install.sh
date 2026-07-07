@@ -49,11 +49,11 @@ else
     cd "$INSTALL_DIR"
 fi
 
-echo "  Setup backend..."
+echo "  Setup backend (install Python packages)..."
 cd backend
 python3 -m venv venv 2>/dev/null || true
 source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
-pip install -r requirements.txt 2>&1 | tail -1
+pip install -r requirements.txt 2>&1
 cat > .env << EOF
 DATABASE_URL=sqlite+aiosqlite:///./autorps.db
 OLLAMA_BASE_URL=http://localhost:11434
@@ -62,9 +62,9 @@ PORT=$BACKEND_PORT
 EOF
 cd ..
 
-echo "  Setup frontend..."
+echo "  Setup frontend (install Node packages)..."
 cd frontend
-npm install 2>&1 | tail -3
+npm install 2>&1
 cd ..
 
 echo -e "${YELLOW}[4/4] Menjalankan aplikasi...${NC}"
