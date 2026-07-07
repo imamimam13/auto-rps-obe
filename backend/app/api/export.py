@@ -18,17 +18,23 @@ RPS_HTML_TEMPLATE = Template("""
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>RPS - {{ data.identitas.nama_mata_kuliah }}</title>
+  <title>RPS - {{ data.identitas.nama_mata_kuliah if data.identitas else '' }}</title>
   <style>
-    body { font-family: 'Times New Roman', serif; font-size: 12pt; margin: 2cm; }
-    h1 { text-align: center; font-size: 16pt; margin-bottom: 5px; }
-    h2 { font-size: 14pt; margin-top: 20px; border-bottom: 1px solid #000; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    th, td { border: 1px solid #000; padding: 6px; text-align: left; font-size: 11pt; }
-    th { background: #f0f0f0; }
-    .header { text-align: center; margin-bottom: 20px; }
+    @page {
+      size: A4;
+      margin: 1.5cm;
+    }
+    body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; line-height: 1.3; }
+    h1 { text-align: center; font-size: 14pt; margin-bottom: 5px; font-weight: bold; }
+    h2 { font-size: 12pt; margin-top: 15px; margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 2px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; }
+    th, td { border: 1px solid #000; padding: 5px; text-align: left; font-size: 10pt; word-wrap: break-word; }
+    th { background: #f2f2f2; font-weight: bold; }
+    .header { text-align: center; margin-bottom: 15px; }
     .header h1 { margin: 0; }
-    .header p { margin: 3px; }
+    .header p { margin: 2px; font-size: 11pt; }
+    ul { margin: 5px 0; padding-left: 20px; }
+    li { font-size: 10pt; margin-bottom: 3px; }
   </style>
 </head>
 <body>
@@ -40,18 +46,23 @@ RPS_HTML_TEMPLATE = Template("""
 
   <h2>Identitas Mata Kuliah</h2>
   <table>
-    <tr><th>Nama MK</th><td>{{ data.identitas.nama_mata_kuliah if data.identitas else '' }}</td></tr>
+    <tr><th width="30%">Nama MK</th><td width="70%">{{ data.identitas.nama_mata_kuliah if data.identitas else '' }}</td></tr>
     <tr><th>Kode MK</th><td>{{ data.identitas.kode_mata_kuliah if data.identitas else '' }}</td></tr>
     <tr><th>SKS</th><td>{{ data.identitas.sks if data.identitas else '' }}</td></tr>
     <tr><th>Semester</th><td>{{ data.identitas.semester if data.identitas else '' }}</td></tr>
   </table>
 
   <h2>Deskripsi Mata Kuliah</h2>
-  <p>{{ data.deskripsi_mata_kuliah }}</p>
+  <p style="text-align: justify;">{{ data.deskripsi_mata_kuliah }}</p>
 
   <h2>CPMK (Capaian Pembelajaran Mata Kuliah)</h2>
   <table>
-    <tr><th>Kode</th><th>Deskripsi</th><th>Bobot</th><th>CPL</th></tr>
+    <tr>
+      <th width="15%">Kode</th>
+      <th width="50%">Deskripsi</th>
+      <th width="15%">Bobot</th>
+      <th width="20%">CPL</th>
+    </tr>
     {% for c in data.cpmk %}
     {% if c is mapping %}
     <tr>
@@ -74,7 +85,12 @@ RPS_HTML_TEMPLATE = Template("""
 
   <h2>Sub-CPMK</h2>
   <table>
-    <tr><th>Kode</th><th>CPMK</th><th>Deskripsi</th><th>Indikator</th></tr>
+    <tr>
+      <th width="15%">Kode</th>
+      <th width="15%">CPMK</th>
+      <th width="45%">Deskripsi</th>
+      <th width="25%">Indikator</th>
+    </tr>
     {% for s in data.sub_cpmk %}
     {% if s is mapping %}
     <tr>
@@ -97,7 +113,13 @@ RPS_HTML_TEMPLATE = Template("""
 
   <h2>Rencana Pembelajaran</h2>
   <table>
-    <tr><th>Minggu</th><th>Sub-CPMK</th><th>Materi</th><th>Metode</th><th>Media</th></tr>
+    <tr>
+      <th width="10%">Minggu</th>
+      <th width="15%">Sub-CPMK</th>
+      <th width="45%">Materi Pembelajaran</th>
+      <th width="15%">Metode</th>
+      <th width="15%">Media</th>
+    </tr>
     {% for r in data.rencana_pembelajaran %}
     {% if r is mapping %}
     <tr>
@@ -129,7 +151,11 @@ RPS_HTML_TEMPLATE = Template("""
 
   <h2>Penilaian</h2>
   <table>
-    <tr><th>Komponen</th><th>Bobot</th><th>Jenis</th></tr>
+    <tr>
+      <th width="40%">Komponen Penilaian</th>
+      <th width="20%">Bobot</th>
+      <th width="40%">Jenis Evaluasi</th>
+    </tr>
     {% for p in data.penilaian %}
     {% if p is mapping %}
     <tr>
@@ -185,7 +211,7 @@ def generate_docx(rps_data: dict, output_path: str):
     
     # Identitas table
     doc.add_heading('Identitas Mata Kuliah', level=2)
-    table = doc.add_table(rows=4, cols=2)
+    table = doc.add_table(rows=4, cols=2, style='Table Grid')
     rows = [
         ('Nama MK', identitas.get('nama_mata_kuliah', '')),
         ('Kode MK', identitas.get('kode_mata_kuliah', '')),
@@ -198,7 +224,7 @@ def generate_docx(rps_data: dict, output_path: str):
 
     # CPMK
     doc.add_heading('CPMK', level=2)
-    cpmk_table = doc.add_table(rows=1, cols=4)
+    cpmk_table = doc.add_table(rows=1, cols=4, style='Table Grid')
     for j, h in enumerate(['Kode', 'Deskripsi', 'Bobot', 'CPL']):
         cpmk_table.rows[0].cells[j].text = h
     for cpmk in (rps_data.get('cpmk') or []):
@@ -217,7 +243,7 @@ def generate_docx(rps_data: dict, output_path: str):
 
     # Rencana Pembelajaran
     doc.add_heading('Rencana Pembelajaran', level=2)
-    rp_table = doc.add_table(rows=1, cols=5)
+    rp_table = doc.add_table(rows=1, cols=5, style='Table Grid')
     for j, h in enumerate(['Minggu', 'Sub-CPMK', 'Materi', 'Metode', 'Media']):
         rp_table.rows[0].cells[j].text = h
     for rp in (rps_data.get('rencana_pembelajaran') or []):
@@ -242,7 +268,7 @@ def generate_docx(rps_data: dict, output_path: str):
 
     # Penilaian
     doc.add_heading('Penilaian', level=2)
-    pen_table = doc.add_table(rows=1, cols=3)
+    pen_table = doc.add_table(rows=1, cols=3, style='Table Grid')
     for j, h in enumerate(['Komponen', 'Bobot', 'Jenis']):
         pen_table.rows[0].cells[j].text = h
     for p in (rps_data.get('penilaian') or []):
