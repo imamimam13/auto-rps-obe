@@ -1,6 +1,6 @@
 import json
 from typing import Dict, Any, List, Optional
-from app.services.ollama_service import ollama_service
+from app.services.ollama_service import ai_service as ollama_service
 from app.prompts.rps_prompts import (
     RPS_GENERATION_SYSTEM_PROMPT,
     RPS_GENERATION_PROMPT,
