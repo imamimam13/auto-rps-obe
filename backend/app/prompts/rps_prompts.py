@@ -105,7 +105,8 @@ Pastikan:
 4. Metode pembelajaran bervariasi dan student-centered
 5. Penilaian mencakup semua Sub-CPMK
 6. Bobot penilaian total = 1.0
-7. Gunakan taksonomi Bloom yang sesuai"""  # noqa: E501
+7. Gunakan taksonomi Bloom yang sesuai
+8. PENTING: Nilai dalam array "cpl_prodi" pada objek CPMK harus persis sama dan HANYA menggunakan kode dari daftar "CPL (Capaian Pembelajaran Lulusan) Prodi" yang diberikan di atas (misalnya: CPL-01, CPL-02, dst.). Dilarang keras mengarang kode CPL baru."""  # noqa: E501
 
 
 CPMK_GENERATION_PROMPT = """Berdasarkan informasi berikut, buatlah CPMK (Capaian Pembelajaran Mata Kuliah) yang sesuai:
@@ -130,7 +131,8 @@ Buat 4-8 CPMK yang relevan. Output format JSON:
   ]
 }}
 
-Bobot total harus 1.0. Gunakan taksonomi Bloom (C1-C6, A1-A5, P1-P4)."""  # noqa: E501
+Bobot total harus 1.0. Gunakan taksonomi Bloom (C1-C6, A1-A5, P1-P4).
+PENTING: Nilai dalam array "cpl_prodi" harus persis sama dan HANYA menggunakan kode dari daftar CPL PRODI yang diberikan di atas (misalnya CPL-1, CPL-2, dst.). Dilarang keras mengarang kode CPL baru."""  # noqa: E501
 
 
 SUB_CPMK_GENERATION_PROMPT = """Berdasarkan CPMK berikut, buat Sub-CPMK untuk setiap CPMK:
