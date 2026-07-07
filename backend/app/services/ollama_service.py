@@ -190,6 +190,7 @@ class AIService:
 
 
 ai_service = AIService()
+ollama_service = ai_service  # alias for backward compat
 
 
 async def get_ai() -> AIService:

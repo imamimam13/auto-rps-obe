@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import httpx
-from app.services.ollama_service import ollama_service
+from app.services.ollama_service import ai_service as ollama_service
 from app.core.config import settings
 
 router = APIRouter(prefix="/ollama", tags=["Ollama"])
