@@ -12,14 +12,14 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/autorps"
-    DATABASE_ECHO: bool = True
+    # Database (SQLite default biar gak perlu PostgreSQL)
+    DATABASE_URL: str = "sqlite+aiosqlite:///./autorps.db"
+    DATABASE_ECHO: bool = False
     
-    # Redis & Celery
-    REDIS_URL: str = "redis://localhost:6379/0"
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    # Redis & Celery (opsional)
+    REDIS_URL: str = ""
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
     
     # Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"

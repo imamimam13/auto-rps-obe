@@ -146,113 +146,27 @@ npm install && npm run dev
 
 ## Instalasi di Casa OS
 
-Casa OS adalah home server OS berbasis Linux. Ada 2 cara instalasi:
+### Cara termudah: 1 perintah
 
-### Cara 1: Via App Store (Docker) - Recommended
-
-Jalankan via Docker Compose (Casa OS sudah include Docker):
+SSH ke Casa OS lalu jalankan:
 
 ```bash
-# Masuk ke Casa OS terminal
-ssh user@casaos-ip
-
-# Clone repo
-git clone https://github.com/imamimam13/auto-rps-obe.git
-cd auto-rps-obe
-
-# Jalankan dengan Docker
-docker compose up -d
+bash <(curl -sL https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/casaos-app/install.sh)
 ```
 
-Atau install manual via **Casa OS App Store** dengan file `docker-compose.yml` yang sudah disediakan.
-
-### Cara 2: Manual Installation (Tanpa Docker)
+Atau manual:
 
 ```bash
-# Update package
-sudo apt update && sudo apt upgrade -y
-
-# Install dependencies
-sudo apt install -y python3 python3-pip python3-venv nodejs npm curl
-
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
-sudo systemctl start ollama
-sudo systemctl enable ollama
-
-# Download model AI
-ollama pull llama3.1:8b
-
-# Clone project
-git clone https://github.com/imamimam13/auto-rps-obe.git
-cd auto-rps-obe
-
-# Setup backend
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Jalankan backend (gunakan screen agar tetap jalan)
-screen -dmS backend uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-# Setup frontend
-cd ../frontend
-npm install
-screen -dmS frontend npm run dev -- --host 0.0.0.0
-```
-
-### Cara 3: Via Casa OS Custom App (Dari GitHub)
-
-> **Port default:** Backend `9810` · Frontend `9811`  
-> Port ini sudah dipilih agar tidak bentrok dengan app Casa OS lain.  
-> Bisa diubah lewat file `.env` (copy dari `.env.example`).
-
-#### Lewat WebUI (Mudah)
-
-1. Buka **Casa OS Dashboard** → **Apps**
-2. Klik tombol **Custom Install** (kanan atas)
-3. Pilih **Import** → **Docker Compose**
-4. Copy paste isi dari [`casaos-app/docker-compose.yml`](https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/casaos-app/docker-compose.yml)
-5. Klik **Submit**
-
-#### Lewat CLI (SSH)
-
-```bash
-# Login ke Casa OS
-ssh user@ip-casaos
-
-# Clone repo
-cd /DATA/AppData
 git clone https://github.com/imamimam13/auto-rps-obe.git
 cd auto-rps-obe/casaos-app
-
-# (Opsional) Ubah port jika bentrok
-cp .env.example .env
-# Edit .env, ganti port sesuai kebutuhan
-
-# Jalankan
-docker compose up -d
+bash install.sh
 ```
 
-Akses: `http://ip-casaos:9811` (frontend) · `http://ip-casaos:9810/docs` (API docs)
+Tunggu sampai selesai, lalu buka `http://ip-casaos:9811`
 
-#### Ubah Port Jika Bentrok
-
-Buat file `.env` di folder `casaos-app/`:
-```bash
-AUTO_RPS_BACKEND_PORT=9820
-AUTO_RPS_FRONTEND_PORT=9821
-OLLAMA_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=llama3.1:8b
-```
-
-#### Via Custom AppStore (Lanjutan)
-
-Bisa juga dengan fork [CasaOS-AppStore](https://github.com/IceWhaleTech/CasaOS-AppStore), lalu tambah app ini ke folder `Apps/`:
-```bash
-casaos-cli app-management register app-store https://github.com/username/casaos-AppStore/archive/main.zip
-```
+> **Catatan:** Script akan install Otomatis Python, Node.js, Ollama + model AI, dan semua dependencies.  
+> Tidak perlu PostgreSQL - pakai SQLite biar ringan.
+> Port: Backend `9810` · Frontend `9811`
 
 **Catatan untuk Casa OS:**
 - Ollama harus diinstall di **host** (bukan container) agar bisa akses GPU

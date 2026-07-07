@@ -7,10 +7,14 @@ class Base(DeclarativeBase):
     pass
 
 
+connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DATABASE_ECHO,
-    pool_pre_ping=True,
+    connect_args=connect_args,
 )
 
 AsyncSessionLocal = async_sessionmaker(
