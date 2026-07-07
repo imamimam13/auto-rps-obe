@@ -21,9 +21,11 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = ""
     CELERY_RESULT_BACKEND: str = ""
     
-    # Ollama
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3.1:8b"
+    # Ollama / LM Studio / 9Router / OpenAI Compatible
+    AI_PROVIDER: str = "ollama"  # ollama, lmstudio, openai, 9router
+    AI_BASE_URL: str = "http://localhost:11434"
+    AI_MODEL: str = "llama3.1:8b"
+    AI_API_KEY: str = ""  # For OpenAI-compatible APIs
     OLLAMA_TIMEOUT: int = 120
     
     # JWT

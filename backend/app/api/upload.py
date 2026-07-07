@@ -41,62 +41,57 @@ def extract_text_from_pdf(file: UploadFile) -> str:
 
 
 def split_visi_misi(text: str) -> dict:
-    """Auto-split visi & misi from PDF text using common patterns."""
-    text_lower = text.lower()
+    """Auto-split visi & misi from PDF text using line-based parsing."""
+    lines = text.split("\n")
+    visi_lines = []
+    misi_lines = []
+    current = None
 
-    # Try splitting by common Indonesian headings
-    patterns = [
-        # "VISI: ... MISI: ..."
-        r"(?:visi|visi\s+prodi)\s*[:\-]?\s*(.+?)(?=\s*(?:misi|misi\s+prodi)\s*[:\-]?\s*)",
-        r"(?:misi|misi\s+prodi)\s*[:\-]?\s*(.+)",
-    ]
+    # Keywords that mark the END of a section
+    stop_keywords = ["tujuan", "sasaran", "strategi", "bab", "cpl", "cpmk", "dosen", "mata kuliah", "program studi", "fakultas"]
 
-    visi = misi = ""
+    for i, line in enumerate(lines):
+        l = line.strip().lower()
 
-    # Look for VISI section
-    visi_match = re.search(
-        r"(?:visi|visi\s+prodi)\s*[:\-]?\s*(.+?)(?=\s*(?:misi|misi\s+prodi|tujuan|bab\s+\d+|$))",
-        text, re.IGNORECASE | re.DOTALL
-    )
-    misi_match = re.search(
-        r"(?:misi|misi\s+prodi)\s*[:\-]?\s*(.+?)(?=\s*(?:tujuan|bab\s+\d+|$))",
-        text, re.IGNORECASE | re.DOTALL
-    )
+        # Detect section headers
+        is_visi_header = bool(re.match(r"^\s*\*?\*?\s*visi\b", l))
+        is_misi_header = bool(re.match(r"^\s*\*?\*?\s*misi\b", l))
 
-    if visi_match:
-        visi = visi_match.group(1).strip().rstrip(".")
-    if misi_match:
-        misi = misi_match.group(1).strip().rstrip(".")
+        if is_visi_header:
+            current = "visi"
+            # Grab text after the keyword on same line
+            after = re.sub(r"^.*?\bvisi\b\s*[\*:\-\(\)]*\s*", "", line, flags=re.IGNORECASE).strip()
+            after = re.sub(r"^[\*\-\.]+", "", after).strip()
+            if after and len(after) > 2:
+                visi_lines.append(after)
+            continue
 
-    # If splitting didn't work, try line-based heuristic
-    if not visi and not misi:
-        lines = text.strip().split("\n")
-        visi_lines, misi_lines = [], []
-        current = None
-        for line in lines:
-            l = line.strip().lower()
-            if re.search(r"\bvisi\b", l):
-                current = "visi"
-                # Extract text after "visi" keyword on same line
-                after = re.sub(r"^.*?\bvisi\b\s*[:\-]?\s*", "", line, flags=re.IGNORECASE)
-                if after.strip():
-                    visi_lines.append(after.strip())
-                continue
-            elif re.search(r"\bmisi\b", l):
-                current = "misi"
-                after = re.sub(r"^.*?\bmisi\b\s*[:\-]?\s*", "", line, flags=re.IGNORECASE)
-                if after.strip():
-                    misi_lines.append(after.strip())
-                continue
-            if current == "visi":
-                visi_lines.append(line)
-            elif current == "misi":
-                misi_lines.append(line)
+        if is_misi_header:
+            current = "misi"
+            after = re.sub(r"^.*?\bmisi\b\s*[\*:\-\(\)]*\s*", "", line, flags=re.IGNORECASE).strip()
+            after = re.sub(r"^[\*\-\.]+", "", after).strip()
+            if after and len(after) > 2:
+                misi_lines.append(after)
+            continue
 
-        if visi_lines:
-            visi = "\n".join(visi_lines).strip().rstrip(".")
-        if misi_lines:
-            misi = "\n".join(misi_lines).strip().rstrip(".")
+        # Check if we hit a new section (stop collecting)
+        if current and any(re.match(rf"^\s*\*?\*?\s*{kw}", l) for kw in stop_keywords):
+            current = None
+            continue
+
+        # Collect lines for current section
+        clean = line.strip()
+        if current == "visi" and clean and clean not in [".", ",", "-", ""]:
+            visi_lines.append(clean)
+        elif current == "misi" and clean and clean not in [".", ",", "-", ""]:
+            misi_lines.append(clean)
+
+    visi = "\n".join(visi_lines).strip()
+    misi = "\n".join(misi_lines).strip()
+
+    # Clean up trailing junk
+    visi = re.sub(r"[\s\.]+$", "", visi)
+    misi = re.sub(r"[\s\.]+$", "", misi)
 
     return {"visi": visi, "misi": misi}
 

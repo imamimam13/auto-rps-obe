@@ -78,7 +78,7 @@ class MataKuliahBase(BaseModel):
 
 
 class MataKuliahCreate(MataKuliahBase):
-    prodi_id: int
+    prodi_id: Optional[int] = None
 
 
 class MataKuliahUpdate(BaseModel):
@@ -117,7 +117,7 @@ class RPSIdentitas(BaseModel):
     semester: int
     prodi: str
     fakultas: str
-    dosen_pengampu: List[Dict[str, str]]
+    dosen_pengampu: Optional[List[Dict[str, str]]] = []
     tahun_akademik: str
 
 
@@ -159,7 +159,7 @@ class RPSBase(BaseModel):
     prodi_id: int
     semester: int
     tahun_akademik: str
-    dosen_pengampu: List[Dict[str, str]]
+    dosen_pengampu: Optional[List[Dict[str, str]]] = []
     identitas: Optional[RPSIdentitas] = None
     cpmk: Optional[List[RPSCPMK]] = []
     sub_cpmk: Optional[List[RPSSubCPMK]] = []
@@ -209,7 +209,15 @@ class RPSGenerateRequest(BaseModel):
     prodi_id: int
     semester: int
     tahun_akademik: str
-    dosen_pengampu: List[Dict[str, str]]
+    dosen_pengampu: Optional[List[Dict[str, str]]] = []
+    additional_context: Optional[str] = None
+
+
+class BulkGenerateRequest(BaseModel):
+    prodi_id: int
+    semester: Optional[int] = None
+    tahun_akademik: str
+    dosen_pengampu: Optional[List[Dict[str, str]]] = []
     additional_context: Optional[str] = None
 
 

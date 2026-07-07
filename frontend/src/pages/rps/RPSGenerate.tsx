@@ -93,10 +93,6 @@ export default function RPSGenerate() {
       toast.error('Data mata kuliah atau prodi tidak ditemukan')
       return
     }
-    if (formData.dosen_pengampu.length === 0) {
-      toast.error('Tambahkan minimal 1 dosen pengampu')
-      return
-    }
     setGenerating(true)
     try {
       const res = await api.post('/api/v1/generate/rps', {
@@ -125,23 +121,22 @@ export default function RPSGenerate() {
         prodi_id: prodi.id,
         semester: formData.semester,
         tahun_akademik: formData.tahun_akademik,
-        dosen_pengampu: formData.dosen_pengampu,
-        identitas: {
-          ...rpsData.identitas,
-          dosen_pengampu: formData.dosen_pengampu,
-        },
-        cpmk: rpsData.cpmk,
-        sub_cpmk: rpsData.sub_cpmk,
-        rencana_pembelajaran: rpsData.rencana_pembelajaran,
-        metode_pembelajaran: rpsData.metode_pembelajaran,
-        media_pembelajaran: rpsData.media_pembelajaran,
-        penilaian: rpsData.penilaian,
-        referensi: rpsData.referensi,
+        dosen_pengampu: formData.dosen_pengampu.length > 0 ? formData.dosen_pengampu : [],
+        identitas: rpsData.identitas || null,
+        cpmk: rpsData.cpmk || [],
+        sub_cpmk: rpsData.sub_cpmk || [],
+        rencana_pembelajaran: rpsData.rencana_pembelajaran || [],
+        metode_pembelajaran: rpsData.metode_pembelajaran || [],
+        media_pembelajaran: rpsData.media_pembelajaran || [],
+        penilaian: rpsData.penilaian || [],
+        referensi: rpsData.referensi || [],
       })
       toast.success('RPS berhasil disimpan!')
       navigate(`/rps/${res.data.id}`)
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Gagal menyimpan RPS')
+      const detail = e.response?.data?.detail
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : (detail || 'Gagal menyimpan RPS')
+      toast.error(msg)
     }
   }
 
