@@ -7,7 +7,7 @@ interface User {
   nama: string
   email?: string
   nidn?: string
-  role: 'admin' | 'dosen'
+  role: 'admin' | 'prodi'
   prodi_id?: number
 }
 

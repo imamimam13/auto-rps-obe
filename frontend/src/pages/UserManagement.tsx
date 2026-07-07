@@ -21,7 +21,7 @@ export default function UserManagement() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [showPasswordModal, setShowPasswordModal] = useState<number | null>(null)
   const [newPassword, setNewPassword] = useState('')
-  const [form, setForm] = useState({ username: '', password: '', nama: '', nidn: '', role: 'dosen' })
+  const [form, setForm] = useState({ username: '', password: '', nama: '', nidn: '', role: 'prodi' })
 
   useEffect(() => { loadUsers() }, [])
 
@@ -104,7 +104,7 @@ export default function UserManagement() {
   function closeForm() {
     setShowForm(false)
     setEditingId(null)
-    setForm({ username: '', password: '', nama: '', nidn: '', role: 'dosen' })
+    setForm({ username: '', password: '', nama: '', nidn: '', role: 'prodi' })
   }
 
   return (
@@ -112,9 +112,9 @@ export default function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Manajemen User</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola akun dosen dan admin</p>
+          <p className="text-sm text-gray-500 mt-1">Kelola akun prodi dan admin</p>
         </div>
-        <button className="macos-button" onClick={() => { setEditingId(null); setForm({ username: '', password: '', nama: '', nidn: '', role: 'dosen' }); setShowForm(true) }}>
+        <button className="macos-button" onClick={() => { setEditingId(null); setForm({ username: '', password: '', nama: '', nidn: '', role: 'prodi' }); setShowForm(true) }}>
           <UserPlus className="w-4 h-4" /> Tambah User
         </button>
       </div>
@@ -147,7 +147,7 @@ export default function UserManagement() {
             <div>
               <label className="macos-label">Role</label>
               <select className="macos-input" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>
-                <option value="dosen">Dosen</option>
+                <option value="prodi">Prodi</option>
                 <option value="admin">Admin</option>
               </select>
             </div>

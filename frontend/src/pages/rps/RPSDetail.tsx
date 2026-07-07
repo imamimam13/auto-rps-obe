@@ -3,9 +3,11 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, FileText, CheckSquare, Download, Sparkles } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function RPSDetail() {
   const { id } = useParams()
+  const { isAdmin } = useAuth()
   const [rps, setRps] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [validating, setValidating] = useState(false)
@@ -162,7 +164,7 @@ export default function RPSDetail() {
           <ArrowLeft className="w-4 h-4" /> Kembali
         </Link>
         <div className="flex items-center gap-2">
-          {rps.status === 'draft' && (
+          {rps.status === 'draft' && isAdmin && (
             <button
               onClick={() => handleUpdateStatus('review')}
               disabled={updatingStatus}
@@ -189,7 +191,7 @@ export default function RPSDetail() {
               Publikasikan
             </button>
           )}
-          {rps.status === 'draft' && (
+          {rps.status === 'draft' && isAdmin && (
             <button onClick={openEditModal} className="macos-button-ghost flex items-center gap-1.5 text-sm">
               <Sparkles className="w-4 h-4 text-purple-500" /> Edit RPS (JSON)
             </button>
@@ -246,7 +248,7 @@ export default function RPSDetail() {
               }`}>
                 Skor: {rps.obe_score}/100
               </span>
-              {rps.status === 'draft' && (
+              {rps.status === 'draft' && isAdmin && (
                 <button
                   onClick={handleAutoFix}
                   disabled={fixing}

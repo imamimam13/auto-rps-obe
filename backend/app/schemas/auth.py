@@ -6,7 +6,7 @@ from enum import Enum
 
 class UserRole(str, Enum):
     ADMIN = "admin"
-    DOSEN = "dosen"
+    PRODI = "prodi"
 
 
 class LoginRequest(BaseModel):
@@ -29,7 +29,7 @@ class UserCreate(BaseModel):
     email: Optional[str] = None
     nama: str
     nidn: Optional[str] = None
-    role: UserRole = UserRole.DOSEN
+    role: UserRole = UserRole.PRODI
     prodi_id: Optional[int] = None
 
 

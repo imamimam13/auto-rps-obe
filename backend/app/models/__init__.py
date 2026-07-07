@@ -123,7 +123,7 @@ class OBEValidationLog(Base):
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
-    DOSEN = "dosen"
+    PRODI = "prodi"
 
 
 class User(Base):
@@ -135,7 +135,7 @@ class User(Base):
     password_hash = Column(String(200), nullable=False)
     nama = Column(String(200), nullable=False)
     nidn = Column(String(20), unique=True)
-    role = Column(Enum(UserRole), default=UserRole.DOSEN)
+    role = Column(Enum(UserRole), default=UserRole.PRODI)
     prodi_id = Column(Integer, ForeignKey("prodi.id"), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
