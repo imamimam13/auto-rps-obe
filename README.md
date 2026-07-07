@@ -202,21 +202,34 @@ npm install
 screen -dmS frontend npm run dev -- --host 0.0.0.0
 ```
 
-### Cara 3: Via Casa OS App Catalog (Custom)
+### Cara 3: Via Casa OS Custom App (Dari GitHub)
 
-Sudah tersedia folder `casaos-app/` di repo ini. Cara deploy:
+Cara paling mudah - Casa OS bisa install langsung dari URL GitHub:
 
+1. Buka **Casa OS Dashboard** → **Apps** → **Install Custom App**
+2. Isi form:
+   - **Nama App**: `Auto RPS & OBE AI`
+   - **URL Repo**: `https://github.com/imamimam13/auto-rps-obe`
+   - **Path docker-compose**: `casaos-app/docker-compose.yml`
+   - **Branch**: `main`
+3. Klik **Install**
+
+Atau lewat CLI:
+```bash
+casaos-cli app install -u https://github.com/imamimam13/auto-rps-obe -p casaos-app/docker-compose.yml
+```
+
+Atau clone manual:
 ```bash
 # Masuk ke direktori Casa OS apps
 sudo mkdir -p /var/lib/casaos/apps/auto-rps-obe
 cd /var/lib/casaos/apps/auto-rps-obe
 
-# Clone atau copy file dari repo
+# Clone repo
 git clone https://github.com/imamimam13/auto-rps-obe.git .
-# atau copy manual folder casaos-app ke sini
+# atau copy folder casaos-app
 
-# Install lewat Casa OS App Store
-# atau jalankan manual:
+# Jalankan
 docker compose up -d
 ```
 
