@@ -204,6 +204,10 @@ screen -dmS frontend npm run dev -- --host 0.0.0.0
 
 ### Cara 3: Via Casa OS Custom App (Dari GitHub)
 
+> **Port default:** Backend `9810` · Frontend `9811`  
+> Port ini sudah dipilih agar tidak bentrok dengan app Casa OS lain.  
+> Bisa diubah lewat file `.env` (copy dari `.env.example`).
+
 #### Lewat WebUI (Mudah)
 
 1. Buka **Casa OS Dashboard** → **Apps**
@@ -212,37 +216,41 @@ screen -dmS frontend npm run dev -- --host 0.0.0.0
 4. Copy paste isi dari [`casaos-app/docker-compose.yml`](https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/casaos-app/docker-compose.yml)
 5. Klik **Submit**
 
-Atau via **Import → Docker CLI**:
-```bash
-docker run -d \
-  --name auto-rps-obe-db \
-  --network casaos \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=autorps \
-  -v auto_rps_db:/var/lib/postgresql/data \
-  postgres:16-alpine
-```
-
-#### Lewat CLI (app-management)
+#### Lewat CLI (SSH)
 
 ```bash
-# Login dulu ke Casa OS via SSH
+# Login ke Casa OS
 ssh user@ip-casaos
 
 # Clone repo
+cd /DATA/AppData
 git clone https://github.com/imamimam13/auto-rps-obe.git
 cd auto-rps-obe/casaos-app
 
-# Jalankan docker compose
+# (Opsional) Ubah port jika bentrok
+cp .env.example .env
+# Edit .env, ganti port sesuai kebutuhan
+
+# Jalankan
 docker compose up -d
+```
+
+Akses: `http://ip-casaos:9811` (frontend) · `http://ip-casaos:9810/docs` (API docs)
+
+#### Ubah Port Jika Bentrok
+
+Buat file `.env` di folder `casaos-app/`:
+```bash
+AUTO_RPS_BACKEND_PORT=9820
+AUTO_RPS_FRONTEND_PORT=9821
+OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=llama3.1:8b
 ```
 
 #### Via Custom AppStore (Lanjutan)
 
 Bisa juga dengan fork [CasaOS-AppStore](https://github.com/IceWhaleTech/CasaOS-AppStore), lalu tambah app ini ke folder `Apps/`:
 ```bash
-# Register app store
 casaos-cli app-management register app-store https://github.com/username/casaos-AppStore/archive/main.zip
 ```
 

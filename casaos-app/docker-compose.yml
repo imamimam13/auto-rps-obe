@@ -37,7 +37,7 @@ services:
       dockerfile: Dockerfile
     container_name: auto-rps-obe-backend
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${AUTO_RPS_BACKEND_PORT:-9810}:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@auto-rps-obe-db:5432/autorps
       REDIS_URL: redis://auto-rps-obe-redis:6379/0
@@ -64,7 +64,7 @@ services:
       dockerfile: Dockerfile
     container_name: auto-rps-obe-frontend
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${AUTO_RPS_FRONTEND_PORT:-9811}:5173"
     depends_on:
       - auto-rps-obe-backend
     restart: unless-stopped
