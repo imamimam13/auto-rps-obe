@@ -119,3 +119,26 @@ class OBEValidationLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     rps = relationship("RPS")
+
+
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"
+    DOSEN = "dosen"
+
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    email = Column(String(100), unique=True, index=True)
+    password_hash = Column(String(200), nullable=False)
+    nama = Column(String(200), nullable=False)
+    nidn = Column(String(20), unique=True)
+    role = Column(Enum(UserRole), default=UserRole.DOSEN)
+    prodi_id = Column(Integer, ForeignKey("prodi.id"), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    prodi = relationship("Prodi")

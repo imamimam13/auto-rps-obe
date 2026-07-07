@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   GraduationCap,
@@ -7,7 +7,10 @@ import {
   CheckSquare,
   Settings,
   Sparkles,
+  Users,
+  LogOut,
 } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,6 +22,14 @@ const navItems = [
 ]
 
 export default function Sidebar() {
+  const { user, logout, isAdmin } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
+
   return (
     <aside className="w-64 macos-sidebar flex flex-col h-screen">
       {/* App Header */}
@@ -53,11 +64,42 @@ export default function Sidebar() {
             <span>{item.label}</span>
           </NavLink>
         ))}
+
+        {isAdmin && (
+          <NavLink
+            to="/admin/users"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2 rounded-apple text-sm font-medium transition-all duration-150 ${
+                isActive
+                  ? 'bg-macos-blue/10 text-macos-blue'
+                  : 'text-gray-600 hover:bg-black/[0.04] hover:text-gray-900'
+              }`
+            }
+          >
+            <Users className="w-4.5 h-4.5" size={18} />
+            <span>Manajemen User</span>
+          </NavLink>
+        )}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/30">
-        <p className="text-[11px] text-gray-400">Auto RPS & OBE AI v1.0</p>
+      {/* User Info & Logout */}
+      <div className="px-4 py-4 border-t border-white/30 space-y-3">
+        <div className="flex items-center gap-2.5 px-1">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-macos-blue to-purple-400 flex items-center justify-center text-white text-xs font-semibold">
+            {user?.nama.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-900 truncate">{user?.nama}</p>
+            <p className="text-[10px] text-gray-400 capitalize">{user?.role}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-3 py-1.5 w-full rounded-apple text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Keluar</span>
+        </button>
       </div>
     </aside>
   )

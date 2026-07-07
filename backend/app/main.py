@@ -7,14 +7,33 @@ from app.api.v1 import router as v1_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     from app.core.database import init_db
+    from app.core.auth import hash_password
+    from app.models import User, UserRole
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import select
+
     try:
         await init_db()
+
+        # Seed default admin
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(User).where(User.username == "admin"))
+            if not result.scalar_one_or_none():
+                admin = User(
+                    username="admin",
+                    password_hash=hash_password("admin"),
+                    nama="Administrator",
+                    role=UserRole.ADMIN,
+                )
+                db.add(admin)
+                await db.commit()
+                print("✅ Default admin created (admin/admin)")
+            else:
+                print("ℹ️  Admin already exists")
     except Exception as e:
-        print(f"Database initialization skipped: {e}")
+        print(f"Startup: {e}")
     yield
-    # Shutdown
 
 
 app = FastAPI(

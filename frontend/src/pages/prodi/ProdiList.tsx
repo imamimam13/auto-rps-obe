@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, GraduationCap, ExternalLink, Upload } from 'lucide-react'
+import { Plus, Search, GraduationCap, ExternalLink, Upload, Link as LinkIcon } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -74,6 +74,41 @@ export default function ProdiList() {
     input.click()
   }
 
+  async function uploadPdfVisiMisi() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const form = new FormData()
+      form.append('file', file)
+      try {
+        const res = await api.post('/api/v1/upload/pdf-prodi', form)
+        setFormData(f => ({ ...f, visi: res.data.visi, misi: res.data.misi }))
+        toast.success('Visi & Misi berhasil diekstrak dari PDF')
+      } catch (e: any) {
+        toast.error(e.response?.data?.detail || 'Gagal baca PDF')
+      }
+    }
+    input.click()
+  }
+
+  const [pdfUrl, setPdfUrl] = useState('')
+
+  async function fetchPdfFromUrl() {
+    if (!pdfUrl) return
+    const form = new FormData()
+    form.append('url', pdfUrl)
+    try {
+      const res = await api.post('/api/v1/upload/pdf-prodi-url', form)
+      setFormData(f => ({ ...f, visi: res.data.visi, misi: res.data.misi }))
+      toast.success('Visi & Misi berhasil dibaca dari URL')
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal baca PDF dari URL')
+    }
+  }
+
   const filtered = prodi.filter(
     (p) =>
       p.nama.toLowerCase().includes(search.toLowerCase()) ||
@@ -116,6 +151,20 @@ export default function ProdiList() {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <button type="button" onClick={uploadPdfVisiMisi} className="macos-button w-full py-2 flex items-center justify-center gap-2 text-sm mb-2">
+                <Upload className="w-4 h-4" /> Upload PDF (Visi & Misi) — 1 file aja
+              </button>
+              <div className="flex gap-2">
+                <input
+                  className="macos-input flex-1 text-sm"
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  placeholder="Atau masukkan URL PDF (Google Drive, dll)..."
+                />
+                <button type="button" onClick={fetchPdfFromUrl} className="macos-button px-3 flex items-center gap-1 text-sm">
+                  <LinkIcon className="w-3.5 h-3.5" /> Baca URL
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="macos-label">Kode Prodi</label>

@@ -1,6 +1,9 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { AuthProvider, useAuth } from '@/hooks/useAuth'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Sidebar from '@/components/layout/Sidebar'
+import LoginPage from '@/pages/LoginPage'
 import Dashboard from '@/pages/Dashboard'
 import ProdiList from '@/pages/prodi/ProdiList'
 import ProdiDetail from '@/pages/prodi/ProdiDetail'
@@ -11,9 +14,13 @@ import RPSList from '@/pages/rps/RPSList'
 import RPSDetail from '@/pages/rps/RPSDetail'
 import RPSGenerate from '@/pages/rps/RPSGenerate'
 import OBEAnalyzer from '@/pages/obe/OBEAnalyzer'
+import UserManagement from '@/pages/UserManagement'
 import Settings from '@/pages/Settings'
 
-export default function App() {
+function AppLayout() {
+  const { user } = useAuth()
+  if (!user) return null
+
   return (
     <div className="flex h-screen bg-macos-bg">
       <Sidebar />
@@ -31,9 +38,29 @@ export default function App() {
             <Route path="/rps/generate/:mkId" element={<RPSGenerate />} />
             <Route path="/obe" element={<OBEAnalyzer />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/admin/users" element={
+              <ProtectedRoute adminOnly>
+                <UserManagement />
+              </ProtectedRoute>
+            } />
           </Routes>
         </div>
       </main>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/*" element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        } />
+      </Routes>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -47,6 +74,6 @@ export default function App() {
           },
         }}
       />
-    </div>
+    </AuthProvider>
   )
 }

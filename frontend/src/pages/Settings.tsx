@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Server, Database, Cpu, Download, RefreshCw } from 'lucide-react'
+import { Settings as SettingsIcon, Server, Cpu, RefreshCw, Link, Save } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -8,6 +8,7 @@ export default function Settings() {
   const [models, setModels] = useState<string[]>([])
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434')
   const [model, setModel] = useState('llama3.1:8b')
+  const [connecting, setConnecting] = useState(false)
 
   useEffect(() => {
     checkOllama()
@@ -21,8 +22,43 @@ export default function Settings() {
         const mRes = await api.get('/api/v1/ollama/models')
         setModels(mRes.data.models || [])
       }
-    } catch (e) {
+    } catch {
       setOllamaStatus(false)
+    }
+  }
+
+  async function connectOllama() {
+    setConnecting(true)
+    try {
+      const res = await api.post('/api/v1/ollama/configure', {
+        base_url: ollamaUrl,
+        model: model,
+      })
+      setOllamaStatus(res.data.available)
+      if (res.data.available) {
+        const mRes = await api.get('/api/v1/ollama/models')
+        setModels(mRes.data.models || [])
+        toast.success('Terhubung ke Ollama!')
+      } else {
+        toast.error('Ollama tidak merespon')
+      }
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal terhubung')
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  async function handleModelChange(newModel: string) {
+    setModel(newModel)
+    try {
+      await api.post('/api/v1/ollama/configure', {
+        base_url: ollamaUrl,
+        model: newModel,
+      })
+      toast.success(`Model diganti ke ${newModel}`)
+    } catch {
+      toast.error('Gagal ganti model')
     }
   }
 
@@ -49,7 +85,7 @@ export default function Settings() {
               )}
             </p>
           </div>
-          <button onClick={checkOllama} className="macos-button-ghost p-2">
+          <button onClick={checkOllama} className="macos-button-ghost p-2" title="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
@@ -57,17 +93,40 @@ export default function Settings() {
         <div className="space-y-4">
           <div>
             <label className="macos-label">Ollama URL</label>
-            <input className="macos-input" value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} placeholder="http://localhost:11434" />
+            <div className="flex gap-2">
+              <input
+                className="macos-input flex-1"
+                value={ollamaUrl}
+                onChange={(e) => setOllamaUrl(e.target.value)}
+                placeholder="http://192.168.1.100:11434"
+              />
+              <button
+                onClick={connectOllama}
+                disabled={connecting}
+                className="macos-button px-4 flex items-center gap-2"
+              >
+                <Link className="w-4 h-4" />
+                {connecting ? '...' : 'Hubungkan'}
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Masukkan IP perangkat lain yang ada Ollama-nya</p>
           </div>
           <div>
             <label className="macos-label">Model AI</label>
-            <select className="macos-input" value={model} onChange={(e) => setModel(e.target.value)}>
+            <select
+              className="macos-input"
+              value={model}
+              onChange={(e) => handleModelChange(e.target.value)}
+            >
               {models.length > 0 ? (
                 models.map((m) => <option key={m} value={m}>{m}</option>)
               ) : (
                 <option value="llama3.1:8b">llama3.1:8b</option>
               )}
             </select>
+            {models.length > 0 && (
+              <p className="text-[11px] text-gray-400 mt-1">{models.length} model tersedia</p>
+            )}
           </div>
         </div>
       </div>
@@ -97,7 +156,7 @@ export default function Settings() {
           </div>
           <div className="flex justify-between py-1.5">
             <span className="text-gray-500">Database</span>
-            <span className="text-gray-900">PostgreSQL</span>
+            <span className="text-gray-900">SQLite</span>
           </div>
         </div>
       </div>
