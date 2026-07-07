@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models import RPS, Prodi, MataKuliah
@@ -76,6 +76,7 @@ async def generate_rps(
 @router.post("/bulk-rps", response_model=dict)
 async def bulk_generate_rps(
     data: BulkGenerateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Generate RPS for all Mata Kuliah in a Prodi."""
@@ -98,6 +99,9 @@ async def bulk_generate_rps(
     errors = []
 
     for mk in mata_kuliah_list:
+        if await request.is_disconnected():
+            print(f"[BULK GENERATE] Client disconnected. Stopping generation at mata kuliah: {mk.nama}")
+            break
         try:
             mk_data = {
                 "kode": mk.kode,
