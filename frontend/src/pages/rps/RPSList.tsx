@@ -92,13 +92,25 @@ export default function RPSList() {
   async function handleExport(id: number, format: string) {
     try {
       const res = await api.post(`/api/v1/export/${id}?export_format=${format}`, {}, { responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const contentType = res.headers['content-type'] || ''
+      const blob = new Blob([res.data], { type: contentType })
+      const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `RPS-${id}.${format}`
+      
+      let ext = format
+      if (format === 'pdf' && contentType.includes('text/html')) {
+        ext = 'html'
+        toast.error('xhtml2pdf tidak terinstall di server. File diunduh sebagai HTML.', { duration: 5000 })
+      }
+      
+      a.download = `RPS-${id}.${ext}`
       a.click()
       window.URL.revokeObjectURL(url)
-      toast.success(`Berhasil export ${format.toUpperCase()}`)
+      
+      if (ext === format) {
+        toast.success(`Berhasil export ${format.toUpperCase()}`)
+      }
     } catch (e) {
       toast.error('Gagal export')
     }

@@ -8,9 +8,6 @@ from sqlalchemy import select
 import json
 import os
 from app.core.config import settings
-from docx import Document
-from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from jinja2 import Template
 
 router = APIRouter(prefix="/export", tags=["Export"])
@@ -60,7 +57,15 @@ RPS_HTML_TEMPLATE = Template("""
       <td>{{ c.kode }}</td>
       <td>{{ c.deskripsi }}</td>
       <td>{{ c.bobot }}</td>
-      <td>{{ c.cpl_prodi | join(', ') }}</td>
+      <td>
+        {% if c.cpl_prodi is string %}
+          {{ c.cpl_prodi }}
+        {% elif c.cpl_prodi is iterable %}
+          {{ c.cpl_prodi | join(', ') }}
+        {% else %}
+          {{ c.cpl_prodi }}
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -73,7 +78,15 @@ RPS_HTML_TEMPLATE = Template("""
       <td>{{ s.kode }}</td>
       <td>{{ s.cpmk_kode }}</td>
       <td>{{ s.deskripsi }}</td>
-      <td>{{ s.indikator | join('; ') }}</td>
+      <td>
+        {% if s.indikator is string %}
+          {{ s.indikator }}
+        {% elif s.indikator is iterable %}
+          {{ s.indikator | join('; ') }}
+        {% else %}
+          {{ s.indikator }}
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -86,8 +99,24 @@ RPS_HTML_TEMPLATE = Template("""
       <td>{{ r.minggu_ke }}</td>
       <td>{{ r.sub_cpmk_kode }}</td>
       <td>{{ r.materi }}</td>
-      <td>{{ r.metode | join(', ') }}</td>
-      <td>{{ r.media | join(', ') }}</td>
+      <td>
+        {% if r.metode is string %}
+          {{ r.metode }}
+        {% elif r.metode is iterable %}
+          {{ r.metode | join(', ') }}
+        {% else %}
+          {{ r.metode }}
+        {% endif %}
+      </td>
+      <td>
+        {% if r.media is string %}
+          {{ r.media }}
+        {% elif r.media is iterable %}
+          {{ r.media | join(', ') }}
+        {% else %}
+          {{ r.media }}
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -107,7 +136,13 @@ RPS_HTML_TEMPLATE = Template("""
   <h2>Referensi</h2>
   <ul>
     {% for ref in data.referensi %}
-    <li>{{ ref.judul }}, {{ ref.pengarang }} ({{ ref.tahun }})</li>
+    <li>
+      {{ ref.judul if ref.judul else '' }}
+      {{ ', ' + ref.pengarang if ref.pengarang else '' }}
+      {% if ref.tahun %}
+        ({{ ref.tahun }})
+      {% endif %}
+    </li>
     {% endfor %}
   </ul>
 </body>
@@ -116,6 +151,10 @@ RPS_HTML_TEMPLATE = Template("""
 
 
 def generate_docx(rps_data: dict, output_path: str):
+    from docx import Document
+    from docx.shared import Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
     doc = Document()
     style = doc.styles['Normal']
     style.font.name = 'Times New Roman'
@@ -150,10 +189,15 @@ def generate_docx(rps_data: dict, output_path: str):
         cpmk_table.rows[0].cells[j].text = h
     for cpmk in rps_data.get('cpmk', []):
         row = cpmk_table.add_row()
-        row.cells[0].text = cpmk.get('kode', '')
-        row.cells[1].text = cpmk.get('deskripsi', '')
-        row.cells[2].text = str(cpmk.get('bobot', ''))
-        row.cells[3].text = ', '.join(cpmk.get('cpl_prodi', []))
+        row.cells[0].text = cpmk.get('kode', '') or ''
+        row.cells[1].text = cpmk.get('deskripsi', '') or ''
+        row.cells[2].text = str(cpmk.get('bobot', '')) or ''
+        
+        cpl_prodi = cpmk.get('cpl_prodi', [])
+        if isinstance(cpl_prodi, list):
+            row.cells[3].text = ', '.join([str(x) for x in cpl_prodi])
+        else:
+            row.cells[3].text = str(cpl_prodi or '')
 
     # Rencana Pembelajaran
     doc.add_heading('Rencana Pembelajaran', level=2)
@@ -162,11 +206,21 @@ def generate_docx(rps_data: dict, output_path: str):
         rp_table.rows[0].cells[j].text = h
     for rp in rps_data.get('rencana_pembelajaran', []):
         row = rp_table.add_row()
-        row.cells[0].text = str(rp.get('minggu_ke', ''))
-        row.cells[1].text = rp.get('sub_cpmk_kode', '')
-        row.cells[2].text = rp.get('materi', '')
-        row.cells[3].text = ', '.join(rp.get('metode', []))
-        row.cells[4].text = ', '.join(rp.get('media', []))
+        row.cells[0].text = str(rp.get('minggu_ke', '')) or ''
+        row.cells[1].text = rp.get('sub_cpmk_kode', '') or ''
+        row.cells[2].text = rp.get('materi', '') or ''
+        
+        metode = rp.get('metode', [])
+        if isinstance(metode, list):
+            row.cells[3].text = ', '.join([str(x) for x in metode])
+        else:
+            row.cells[3].text = str(metode or '')
+            
+        media = rp.get('media', [])
+        if isinstance(media, list):
+            row.cells[4].text = ', '.join([str(x) for x in media])
+        else:
+            row.cells[4].text = str(media or '')
 
     # Penilaian
     doc.add_heading('Penilaian', level=2)
@@ -175,9 +229,9 @@ def generate_docx(rps_data: dict, output_path: str):
         pen_table.rows[0].cells[j].text = h
     for p in rps_data.get('penilaian', []):
         row = pen_table.add_row()
-        row.cells[0].text = p.get('komponen', '')
-        row.cells[1].text = str(p.get('bobot', ''))
-        row.cells[2].text = p.get('jenis', '')
+        row.cells[0].text = p.get('komponen', '') or ''
+        row.cells[1].text = str(p.get('bobot', '')) or ''
+        row.cells[2].text = p.get('jenis', '') or ''
 
     doc.save(output_path)
 
