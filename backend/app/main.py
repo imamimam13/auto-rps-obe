@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
             else:
                 print("ℹ️  Admin already exists")
     except Exception as e:
-        print(f"Startup: {e}")
+        print(f"Startup error: {e}")
     yield
 
 
