@@ -4,6 +4,24 @@ Aplikasi berbasis AI untuk menyusun Rencana Pembelajaran Semester (RPS) dan vali
 
 Didesain dengan gaya macOS - clean, minimal, frosted glass.
 
+## Instalasi (1 Perintah)
+
+**Semua platform:**
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/install.sh)
+```
+
+**Casa OS:**
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/casaos-app/install.sh)
+```
+
+Tunggu selesai, buka **http://localhost:9811**
+
+> Port: Backend `9810` · Frontend `9811`  
+> Bisa diubah: `BACKEND_PORT=9820 FRONTEND_PORT=9821 bash install.sh`  
+> Ollama opsional - AI features tetap jalan kalau sudah terinstall.
+
 ## Fitur
 
 - **Generate RPS dengan AI** - Masukkan visi misi prodi, AI menyusun RPS lengkap 16 minggu
@@ -20,175 +38,22 @@ Didesain dengan gaya macOS - clean, minimal, frosted glass.
 | Frontend | React + Vite + TypeScript |
 | Styling | Tailwind CSS (macOS design) |
 | AI Engine | Ollama (Llama 3.1) - Local LLM |
-| Database | PostgreSQL |
-| Cache | Redis |
+| Database | SQLite (default) / PostgreSQL |
 
-## Instalasi di macOS
+## Struktur API
 
-### Prasyarat
-
-Sebelum memulai, pastikan sistem Anda sudah memiliki:
-
-1. **Xcode Command Line Tools**
-   ```bash
-   xcode-select --install
-   ```
-
-2. **Homebrew** (jika belum ada)
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-
-### 1. Install Ollama (AI Lokal)
-
-```bash
-# Install Ollama
-brew install ollama
-
-# Download model Llama 3.1 (8B)
-ollama pull llama3.1:8b
-
-# Jalankan Ollama (di background)
-ollama serve &
-```
-
-Verifikasi Ollama berjalan:
-```bash
-curl http://localhost:11434/api/tags
-```
-
-### 2. Clone & Setup Project
-
-```bash
-# Clone repository
-git clone https://github.com/[username]/auto-rps-obe.git
-cd auto-rps-obe
-```
-
-### 3. Setup Backend
-
-```bash
-# Masuk ke direktori backend
-cd backend
-
-# Buat virtual environment
-python3 -m venv venv
-
-# Aktivasi virtual environment
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Jalankan backend
-uvicorn app.main:app --reload
-```
-
-Backend akan berjalan di `http://localhost:8000`
-Dokumentasi API: `http://localhost:8000/docs`
-
-### 4. Setup Frontend
-
-Buka terminal baru:
-
-```bash
-# Masuk ke direktori frontend
-cd frontend
-
-# Install dependencies
-npm install
-
-# Jalankan frontend
-npm run dev
-```
-
-Frontend akan berjalan di `http://localhost:5173`
-
-### 5. Setup Database (Opsional - untuk production)
-
-Jika ingin menggunakan database PostgreSQL:
-
-```bash
-# Install PostgreSQL
-brew install postgresql@16
-
-# Jalankan PostgreSQL
-brew services start postgresql@16
-
-# Buat database
-createdb autorps
-```
-
-Atau gunakan Docker untuk database:
-
-```bash
-# Jalankan PostgreSQL + Redis via Docker
-docker compose up db redis -d
-```
-
-### Installasi Lengkap (Satu Perintah)
-
-```bash
-# Install dependencies
-brew install ollama python@3.12 node postgresql@16
-ollama pull llama3.1:8b
-ollama serve &
-
-# Setup backend
-cd backend
-python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-uvicorn app.main:app --reload &
-
-# Setup frontend
-cd ../frontend
-npm install && npm run dev
-```
-
-## Instalasi di Casa OS
-
-### Cara termudah: 1 perintah
-
-SSH ke Casa OS lalu jalankan:
-
-```bash
-bash <(curl -sL https://raw.githubusercontent.com/imamimam13/auto-rps-obe/main/casaos-app/install.sh)
-```
-
-Atau manual:
-
-```bash
-git clone https://github.com/imamimam13/auto-rps-obe.git
-cd auto-rps-obe/casaos-app
-bash install.sh
-```
-
-Tunggu sampai selesai, lalu buka `http://ip-casaos:9811`
-
-> **Catatan:** Script akan install Otomatis Python, Node.js, Ollama + model AI, dan semua dependencies.  
-> Tidak perlu PostgreSQL - pakai SQLite biar ringan.
-> Port: Backend `9810` · Frontend `9811`
-
-**Catatan untuk Casa OS:**
-- Ollama harus diinstall di **host** (bukan container) agar bisa akses GPU
-- Install Ollama di Casa OS: `curl -fsSL https://ollama.com/install.sh | sh`
-- Download model: `ollama pull llama3.1:8b`
-- Pastikan port 8000 dan 5173 tidak bertabrakan dengan app lain
-- Untuk akses dari perangkat lain, gunakan IP Casa OS (mis: `http://192.168.1.100:5173`)
-
-## Docker Deployment
-
-```bash
-# Jalankan semua service
-docker compose up --build
-
-# Atau jalankan di background
-docker compose up -d
-```
-
-Akses:
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8000`
-- API Docs: `http://localhost:8000/docs`
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| GET | `/api/v1/prodi/` | List program studi |
+| POST | `/api/v1/prodi/` | Tambah prodi |
+| GET | `/api/v1/mata-kuliah/` | List mata kuliah |
+| POST | `/api/v1/mata-kuliah/` | Tambah mata kuliah |
+| GET | `/api/v1/rps/` | List RPS |
+| POST | `/api/v1/rps/` | Buat RPS |
+| POST | `/api/v1/generate/rps` | Generate RPS dengan AI |
+| POST | `/api/v1/generate/validate-obe` | Validasi OBE |
+| POST | `/api/v1/export/{id}` | Export RPS (PDF/DOCX) |
+| GET | `/api/v1/ollama/status` | Cek status Ollama |
 
 ## Panduan Penggunaan
 
@@ -218,21 +83,6 @@ Akses:
 ### 5. Export
 - Di halaman detail RPS, klik "PDF" atau "DOCX"
 - File akan terdownload otomatis
-
-## Struktur API
-
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| GET | `/api/v1/prodi/` | List program studi |
-| POST | `/api/v1/prodi/` | Tambah prodi |
-| GET | `/api/v1/mata-kuliah/` | List mata kuliah |
-| POST | `/api/v1/mata-kuliah/` | Tambah mata kuliah |
-| GET | `/api/v1/rps/` | List RPS |
-| POST | `/api/v1/rps/` | Buat RPS |
-| POST | `/api/v1/generate/rps` | Generate RPS dengan AI |
-| POST | `/api/v1/generate/validate-obe` | Validasi OBE |
-| POST | `/api/v1/export/{id}` | Export RPS (PDF/DOCX) |
-| GET | `/api/v1/ollama/status` | Cek status Ollama |
 
 ## Lisensi
 
