@@ -23,8 +23,7 @@ class TokenResponse(BaseModel):
         from_attributes = True
 
 
-# Rebuild TokenResponse to resolve forward reference to UserResponse
-TokenResponse.model_rebuild()
+class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=4)
     email: Optional[str] = None
@@ -56,3 +55,6 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+TokenResponse.model_rebuild()
