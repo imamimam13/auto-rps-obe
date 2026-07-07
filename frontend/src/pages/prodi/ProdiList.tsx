@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, GraduationCap, ExternalLink } from 'lucide-react'
+import { Plus, Search, GraduationCap, ExternalLink, Upload } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -52,6 +52,26 @@ export default function ProdiList() {
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Gagal menyimpan')
     }
+  }
+
+  async function uploadPdf(target: 'visi' | 'misi') {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      const form = new FormData()
+      form.append('file', file)
+      try {
+        const res = await api.post('/api/v1/upload/pdf', form)
+        setFormData(f => ({ ...f, [target]: res.data.text }))
+        toast.success(`Teks ${target} berhasil diekstrak dari PDF`)
+      } catch (e: any) {
+        toast.error(e.response?.data?.detail || 'Gagal baca PDF')
+      }
+    }
+    input.click()
   }
 
   const filtered = prodi.filter(
@@ -129,7 +149,12 @@ export default function ProdiList() {
                 />
               </div>
               <div>
-                <label className="macos-label">Visi</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="macos-label">Visi</label>
+                  <button type="button" onClick={() => uploadPdf('visi')} className="text-xs text-macos-blue hover:text-blue-600 flex items-center gap-1">
+                    <Upload className="w-3 h-3" /> Upload PDF
+                  </button>
+                </div>
                 <textarea
                   className="macos-input min-h-[80px] resize-none"
                   value={formData.visi}
@@ -139,7 +164,12 @@ export default function ProdiList() {
                 />
               </div>
               <div>
-                <label className="macos-label">Misi</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="macos-label">Misi</label>
+                  <button type="button" onClick={() => uploadPdf('misi')} className="text-xs text-macos-blue hover:text-blue-600 flex items-center gap-1">
+                    <Upload className="w-3 h-3" /> Upload PDF
+                  </button>
+                </div>
                 <textarea
                   className="macos-input min-h-[80px] resize-none"
                   value={formData.misi}
