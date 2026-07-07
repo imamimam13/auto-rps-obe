@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, UserPlus, Trash2, Shield, ShieldOff } from 'lucide-react'
+import { Users, UserPlus, Trash2, Edit2, X, Key } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -18,6 +18,9 @@ export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [showPasswordModal, setShowPasswordModal] = useState<number | null>(null)
+  const [newPassword, setNewPassword] = useState('')
   const [form, setForm] = useState({ username: '', password: '', nama: '', nidn: '', role: 'dosen' })
 
   useEffect(() => { loadUsers() }, [])
@@ -35,11 +38,26 @@ export default function UserManagement() {
     try {
       await api.post('/api/v1/auth/users', form)
       toast.success('User berhasil dibuat')
-      setShowForm(false)
-      setForm({ username: '', password: '', nama: '', nidn: '', role: 'dosen' })
+      closeForm()
       loadUsers()
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Gagal membuat user')
+    }
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    try {
+      await api.put(`/api/v1/auth/users/${editingId}`, {
+        nama: form.nama,
+        nidn: form.nidn,
+        role: form.role,
+      })
+      toast.success('User berhasil diperbarui')
+      closeForm()
+      loadUsers()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Gagal memperbarui user')
     }
   }
 
@@ -59,6 +77,36 @@ export default function UserManagement() {
     } catch { toast.error('Gagal update') }
   }
 
+  async function changePassword() {
+    if (!newPassword) return
+    try {
+      await api.put(`/api/v1/auth/users/${showPasswordModal}/password`, { new_password: newPassword })
+      toast.success('Password berhasil diubah')
+      setShowPasswordModal(null)
+      setNewPassword('')
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Gagal mengubah password')
+    }
+  }
+
+  function openEditForm(user: User) {
+    setEditingId(user.id)
+    setForm({
+      username: user.username,
+      password: '',
+      nama: user.nama,
+      nidn: user.nidn || '',
+      role: user.role,
+    })
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm({ username: '', password: '', nama: '', nidn: '', role: 'dosen' })
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -66,22 +114,28 @@ export default function UserManagement() {
           <h1 className="text-2xl font-semibold text-gray-900">Manajemen User</h1>
           <p className="text-sm text-gray-500 mt-1">Kelola akun dosen dan admin</p>
         </div>
-        <button className="macos-button" onClick={() => setShowForm(!showForm)}>
+        <button className="macos-button" onClick={() => { setEditingId(null); setForm({ username: '', password: '', nama: '', nidn: '', role: 'dosen' }); setShowForm(true) }}>
           <UserPlus className="w-4 h-4" /> Tambah User
         </button>
       </div>
 
       {showForm && (
         <div className="macos-card p-5 animate-scale-in">
-          <form onSubmit={handleCreate} className="grid grid-cols-2 gap-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium">{editingId ? 'Edit User' : 'Tambah User Baru'}</h3>
+            <button onClick={closeForm}><X className="w-4 h-4" /></button>
+          </div>
+          <form onSubmit={editingId ? handleUpdate : handleCreate} className="grid grid-cols-2 gap-4">
             <div>
               <label className="macos-label">Username *</label>
-              <input className="macos-input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required />
+              <input className="macos-input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required disabled={!!editingId} />
             </div>
-            <div>
-              <label className="macos-label">Password *</label>
-              <input type="password" className="macos-input" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required />
-            </div>
+            {!editingId && (
+              <div>
+                <label className="macos-label">Password *</label>
+                <input type="password" className="macos-input" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={!editingId} />
+              </div>
+            )}
             <div>
               <label className="macos-label">Nama *</label>
               <input className="macos-input" value={form.nama} onChange={e => setForm({...form, nama: e.target.value})} required />
@@ -98,10 +152,29 @@ export default function UserManagement() {
               </select>
             </div>
             <div className="flex items-end gap-2">
-              <button type="submit" className="macos-button">Simpan</button>
-              <button type="button" className="macos-button macos-button-secondary" onClick={() => setShowForm(false)}>Batal</button>
+              <button type="submit" className="macos-button">{editingId ? 'Update' : 'Simpan'}</button>
+              <button type="button" className="macos-button macos-button-secondary" onClick={closeForm}>Batal</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="macos-window p-6 w-full max-w-sm animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium">Ganti Password</h3>
+              <button onClick={() => setShowPasswordModal(null)}><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="macos-label">Password Baru</label>
+                <input type="password" className="macos-input" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Masukkan password baru" />
+              </div>
+              <button onClick={changePassword} className="macos-button w-full">Simpan Password</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -134,9 +207,17 @@ export default function UserManagement() {
                   </button>
                 </td>
                 <td className="p-4 text-right">
-                  <button onClick={() => handleDelete(u.id)} className="text-red-400 hover:text-red-600">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => openEditForm(u)} className="p-1.5 text-blue-400 hover:text-blue-600" title="Edit">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setShowPasswordModal(u.id)} className="p-1.5 text-orange-400 hover:text-orange-600" title="Ganti Password">
+                      <Key className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(u.id)} className="p-1.5 text-red-400 hover:text-red-600" title="Hapus">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

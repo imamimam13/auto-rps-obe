@@ -57,4 +57,8 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class ChangePasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=4)
+
+
 TokenResponse.model_rebuild()
