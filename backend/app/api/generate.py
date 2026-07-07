@@ -10,6 +10,15 @@ import json
 router = APIRouter(prefix="/generate", tags=["AI Generation"])
 
 
+def handle_ai_error(e: Exception) -> str:
+    err_msg = str(e)
+    if "connect" in err_msg.lower() or "connection refused" in err_msg.lower() or "timeout" in err_msg.lower():
+        return "Koneksi ke AI Provider gagal. Pastikan server AI (Ollama/LM Studio/9Router) Anda sudah aktif dan URL di Pengaturan sudah benar."
+    elif "404" in err_msg or "not found" in err_msg.lower():
+        return f"Model AI tidak ditemukan atau tidak merespon (HTTP 404). Silakan cek nama model di Pengaturan. Detail: {err_msg}"
+    return f"Gagal memproses dengan AI: {err_msg}"
+
+
 @router.post("/rps", response_model=dict)
 async def generate_rps(
     data: RPSGenerateRequest,
@@ -53,10 +62,15 @@ async def generate_rps(
             "data": rps_data,
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        friendly_err = handle_ai_error(e)
+        print(f"[GENERATE RPS ERROR] {friendly_err}")
         raise HTTPException(
             status_code=500,
-            detail=f"Gagal generate RPS: {str(e)}",
+            detail=friendly_err,
         )
+
 
 
 @router.post("/bulk-rps", response_model=dict)
@@ -165,7 +179,7 @@ async def generate_cpmk(
         )
         return {"success": True, "data": cpmk}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
 
 
 @router.post("/sub-cpmk", response_model=dict)
@@ -177,7 +191,7 @@ async def generate_sub_cpmk(data: dict):
         )
         return {"success": True, "data": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
 
 
 @router.post("/rencana-mingguan", response_model=dict)
@@ -190,7 +204,7 @@ async def generate_rencana_mingguan(data: dict):
         )
         return {"success": True, "data": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
 
 
 @router.post("/penilaian", response_model=dict)
@@ -202,7 +216,7 @@ async def generate_penilaian(data: dict):
         )
         return {"success": True, "data": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
 
 
 @router.post("/validate-obe", response_model=OBEValidationResponse)
@@ -244,7 +258,7 @@ async def validate_obe(
             details=validation.get("details", {}),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
 
 
 @router.post("/review", response_model=dict)
@@ -255,4 +269,4 @@ async def review_rps(data: dict):
         result = await rps_generator_service.review_and_improve(rps_data, feedback)
         return {"success": True, "data": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))

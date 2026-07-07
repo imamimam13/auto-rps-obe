@@ -81,14 +81,18 @@ async def create_rps(data: RPSCreate, db: AsyncSession = Depends(get_db)):
     
     rps = RPS(
         kode=generate_rps_kode(),
-        **data.model_dump(exclude={"identitas", "cpmk", "sub_cpmk", "rencana_pembelajaran", "metode_pembelajaran", "media_pembelajaran", "penilaian", "referensi"}),
-        identitas=data.identitas.model_dump() if data.identitas else None,
-        cpmk=[c.model_dump() for c in data.cpmk] if data.cpmk else [],
-        sub_cpmk=[s.model_dump() for s in data.sub_cpmk] if data.sub_cpmk else [],
-        rencana_pembelajaran=[r.model_dump() for r in data.rencana_pembelajaran] if data.rencana_pembelajaran else [],
+        mata_kuliah_id=data.mata_kuliah_id,
+        prodi_id=data.prodi_id,
+        semester=data.semester,
+        tahun_akademik=data.tahun_akademik,
+        dosen_pengampu=data.dosen_pengampu or [],
+        identitas=data.identitas if isinstance(data.identitas, dict) else (data.identitas.model_dump() if data.identitas else None),
+        cpmk=[c if isinstance(c, dict) else c.model_dump() for c in (data.cpmk or [])],
+        sub_cpmk=[s if isinstance(s, dict) else s.model_dump() for s in (data.sub_cpmk or [])],
+        rencana_pembelajaran=[r if isinstance(r, dict) else r.model_dump() for r in (data.rencana_pembelajaran or [])],
         metode_pembelajaran=data.metode_pembelajaran or [],
         media_pembelajaran=data.media_pembelajaran or [],
-        penilaian=[p.model_dump() for p in data.penilaian] if data.penilaian else [],
+        penilaian=[p if isinstance(p, dict) else p.model_dump() for p in (data.penilaian or [])],
         referensi=data.referensi or [],
     )
     db.add(rps)

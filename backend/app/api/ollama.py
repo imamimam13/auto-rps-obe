@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 import httpx
 from app.services.ollama_service import ai_service
-from app.core.config import settings
+from app.core.config import settings, save_settings_to_env
 
 router = APIRouter(prefix="/ollama", tags=["Ollama"])
 
@@ -18,7 +18,13 @@ class AIConfig(BaseModel):
 @router.get("/status")
 async def check_ai():
     available = await ai_service.check_available()
-    return {"available": available, "provider": ai_service.provider}
+    return {
+        "available": available,
+        "provider": ai_service.provider,
+        "base_url": ai_service.base_url,
+        "model": ai_service.model,
+        "api_key": ai_service.api_key,
+    }
 
 
 @router.get("/models")
@@ -44,6 +50,15 @@ async def configure_ai(config: AIConfig):
         timeout=ai_service.timeout,
     )
     available = await ai_service.check_available()
+
+    # Save updates permanently to .env file
+    save_settings_to_env({
+        "AI_PROVIDER": ai_service.provider,
+        "AI_BASE_URL": ai_service.base_url,
+        "AI_MODEL": ai_service.model,
+        "AI_API_KEY": ai_service.api_key,
+    })
+
     return {
         "success": True,
         "available": available,
@@ -52,3 +67,4 @@ async def configure_ai(config: AIConfig):
         "model": config.model,
         "has_api_key": bool(ai_service.api_key),
     }
+

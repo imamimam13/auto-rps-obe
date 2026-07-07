@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 
@@ -117,41 +117,41 @@ class RPSIdentitas(BaseModel):
     semester: int
     prodi: str
     fakultas: str
-    dosen_pengampu: Optional[List[Dict[str, str]]] = []
+    dosen_pengampu: Optional[List[Dict[str, Any]]] = []
     tahun_akademik: str
 
 
 class RPSCPMK(BaseModel):
     kode: str
     deskripsi: str
-    bobot: float
-    cpl_prodi: List[str]
+    bobot: Union[float, int, str, Any]
+    cpl_prodi: List[Any]
 
 
 class RPSSubCPMK(BaseModel):
     kode: str
     cpmk_kode: str
     deskripsi: str
-    indikator: List[str]
+    indikator: List[Any]
 
 
 class RPSRencanaMingguan(BaseModel):
     minggu_ke: int
     sub_cpmk_kode: str
     materi: str
-    metode: List[str]
-    media: List[str]
-    durasi: int  # menit
-    tugas: Optional[str] = None
-    penilaian: Optional[str] = None
+    metode: Union[List[Any], str, Any]
+    media: Union[List[Any], str, Any]
+    durasi: Union[int, str, Any]  # menit
+    tugas: Optional[Any] = None
+    penilaian: Optional[Any] = None
 
 
 class RPSPenilaian(BaseModel):
     komponen: str
-    bobot: float
+    bobot: Union[float, int, str, Any]
     jenis: str  # tugas, uts, uas, kehadiran, dll
-    kriteria: List[str]
-    sub_cpmk_kode: List[str]
+    kriteria: List[Any]
+    sub_cpmk_kode: List[Any]
 
 
 class RPSBase(BaseModel):
@@ -159,7 +159,7 @@ class RPSBase(BaseModel):
     prodi_id: int
     semester: int
     tahun_akademik: str
-    dosen_pengampu: Optional[List[Dict[str, str]]] = []
+    dosen_pengampu: Optional[List[Dict[str, Any]]] = []
     identitas: Optional[RPSIdentitas] = None
     cpmk: Optional[List[RPSCPMK]] = []
     sub_cpmk: Optional[List[RPSSubCPMK]] = []
@@ -167,7 +167,7 @@ class RPSBase(BaseModel):
     metode_pembelajaran: Optional[List[str]] = []
     media_pembelajaran: Optional[List[str]] = []
     penilaian: Optional[List[RPSPenilaian]] = []
-    referensi: Optional[List[Dict[str, str]]] = []
+    referensi: Optional[List[Dict[str, Any]]] = []
 
 
 class RPSCreate(RPSBase):
@@ -175,7 +175,7 @@ class RPSCreate(RPSBase):
 
 
 class RPSUpdate(BaseModel):
-    dosen_pengampu: Optional[List[Dict[str, str]]] = None
+    dosen_pengampu: Optional[List[Dict[str, Any]]] = None
     identitas: Optional[RPSIdentitas] = None
     cpmk: Optional[List[RPSCPMK]] = None
     sub_cpmk: Optional[List[RPSSubCPMK]] = None
@@ -183,7 +183,7 @@ class RPSUpdate(BaseModel):
     metode_pembelajaran: Optional[List[str]] = None
     media_pembelajaran: Optional[List[str]] = None
     penilaian: Optional[List[RPSPenilaian]] = None
-    referensi: Optional[List[Dict[str, str]]] = None
+    referensi: Optional[List[Dict[str, Any]]] = None
     status: Optional[RPSStatus] = None
 
 

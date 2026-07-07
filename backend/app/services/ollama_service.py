@@ -61,8 +61,12 @@ class AIService:
             data = resp.json()
             return data.get("response", "")
         except httpx.HTTPStatusError as e:
-            raise Exception(f"API error: {e.response.text}")
+            print(f"[AI HTTP ERROR] {e.response.status_code}: {e.response.text[:500]}")
+            raise Exception(f"API error: {e.response.text[:500]}")
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[AI ERROR] {e}")
             raise Exception(f"Error: {str(e)}")
 
     async def _generate_openai_compat(
@@ -100,8 +104,12 @@ class AIService:
                 return content
             return content
         except httpx.HTTPStatusError as e:
-            raise Exception(f"API error: {e.response.text}")
+            print(f"[AI HTTP ERROR] {e.response.status_code}: {e.response.text[:500]}")
+            raise Exception(f"API error: {e.response.text[:500]}")
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[AI ERROR] {e}")
             raise Exception(f"Error: {str(e)}")
 
     async def generate_stream(

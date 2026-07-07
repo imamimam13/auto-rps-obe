@@ -56,3 +56,77 @@ if settings.OLLAMA_MODEL != "llama3.1:8b":
     settings.AI_MODEL = settings.OLLAMA_MODEL
 if settings.OLLAMA_TIMEOUT != 120:
     settings.AI_TIMEOUT = settings.OLLAMA_TIMEOUT
+
+
+def save_settings_to_env(updates: dict):
+    import os
+    # Update global settings in-memory
+    if "AI_PROVIDER" in updates:
+        settings.AI_PROVIDER = updates["AI_PROVIDER"]
+    if "AI_BASE_URL" in updates:
+        settings.AI_BASE_URL = updates["AI_BASE_URL"]
+        settings.OLLAMA_BASE_URL = updates["AI_BASE_URL"]
+    if "AI_MODEL" in updates:
+        settings.AI_MODEL = updates["AI_MODEL"]
+        settings.OLLAMA_MODEL = updates["AI_MODEL"]
+    if "AI_API_KEY" in updates:
+        settings.AI_API_KEY = updates["AI_API_KEY"]
+
+    env_path = ".env"
+    possible_paths = [
+        ".env",
+        "backend/.env",
+        "/Users/imamimam/Documents/auto RPS obe/backend/.env"
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            env_path = p
+            break
+
+    # Read existing content
+    lines = []
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            print(f"[SAVE ENV ERROR] Reading failed: {e}")
+
+    updated_keys = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if "=" in line and not stripped.startswith("#"):
+            key, val = line.split("=", 1)
+            key = key.strip()
+            if key in updates:
+                new_lines.append(f"{key}={updates[key]}\n")
+                updated_keys.add(key)
+                continue
+            # Also sync legacy keys if they are in the updates
+            if key == "OLLAMA_BASE_URL" and "AI_BASE_URL" in updates:
+                new_lines.append(f"OLLAMA_BASE_URL={updates['AI_BASE_URL']}\n")
+                updated_keys.add(key)
+                continue
+            if key == "OLLAMA_MODEL" and "AI_MODEL" in updates:
+                new_lines.append(f"OLLAMA_MODEL={updates['AI_MODEL']}\n")
+                updated_keys.add(key)
+                continue
+        new_lines.append(line)
+
+    for key, val in updates.items():
+        if key not in updated_keys:
+            new_lines.append(f"{key}={val}\n")
+            
+    # Also add legacy keys if they weren't in the file and we updated their new equivalents
+    if "OLLAMA_BASE_URL" not in updated_keys and "AI_BASE_URL" in updates:
+        new_lines.append(f"OLLAMA_BASE_URL={updates['AI_BASE_URL']}\n")
+    if "OLLAMA_MODEL" not in updated_keys and "AI_MODEL" in updates:
+        new_lines.append(f"OLLAMA_MODEL={updates['AI_MODEL']}\n")
+
+    try:
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        print(f"[SAVE ENV ERROR] Writing failed: {e}")
+

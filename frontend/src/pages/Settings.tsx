@@ -26,6 +26,9 @@ export default function Settings() {
       const res = await api.get('/api/v1/ollama/status')
       setAiStatus(res.data.available)
       if (res.data.provider) setProvider(res.data.provider)
+      if (res.data.base_url) setAiUrl(res.data.base_url)
+      if (res.data.model) setModel(res.data.model)
+      if (res.data.api_key) setApiKey(res.data.api_key)
       if (res.data.available) {
         const mRes = await api.get('/api/v1/ollama/models')
         setModels(mRes.data.models || [])
