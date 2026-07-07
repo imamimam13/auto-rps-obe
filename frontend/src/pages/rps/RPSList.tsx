@@ -55,9 +55,13 @@ export default function RPSList() {
     }
   }
 
-  const filtered = rpsList.filter((r) =>
-    r.kode?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = rpsList.filter((r) => {
+    const searchLower = search.toLowerCase()
+    const matchKode = r.kode?.toLowerCase().includes(searchLower)
+    const matchMK = r.identitas?.nama_mata_kuliah?.toLowerCase().includes(searchLower)
+    const matchDosen = r.dosen_pengampu?.some((d: any) => d.nama?.toLowerCase().includes(searchLower))
+    return matchKode || matchMK || matchDosen
+  })
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -71,7 +75,7 @@ export default function RPSList() {
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Cari RPS..." value={search} onChange={(e) => setSearch(e.target.value)} className="macos-input pl-10" />
+          <input type="text" placeholder="Cari berdasarkan mata kuliah, dosen, atau kode..." value={search} onChange={(e) => setSearch(e.target.value)} className="macos-input pl-10" />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="macos-input max-w-[150px]">
           <option value="">Semua Status</option>
@@ -90,21 +94,25 @@ export default function RPSList() {
         <div className="grid gap-3">
           {filtered.map((rps) => {
             const StatusIcon = statusIcons[rps.status] || Clock
+            const dosenNames = rps.dosen_pengampu?.map((d: any) => d.nama).join(', ') || '-'
             return (
               <div key={rps.id} className="macos-card p-4 flex items-center gap-4 group">
                 <div className="p-3 rounded-apple-lg bg-green-50">
                   <FileText className="w-5 h-5 text-green-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Link to={`/rps/${rps.id}`} className="text-sm font-semibold text-gray-900 hover:text-macos-blue transition-colors">
-                    {rps.kode}
+                  <Link to={`/rps/${rps.id}`} className="text-sm font-semibold text-gray-900 hover:text-macos-blue transition-colors block truncate">
+                    {rps.identitas?.nama_mata_kuliah || 'RPS Tanpa Nama'}
                   </Link>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Semester {rps.semester} · {rps.tahun_akademik}
-                    {rps.obe_validated && ` · OBE: ${rps.obe_score}`}
+                  <p className="text-xs text-gray-600 mt-0.5 truncate">
+                    Dosen: <span className="font-medium text-gray-700">{dosenNames}</span>
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Kode: {rps.kode} · Semester {rps.semester} · {rps.tahun_akademik}
+                    {rps.obe_validated && ` · OBE: ${rps.obe_score}/100`}
                   </p>
                 </div>
-                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[rps.status] || 'bg-gray-50 text-gray-600'}`}>
+                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${statusColors[rps.status] || 'bg-gray-50 text-gray-600'}`}>
                   <StatusIcon className="w-3 h-3" />
                   {rps.status}
                 </span>
