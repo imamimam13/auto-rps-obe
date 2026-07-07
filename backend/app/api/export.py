@@ -167,7 +167,7 @@ def generate_docx(rps_data: dict, output_path: str):
     run.bold = True
     run.font.size = Pt(16)
 
-    identitas = rps_data.get('identitas', {})
+    identitas = rps_data.get('identitas') or {}
     
     # Identitas table
     doc.add_heading('Identitas Mata Kuliah', level=2)
@@ -187,7 +187,7 @@ def generate_docx(rps_data: dict, output_path: str):
     cpmk_table = doc.add_table(rows=1, cols=4)
     for j, h in enumerate(['Kode', 'Deskripsi', 'Bobot', 'CPL']):
         cpmk_table.rows[0].cells[j].text = h
-    for cpmk in rps_data.get('cpmk', []):
+    for cpmk in (rps_data.get('cpmk') or []):
         row = cpmk_table.add_row()
         row.cells[0].text = cpmk.get('kode', '') or ''
         row.cells[1].text = cpmk.get('deskripsi', '') or ''
@@ -204,7 +204,7 @@ def generate_docx(rps_data: dict, output_path: str):
     rp_table = doc.add_table(rows=1, cols=5)
     for j, h in enumerate(['Minggu', 'Sub-CPMK', 'Materi', 'Metode', 'Media']):
         rp_table.rows[0].cells[j].text = h
-    for rp in rps_data.get('rencana_pembelajaran', []):
+    for rp in (rps_data.get('rencana_pembelajaran') or []):
         row = rp_table.add_row()
         row.cells[0].text = str(rp.get('minggu_ke', '')) or ''
         row.cells[1].text = rp.get('sub_cpmk_kode', '') or ''
@@ -227,7 +227,7 @@ def generate_docx(rps_data: dict, output_path: str):
     pen_table = doc.add_table(rows=1, cols=3)
     for j, h in enumerate(['Komponen', 'Bobot', 'Jenis']):
         pen_table.rows[0].cells[j].text = h
-    for p in rps_data.get('penilaian', []):
+    for p in (rps_data.get('penilaian') or []):
         row = pen_table.add_row()
         row.cells[0].text = p.get('komponen', '') or ''
         row.cells[1].text = str(p.get('bobot', '')) or ''
@@ -254,15 +254,15 @@ async def export_rps(
     deskripsi_mk = mk.deskripsi if (mk and mk.deskripsi) else ""
     
     rps_data = {
-        "identitas": rps.identitas,
-        "deskripsi_mata_kuliah": deskripsi_mk,
-        "cpmk": rps.cpmk,
-        "sub_cpmk": rps.sub_cpmk,
-        "rencana_pembelajaran": rps.rencana_pembelajaran,
-        "metode_pembelajaran": rps.metode_pembelajaran,
-        "media_pembelajaran": rps.media_pembelajaran,
-        "penilaian": rps.penilaian,
-        "referensi": rps.referensi,
+        "identitas": rps.identitas or {},
+        "deskripsi_mata_kuliah": deskripsi_mk or "",
+        "cpmk": rps.cpmk or [],
+        "sub_cpmk": rps.sub_cpmk or [],
+        "rencana_pembelajaran": rps.rencana_pembelajaran or [],
+        "metode_pembelajaran": rps.metode_pembelajaran or [],
+        "media_pembelajaran": rps.media_pembelajaran or [],
+        "penilaian": rps.penilaian or [],
+        "referensi": rps.referensi or [],
     }
     
     os.makedirs(settings.EXPORT_DIR, exist_ok=True)
