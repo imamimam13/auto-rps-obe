@@ -129,9 +129,14 @@ export default function RPSList() {
 
   const filtered = rpsList.filter((r) => {
     const searchLower = search.toLowerCase()
-    const matchKode = r.kode?.toLowerCase().includes(searchLower)
-    const matchMK = r.identitas?.nama_mata_kuliah?.toLowerCase().includes(searchLower)
-    const matchDosen = r.dosen_pengampu?.some((d: any) => d.nama?.toLowerCase().includes(searchLower))
+    const code = r.kode || ''
+    const mk = r.identitas?.nama_mata_kuliah || ''
+    const matchKode = code.toLowerCase().includes(searchLower)
+    const matchMK = mk.toLowerCase().includes(searchLower)
+    const matchDosen = r.dosen_pengampu?.some((d: any) => {
+      const name = d?.nama || ''
+      return name.toLowerCase().includes(searchLower)
+    }) || false
     return matchKode || matchMK || matchDosen
   })
 

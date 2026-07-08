@@ -76,9 +76,9 @@ export default function LandingPage() {
   const filteredRPS = rpsList.filter(rps => {
     if (rps.status !== 'published') return false
     const searchLower = searchQuery.toLowerCase()
-    const nameMatch = rps.identitas?.nama_mata_kuliah?.toLowerCase().includes(searchLower)
-    const codeMatch = rps.identitas?.kode_mata_kuliah?.toLowerCase().includes(searchLower)
-    return nameMatch || codeMatch
+    const name = rps.identitas?.nama_mata_kuliah || ''
+    const code = rps.identitas?.kode_mata_kuliah || ''
+    return name.toLowerCase().includes(searchLower) || code.toLowerCase().includes(searchLower)
   })
 
   // Download handlers
