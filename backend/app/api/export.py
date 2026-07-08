@@ -218,7 +218,7 @@ RPS_HTML_TEMPLATE = Template("""
             <ol>
               {% for u in data.referensi.utama %}
                 <li>{{ u }}</li>
-              {% endol %}
+              {% endfor %}
             </ol>
           {% else %}
             {{ data.referensi.utama or '-' }}
