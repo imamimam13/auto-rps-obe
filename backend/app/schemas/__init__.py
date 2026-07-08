@@ -138,10 +138,16 @@ class RPSSubCPMK(BaseModel):
 class RPSRencanaMingguan(BaseModel):
     minggu_ke: int
     sub_cpmk_kode: str
+    sub_cpmk_deskripsi: Optional[str] = None
     materi: str
     metode: Union[List[Any], str, Any]
-    media: Union[List[Any], str, Any]
-    durasi: Union[int, str, Any]  # menit
+    media: Optional[Union[List[Any], str, Any]] = None
+    durasi: Optional[Union[int, str, Any]] = None  # backward compatibility
+    estimasi_waktu: Optional[str] = None
+    pengalaman_belajar: Optional[str] = None
+    kriteria_penilaian: Optional[str] = None
+    indikator: Optional[str] = None
+    bobot: Optional[Union[int, float, str]] = None
     tugas: Optional[Any] = None
     penilaian: Optional[Any] = None
 
@@ -165,9 +171,9 @@ class RPSBase(BaseModel):
     sub_cpmk: Optional[List[RPSSubCPMK]] = []
     rencana_pembelajaran: Optional[List[RPSRencanaMingguan]] = []
     metode_pembelajaran: Optional[List[str]] = []
-    media_pembelajaran: Optional[List[str]] = []
+    media_pembelajaran: Optional[Union[List[Any], Dict[str, Any], Any]] = None
     penilaian: Optional[List[RPSPenilaian]] = []
-    referensi: Optional[List[Dict[str, Any]]] = []
+    referensi: Optional[Union[List[Any], Dict[str, Any], Any]] = None
 
 
 class RPSCreate(RPSBase):
@@ -181,9 +187,9 @@ class RPSUpdate(BaseModel):
     sub_cpmk: Optional[List[RPSSubCPMK]] = None
     rencana_pembelajaran: Optional[List[RPSRencanaMingguan]] = None
     metode_pembelajaran: Optional[List[str]] = None
-    media_pembelajaran: Optional[List[str]] = None
+    media_pembelajaran: Optional[Union[List[Any], Dict[str, Any], Any]] = None
     penilaian: Optional[List[RPSPenilaian]] = None
-    referensi: Optional[List[Dict[str, Any]]] = None
+    referensi: Optional[Union[List[Any], Dict[str, Any], Any]] = None
     status: Optional[RPSStatus] = None
 
 

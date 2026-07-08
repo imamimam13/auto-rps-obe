@@ -68,3 +68,32 @@ async def configure_ai(config: AIConfig):
         "has_api_key": bool(ai_service.api_key),
     }
 
+
+class BrandingConfig(BaseModel):
+    brand_campus_name: str
+    brand_campus_logo_url: Optional[str] = ""
+
+
+@router.get("/branding")
+async def get_branding():
+    return {
+        "brand_campus_name": settings.BRAND_CAMPUS_NAME,
+        "brand_campus_logo_url": settings.BRAND_CAMPUS_LOGO_URL,
+    }
+
+
+@router.post("/branding")
+async def update_branding(config: BrandingConfig):
+    settings.BRAND_CAMPUS_NAME = config.brand_campus_name
+    settings.BRAND_CAMPUS_LOGO_URL = config.brand_campus_logo_url or ""
+
+    save_settings_to_env({
+        "BRAND_CAMPUS_NAME": config.brand_campus_name,
+        "BRAND_CAMPUS_LOGO_URL": config.brand_campus_logo_url or "",
+    })
+    return {
+        "success": True,
+        "brand_campus_name": settings.BRAND_CAMPUS_NAME,
+        "brand_campus_logo_url": settings.BRAND_CAMPUS_LOGO_URL,
+    }
+

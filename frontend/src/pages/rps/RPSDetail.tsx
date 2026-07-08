@@ -369,24 +369,35 @@ export default function RPSDetail() {
       {/* Rencana Pembelajaran */}
       {rps.rencana_pembelajaran?.length > 0 && (
         <div className="macos-card p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Rencana Pembelajaran (16 Minggu)</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Rencana Kegiatan Pembelajaran (16 Minggu)</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Minggu</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Sub-CPMK</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Materi</th>
-                  <th className="text-left py-2 px-3 text-gray-500 font-medium">Metode</th>
+                <tr className="border-b border-gray-200 bg-gray-50/50">
+                  <th className="text-center py-2 px-3 text-gray-500 font-medium w-[6%]">Minggu</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium w-[22%]">Sub-CPMK</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium w-[22%]">Materi Pembelajaran</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium w-[15%]">Bentuk & Metode</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium w-[12%]">Estimasi Waktu</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium w-[12%]">Pengalaman Belajar</th>
+                  <th className="text-left py-2 px-3 text-gray-500 font-medium w-[12%]">Kriteria Penilaian</th>
+                  <th className="text-center py-2 px-3 text-gray-500 font-medium w-[7%]">Bobot (%)</th>
                 </tr>
               </thead>
               <tbody>
                 {rps.rencana_pembelajaran.map((r: any) => (
                   <tr key={r.minggu_ke} className="border-b border-gray-100 hover:bg-gray-50/50">
-                    <td className="py-2.5 px-3 font-mono text-xs">{r.minggu_ke}</td>
-                    <td className="py-2.5 px-3 text-xs text-gray-500">{r.sub_cpmk_kode}</td>
+                    <td className="py-2.5 px-3 font-mono text-center font-semibold">{r.minggu_ke}</td>
+                    <td className="py-2.5 px-3 text-gray-900">
+                      <strong>{r.sub_cpmk_kode}</strong>
+                      {r.sub_cpmk_deskripsi && <span className="block text-gray-400 font-normal mt-0.5">{r.sub_cpmk_deskripsi}</span>}
+                    </td>
                     <td className="py-2.5 px-3 text-gray-700">{r.materi}</td>
-                    <td className="py-2.5 px-3 text-xs text-gray-500">{r.metode?.join(', ')}</td>
+                    <td className="py-2.5 px-3 text-gray-600">{typeof r.metode === 'object' ? r.metode?.join(', ') : r.metode}</td>
+                    <td className="py-2.5 px-3 text-gray-500 font-mono">{r.estimasi_waktu || r.durasi}</td>
+                    <td className="py-2.5 px-3 text-gray-500">{r.pengalaman_belajar || '-'}</td>
+                    <td className="py-2.5 px-3 text-gray-500">{r.kriteria_penilaian || '-'}</td>
+                    <td className="py-2.5 px-3 text-center font-medium text-gray-900">{r.bobot || 0}%</td>
                   </tr>
                 ))}
               </tbody>

@@ -37,29 +37,32 @@ Buat RPS lengkap dengan format JSON berikut. Pastikan konten relevan dengan visi
 
 {{
   "identitas": {{
-    "nama_mata_kuliah": "...",
-    "kode_mata_kuliah": "...", 
+    "nama_mata_kuliah": "{nama_mata_kuliah}",
+    "kode_mata_kuliah": "{kode_mata_kuliah}", 
     "sks": {sks},
     "semester": {semester},
     "prodi": "nama prodi",
     "fakultas": "nama fakultas",
-    "dosen_pengampu": [{{"nama": "...", "nidn": "..."}}],
-    "tahun_akademik": "{tahun_akademik}"
+    "tanggal_penyusunan": "Tanggal hari ini",
+    "no_dokumen": "No dokumen/RPS",
+    "koordinator_pengembang_rps": "Nama Dosen/Koordinator Pengembang",
+    "koordinator_rmk": "Nama Koordinator Rumpun MK",
+    "ka_prodi": "Nama Ketua Program Studi"
   }},
   "deskripsi_mata_kuliah": "deskripsi lengkap sesuai CPL",
   "cpmk": [
     {{
-      "kode": "CPMK01",
+      "kode": "CPMK1",
       "deskripsi": "...", 
-      "bobot": 0.0,
+      "bobot": 0.20,
       "cpl_prodi": ["kode_cpl_yang_relevan"],
       "taksonomi_bloom": "C3/A2/P2"
     }}
   ],
   "sub_cpmk": [
     {{
-      "kode": "SUBCPMK01",
-      "cpmk_kode": "CPMK01",
+      "kode": "Sub-CPMK 1",
+      "cpmk_kode": "CPMK1",
       "deskripsi": "...",
       "indikator": ["indikator 1", "indikator 2"]
     }}
@@ -67,35 +70,38 @@ Buat RPS lengkap dengan format JSON berikut. Pastikan konten relevan dengan visi
   "rencana_pembelajaran": [
     {{
       "minggu_ke": 1,
-      "sub_cpmk_kode": "SUBCPMK01",
-      "materi": "materi pembelajaran",
-      "metode": ["Kuliah", "Diskusi"],
-      "media": ["LCD", "Whiteboard"],
-      "durasi": 150,
-      "tugas": "deskripsi tugas",
-      "penilaian": "kriteria penilaian"
+      "sub_cpmk_kode": "Sub-CPMK 1",
+      "sub_cpmk_deskripsi": "deskripsi Sub-CPMK / kemampuan akhir yg diharapkan",
+      "materi": "Materi Pembelajaran yang diajarkan",
+      "metode": "Bentuk: Kuliah, Metode: Diskusi interaktif / Problem Based Learning",
+      "estimasi_waktu": "TM: 1x3x50' BT: 1x3x60' BM: 1x3x60'",
+      "pengalaman_belajar": "Membaca materi, diskusi kelompok, presentasi mandiri",
+      "kriteria_penilaian": "Kriteria: Rubrik. Bentuk non-test: Ringkasan/Makalah/Kuis",
+      "indikator": "Ketepatan menjelaskan teori...",
+      "bobot": 5
     }}
   ],
-  "metode_pembelajaran": [
-    "Ceramah interaktif",
-    "Diskusi kelompok",
-    "Problem Based Learning",
-    "Project Based Learning",
-    "Praktikum"
-  ],
-  "media_pembelajaran": ["LCD Proyektor", "Whiteboard", "LMS", "Zoom/Google Meet"],
+  "media_pembelajaran": {{
+    "perangkat_lunak": ["Microsoft Power Point", "Google Classroom", "Zoom"],
+    "perangkat_keras": ["LCD & Projector", "Whiteboard", "Notebook"]
+  }},
   "penilaian": [
     {{
       "komponen": "Tugas Individu",
-      "bobot": 0.0,
+      "bobot": 0.20,
       "jenis": "tugas",
       "kriteria": ["kriteria 1", "kriteria 2"],
-      "sub_cpmk_kode": ["SUBCPMK01"]
+      "sub_cpmk_kode": ["Sub-CPMK 1"]
     }}
   ],
-  "referensi": [
-    {{"judul": "...", "pengarang": "...", "tahun": 2024, "penerbit": "..."}}
-  ]
+  "referensi": {{
+    "utama": [
+      "Nama Pengarang. Tahun. Judul Buku. Kota: Penerbit."
+    ],
+    "pendukung": [
+      "Nama Pengarang. Tahun. Judul Buku Rujukan. Kota: Penerbit."
+    ]
+  }}
 }}
 
 Pastikan:

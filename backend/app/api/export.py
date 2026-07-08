@@ -24,51 +24,122 @@ RPS_HTML_TEMPLATE = Template("""
       size: A4;
       margin: 1.5cm;
     }
-    body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; line-height: 1.3; }
-    h1 { text-align: center; font-size: 14pt; margin-bottom: 5px; font-weight: bold; }
-    h2 { font-size: 12pt; margin-top: 15px; margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 2px; }
+    body { font-family: 'Times New Roman', serif; font-size: 10pt; color: #000; line-height: 1.3; }
+    h1 { text-align: center; font-size: 13pt; margin-bottom: 5px; font-weight: bold; }
+    h2 { font-size: 11pt; margin-top: 15px; margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 2px; }
+    h3 { font-size: 10pt; margin-top: 8px; margin-bottom: 3px; font-weight: bold; }
     table { width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; }
-    th, td { border: 1px solid #000; padding: 5px; text-align: left; font-size: 10pt; word-wrap: break-word; }
-    th { background: #f2f2f2; font-weight: bold; }
-    .header { text-align: center; margin-bottom: 15px; }
-    .header h1 { margin: 0; }
-    .header p { margin: 2px; font-size: 11pt; }
-    ul { margin: 5px 0; padding-left: 20px; }
-    li { font-size: 10pt; margin-bottom: 3px; }
+    th, td { border: 1px solid #000; padding: 5px; text-align: left; font-size: 9pt; word-wrap: break-word; vertical-align: top; }
+    th { background: #f2f2f2; font-weight: bold; text-align: center; }
+    .header-table td { padding: 8px; vertical-align: middle; }
+    .text-center { text-align: center; }
+    ul, ol { margin: 5px 0; padding-left: 18px; }
+    li { font-size: 9pt; margin-bottom: 2px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>RENCANA PEMBELAJARAN SEMESTER (RPS)</h1>
-    <p>{{ data.identitas.prodi if data.identitas else '' }} - {{ data.identitas.fakultas if data.identitas else '' }}</p>
-    <p>Tahun Akademik {{ data.identitas.tahun_akademik if data.identitas else '' }}</p>
-  </div>
-
-  <h2>Identitas Mata Kuliah</h2>
-  <table>
-    <tr><th width="30%">Nama MK</th><td width="70%">{{ data.identitas.nama_mata_kuliah if data.identitas else '' }}</td></tr>
-    <tr><th>Kode MK</th><td>{{ data.identitas.kode_mata_kuliah if data.identitas else '' }}</td></tr>
-    <tr><th>SKS</th><td>{{ data.identitas.sks if data.identitas else '' }}</td></tr>
-    <tr><th>Semester</th><td>{{ data.identitas.semester if data.identitas else '' }}</td></tr>
+  
+  <!-- Kop Sekolah / Perguruan Tinggi -->
+  <table class="header-table" style="width: 100%; margin-bottom: 15px;">
+    <tr>
+      <td rowspan="2" style="width: 15%; text-align: center; border: 1px solid #000;">
+        {% if brand_logo %}
+          <img src="{{ brand_logo }}" style="max-height: 60px; max-width: 100%;" />
+        {% else %}
+          <div style="font-weight: bold; font-size: 8pt; color: #777;">LOGO</div>
+        {% endif %}
+      </td>
+      <td style="width: 85%; text-align: center; border: 1px solid #000; font-weight: bold; font-size: 13pt; letter-spacing: 0.5px;">
+        {{ brand_name }}
+      </td>
+    </tr>
+    <tr>
+      <td style="text-align: center; border: 1px solid #000; font-weight: bold; font-size: 11pt;">
+        JURUSAN / PROGRAM STUDI {{ data.identitas.prodi | upper if data.identitas else '' }}
+      </td>
+    </tr>
   </table>
 
-  <h2>Deskripsi Mata Kuliah</h2>
-  <p style="text-align: justify;">{{ data.deskripsi_mata_kuliah }}</p>
+  <!-- Judul dan Identitas RPS -->
+  <table style="width: 100%; margin-bottom: 15px;">
+    <tr>
+      <td colspan="4" style="text-align: center; font-weight: bold; background-color: #f2f2f2; font-size: 11pt; padding: 6px;">
+        RENCANA PEMBELAJARAN SEMESTER (RPS)
+      </td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; width: 25%;">Nama Mata Kuliah</td>
+      <td style="width: 25%;">{{ data.identitas.nama_mata_kuliah if data.identitas else '' }}</td>
+      <td style="font-weight: bold; width: 20%;">Kode MK</td>
+      <td style="width: 30%;">{{ data.identitas.kode_mata_kuliah if data.identitas else '' }}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold;">Bobot (SKS)</td>
+      <td>{{ data.identitas.sks if data.identitas else '' }} SKS</td>
+      <td style="font-weight: bold;">Semester</td>
+      <td>{{ data.identitas.semester if data.identitas else '' }}</td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold;">Tanggal Penyusunan</td>
+      <td>{{ data.identitas.tanggal_penyusunan if data.identitas else '-' }}</td>
+      <td style="font-weight: bold;">No Dokumen</td>
+      <td>{{ data.identitas.no_dokumen if data.identitas else '-' }}</td>
+    </tr>
+    <tr>
+      <td colspan="4" style="font-weight: bold; background-color: #f9f9f9; text-align: center; padding: 4px;">
+        OTORISASI
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-weight: bold; text-align: center; padding: 4px;">Koordinator Pengembang RPS</td>
+      <td style="font-weight: bold; text-align: center; padding: 4px;">Koordinator Rumpun MK</td>
+      <td style="font-weight: bold; text-align: center; padding: 4px;">Ka PRODI</td>
+    </tr>
+    <tr style="height: 50px;">
+      <td colspan="2" style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
+        Tanda tangan<br/><strong>{{ data.identitas.koordinator_pengembang_rps if data.identitas else '-' }}</strong>
+      </td>
+      <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
+        Tanda tangan<br/><strong>{{ data.identitas.koordinator_rmk if data.identitas else '-' }}</strong>
+      </td>
+      <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
+        Tanda tangan<br/><strong>{{ data.identitas.ka_prodi if data.identitas else '-' }}</strong>
+      </td>
+    </tr>
+  </table>
 
-  <h2>CPMK (Capaian Pembelajaran Mata Kuliah)</h2>
+  <h2>Capaian Pembelajaran (CP)</h2>
+  
+  <h3>1. CPL-PRODI (Capaian Pembelajaran Lulusan Program Studi) Yang Dibebankan Pada Mata Kuliah</h3>
   <table>
     <tr>
-      <th width="15%">Kode</th>
-      <th width="50%">Deskripsi</th>
-      <th width="15%">Bobot</th>
-      <th width="20%">CPL</th>
+      <th width="15%">Kode CPL</th>
+      <th width="85%">Deskripsi Capaian Pembelajaran</th>
+    </tr>
+    {% for cpl in course_cpls %}
+    <tr>
+      <td style="font-weight: bold; text-align: center;">{{ cpl.kode }}</td>
+      <td>{{ cpl.deskripsi }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="2" class="text-center" style="color: #777; font-style: italic;">Belum ada pemetaan CPL prodi yang dispesifikasikan.</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h3>2. CPMK (Capaian Pembelajaran Mata Kuliah)</h3>
+  <table>
+    <tr>
+      <th width="15%">Kode CPMK</th>
+      <th width="65%">Deskripsi CPMK</th>
+      <th width="20%">CPL Yang Didukung</th>
     </tr>
     {% for c in data.cpmk %}
     {% if c is mapping %}
     <tr>
-      <td>{{ c.kode if c.kode else '' }}</td>
-      <td>{{ c.deskripsi if c.deskripsi else '' }}</td>
-      <td>{{ c.bobot if c.bobot else '' }}</td>
+      <td style="font-weight: bold; text-align: center;">{{ c.kode }}</td>
+      <td>{{ c.deskripsi }}</td>
       <td>
         {% if c.cpl_prodi is string %}
           {{ c.cpl_prodi }}
@@ -83,114 +154,145 @@ RPS_HTML_TEMPLATE = Template("""
     {% endfor %}
   </table>
 
-  <h2>Sub-CPMK</h2>
+  <h2>Deskripsi Singkat Mata Kuliah</h2>
+  <p style="text-align: justify; margin: 5px 0;">{{ data.deskripsi_mata_kuliah }}</p>
+
+  <h2>Media Pembelajaran</h2>
   <table>
     <tr>
-      <th width="15%">Kode</th>
-      <th width="15%">CPMK</th>
-      <th width="45%">Deskripsi</th>
-      <th width="25%">Indikator</th>
+      <th width="50%">Perangkat Lunak (Software)</th>
+      <th width="50%">Perangkat Keras (Hardware)</th>
     </tr>
-    {% for s in data.sub_cpmk %}
-    {% if s is mapping %}
     <tr>
-      <td>{{ s.kode if s.kode else '' }}</td>
-      <td>{{ s.cpmk_kode if s.cpmk_kode else '' }}</td>
-      <td>{{ s.deskripsi if s.deskripsi else '' }}</td>
       <td>
-        {% if s.indikator is string %}
-          {{ s.indikator }}
-        {% elif s.indikator is iterable %}
-          {{ s.indikator | join('; ') }}
+        {% if data.media_pembelajaran is mapping %}
+          {% if data.media_pembelajaran.perangkat_lunak is iterable and data.media_pembelajaran.perangkat_lunak is not string %}
+            <ul>
+              {% for s in data.media_pembelajaran.perangkat_lunak %}
+                <li>{{ s }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            {{ data.media_pembelajaran.perangkat_lunak or '-' }}
+          {% endif %}
         {% else %}
-          {{ s.indikator }}
+          {% if data.media_pembelajaran is iterable and data.media_pembelajaran is not string %}
+            <ul>
+              {% for m in data.media_pembelajaran %}
+                <li>{{ m }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            {{ data.media_pembelajaran or '-' }}
+          {% endif %}
+        {% endif %}
+      </td>
+      <td>
+        {% if data.media_pembelajaran is mapping %}
+          {% if data.media_pembelajaran.perangkat_keras is iterable and data.media_pembelajaran.perangkat_keras is not string %}
+            <ul>
+              {% for h in data.media_pembelajaran.perangkat_keras %}
+                <li>{{ h }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            {{ data.media_pembelajaran.perangkat_keras or '-' }}
+          {% endif %}
+        {% else %}
+          -
         {% endif %}
       </td>
     </tr>
-    {% endif %}
-    {% endfor %}
   </table>
 
-  <h2>Rencana Pembelajaran</h2>
+  <h2>Daftar Referensi</h2>
   <table>
     <tr>
-      <th width="10%">Minggu</th>
-      <th width="15%">Sub-CPMK</th>
-      <th width="45%">Materi Pembelajaran</th>
-      <th width="15%">Metode</th>
-      <th width="15%">Media</th>
+      <th width="50%">Referensi Utama</th>
+      <th width="50%">Referensi Pendukung</th>
+    </tr>
+    <tr>
+      <td>
+        {% if data.referensi is mapping %}
+          {% if data.referensi.utama is iterable and data.referensi.utama is not string %}
+            <ol>
+              {% for u in data.referensi.utama %}
+                <li>{{ u }}</li>
+              {% endol %}
+            </ol>
+          {% else %}
+            {{ data.referensi.utama or '-' }}
+          {% endif %}
+        {% else %}
+          {% if data.referensi is iterable and data.referensi is not string %}
+            <ol>
+              {% for ref in data.referensi %}
+              <li>
+                {% if ref is string %}
+                  {{ ref }}
+                {% elif ref is mapping %}
+                  {{ ref.judul if ref.judul else '' }}{{ ', ' + ref.pengarang if ref.pengarang else '' }}{{ ' (' + ref.tahun|string + ')' if ref.tahun else '' }}
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ol>
+          {% else %}
+            {{ data.referensi or '-' }}
+          {% endif %}
+        {% endif %}
+      </td>
+      <td>
+        {% if data.referensi is mapping %}
+          {% if data.referensi.pendukung is iterable and data.referensi.pendukung is not string %}
+            <ol>
+              {% for p in data.referensi.pendukung %}
+                <li>{{ p }}</li>
+              {% endfor %}
+            </ol>
+          {% else %}
+            {{ data.referensi.pendukung or '-' }}
+          {% endif %}
+        {% else %}
+          -
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <h2>Rencana Kegiatan Pembelajaran Mingguan</h2>
+  <table>
+    <tr>
+      <th width="6%">Mg Ke-</th>
+      <th width="15%">Sub-CP-MK (Kemampuan Akhir yg Diharapkan)</th>
+      <th width="20%">Materi Pembelajaran</th>
+      <th width="14%">Bentuk & Metode Pembelajaran</th>
+      <th width="11%">Estimasi Waktu</th>
+      <th width="13%">Pengalaman Belajar Mahasiswa</th>
+      <th width="13%">Kriteria & Bentuk Penilaian</th>
+      <th width="8%">Bobot (%)</th>
     </tr>
     {% for r in data.rencana_pembelajaran %}
     {% if r is mapping %}
     <tr>
-      <td>{{ r.minggu_ke if r.minggu_ke else '' }}</td>
-      <td>{{ r.sub_cpmk_kode if r.sub_cpmk_kode else '' }}</td>
-      <td>{{ r.materi if r.materi else '' }}</td>
-      <td>
-        {% if r.metode is string %}
-          {{ r.metode }}
-        {% elif r.metode is iterable %}
-          {{ r.metode | join(', ') }}
-        {% else %}
-          {{ r.metode }}
-        {% endif %}
-      </td>
-      <td>
-        {% if r.media is string %}
-          {{ r.media }}
-        {% elif r.media is iterable %}
-          {{ r.media | join(', ') }}
-        {% else %}
-          {{ r.media }}
-        {% endif %}
-      </td>
+      <td class="text-center" style="font-weight: bold;">{{ r.minggu_ke }}</td>
+      <td><strong>{{ r.sub_cpmk_kode }}</strong><br/>{{ r.sub_cpmk_deskripsi or '' }}</td>
+      <td>{{ r.materi }}</td>
+      <td>{{ r.metode }}</td>
+      <td>{{ r.estimasi_waktu or '' }}</td>
+      <td>{{ r.pengalaman_belajar or '' }}</td>
+      <td>{{ r.kriteria_penilaian or '' }}</td>
+      <td class="text-center">{{ r.bobot or '0' }}%</td>
     </tr>
     {% endif %}
     {% endfor %}
   </table>
 
-  <h2>Penilaian</h2>
-  <table>
-    <tr>
-      <th width="40%">Komponen Penilaian</th>
-      <th width="20%">Bobot</th>
-      <th width="40%">Jenis Evaluasi</th>
-    </tr>
-    {% for p in data.penilaian %}
-    {% if p is mapping %}
-    <tr>
-      <td>{{ p.komponen if p.komponen else '' }}</td>
-      <td>{{ p.bobot if p.bobot else '' }}</td>
-      <td>{{ p.jenis if p.jenis else '' }}</td>
-    </tr>
-    {% endif %}
-    {% endfor %}
-  </table>
-
-  <h2>Referensi</h2>
-  <ul>
-    {% for ref in data.referensi %}
-    <li>
-      {% if ref is string %}
-        {{ ref }}
-      {% elif ref is mapping %}
-        {{ ref.judul if ref.judul else '' }}
-        {{ ', ' + ref.pengarang if ref.pengarang else '' }}
-        {% if ref.tahun %}
-          ({{ ref.tahun }})
-        {% endif %}
-      {% else %}
-        {{ ref }}
-      {% endif %}
-    </li>
-    {% endfor %}
-  </ul>
 </body>
 </html>
 """)
 
 
-def generate_docx(rps_data: dict, output_path: str):
+def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_name: str, brand_logo: str):
     from docx import Document
     from docx.shared import Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -198,86 +300,151 @@ def generate_docx(rps_data: dict, output_path: str):
     doc = Document()
     style = doc.styles['Normal']
     style.font.name = 'Times New Roman'
-    style.font.size = Pt(12)
-
-    # Header
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run('RENCANA PEMBELAJARAN SEMESTER (RPS)')
-    run.bold = True
-    run.font.size = Pt(16)
+    style.font.size = Pt(11)
 
     identitas = rps_data.get('identitas') or {}
-    
-    # Identitas table
-    doc.add_heading('Identitas Mata Kuliah', level=2)
-    table = doc.add_table(rows=4, cols=2, style='Table Grid')
-    rows = [
-        ('Nama MK', identitas.get('nama_mata_kuliah', '')),
-        ('Kode MK', identitas.get('kode_mata_kuliah', '')),
-        ('SKS', str(identitas.get('sks', ''))),
-        ('Semester', str(identitas.get('semester', ''))),
-    ]
-    for i, (label, val) in enumerate(rows):
-        table.rows[i].cells[0].text = label
-        table.rows[i].cells[1].text = val
 
-    # CPMK
-    doc.add_heading('CPMK', level=2)
-    cpmk_table = doc.add_table(rows=1, cols=4, style='Table Grid')
-    for j, h in enumerate(['Kode', 'Deskripsi', 'Bobot', 'CPL']):
-        cpmk_table.rows[0].cells[j].text = h
-    for cpmk in (rps_data.get('cpmk') or []):
-        if not isinstance(cpmk, dict):
+    # Cover Header Text
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_inst = p.add_run(f"{brand_name}\nPROGRAM STUDI {identitas.get('prodi', '').upper()}\n\n")
+    run_inst.bold = True
+    run_inst.font.size = Pt(13)
+
+    run_title = p.add_run("RENCANA PEMBELAJARAN SEMESTER (RPS)")
+    run_title.bold = True
+    run_title.font.size = Pt(14)
+
+    # Identitas Table with Otorisasi block
+    doc.add_heading('A. Identitas & Otorisasi', level=2)
+    table = doc.add_table(rows=7, cols=4, style='Table Grid')
+    
+    table.rows[0].cells[0].text = 'Nama Mata Kuliah'
+    table.rows[0].cells[1].text = identitas.get('nama_mata_kuliah', '')
+    table.rows[0].cells[2].text = 'Kode MK'
+    table.rows[0].cells[3].text = identitas.get('kode_mata_kuliah', '')
+    
+    table.rows[1].cells[0].text = 'Bobot (SKS)'
+    table.rows[1].cells[1].text = f"{identitas.get('sks', '')} SKS"
+    table.rows[1].cells[2].text = 'Semester'
+    table.rows[1].cells[3].text = str(identitas.get('semester', ''))
+    
+    table.rows[2].cells[0].text = 'Tanggal Penyusunan'
+    table.rows[2].cells[1].text = identitas.get('tanggal_penyusunan', '') or '-'
+    table.rows[2].cells[2].text = 'No Dokumen'
+    table.rows[2].cells[3].text = identitas.get('no_dokumen', '') or '-'
+    
+    # Merge row 3 for Otorisasi Section Header
+    cell_oto = table.rows[3].cells[0]
+    cell_oto.text = 'OTORISASI'
+    for col in range(1, 4):
+        cell_oto.merge(table.rows[3].cells[col])
+        
+    table.rows[4].cells[0].text = 'Koordinator Pengembang RPS'
+    table.rows[4].cells[2].text = 'Koordinator Rumpun MK'
+    table.rows[4].cells[3].text = 'Ka PRODI'
+    
+    table.rows[4].cells[0].merge(table.rows[4].cells[1])
+    table.rows[5].cells[0].merge(table.rows[5].cells[1])
+    
+    table.rows[5].cells[0].text = f"Tanda tangan\n\n\n{identitas.get('koordinator_pengembang_rps', '') or '-'}"
+    table.rows[5].cells[2].text = f"Tanda tangan\n\n\n{identitas.get('koordinator_rmk', '') or '-'}"
+    table.rows[5].cells[3].text = f"Tanda tangan\n\n\n{identitas.get('ka_prodi', '') or '-'}"
+
+    # CPL-PRODI Mapped Table
+    doc.add_heading('B. Capaian Pembelajaran Lulusan (CPL-PRODI)', level=2)
+    cpl_table = doc.add_table(rows=1, cols=2, style='Table Grid')
+    cpl_table.rows[0].cells[0].text = 'Kode CPL'
+    cpl_table.rows[0].cells[1].text = 'Deskripsi CPL yang Dibebankan'
+    
+    for cpl in course_cpls:
+        row = cpl_table.add_row()
+        row.cells[0].text = cpl.get('kode', '')
+        row.cells[1].text = cpl.get('deskripsi', '')
+
+    # CPMK Mapped Table
+    doc.add_heading('C. Capaian Pembelajaran Mata Kuliah (CPMK)', level=2)
+    cpmk_table = doc.add_table(rows=1, cols=3, style='Table Grid')
+    cpmk_table.rows[0].cells[0].text = 'Kode CPMK'
+    cpmk_table.rows[0].cells[1].text = 'Deskripsi CPMK'
+    cpmk_table.rows[0].cells[2].text = 'CPL Terkait'
+    
+    for c in (rps_data.get('cpmk') or []):
+        if not isinstance(c, dict):
             continue
         row = cpmk_table.add_row()
-        row.cells[0].text = cpmk.get('kode', '') or ''
-        row.cells[1].text = cpmk.get('deskripsi', '') or ''
-        row.cells[2].text = str(cpmk.get('bobot', '')) or ''
-        
-        cpl_prodi = cpmk.get('cpl_prodi', [])
-        if isinstance(cpl_prodi, list):
-            row.cells[3].text = ', '.join([str(x) for x in cpl_prodi])
-        else:
-            row.cells[3].text = str(cpl_prodi or '')
+        row.cells[0].text = c.get('kode', '')
+        row.cells[1].text = c.get('deskripsi', '')
+        cpl_prodi = c.get('cpl_prodi', [])
+        row.cells[2].text = ', '.join(cpl_prodi) if isinstance(cpl_prodi, list) else str(cpl_prodi or '')
 
-    # Rencana Pembelajaran
-    doc.add_heading('Rencana Pembelajaran', level=2)
-    rp_table = doc.add_table(rows=1, cols=5, style='Table Grid')
-    for j, h in enumerate(['Minggu', 'Sub-CPMK', 'Materi', 'Metode', 'Media']):
+    # Deskripsi
+    doc.add_heading('D. Deskripsi Singkat MK', level=2)
+    doc.add_paragraph(rps_data.get('deskripsi_mata_kuliah', ''))
+
+    # Media Pembelajaran Table
+    doc.add_heading('E. Media Pembelajaran', level=2)
+    media_table = doc.add_table(rows=2, cols=2, style='Table Grid')
+    media_table.rows[0].cells[0].text = 'Perangkat Lunak (Software)'
+    media_table.rows[0].cells[1].text = 'Perangkat Keras (Hardware)'
+    
+    media_data = rps_data.get('media_pembelajaran') or {}
+    if isinstance(media_data, dict):
+        soft = '\n'.join(media_data.get('perangkat_lunak', [])) if isinstance(media_data.get('perangkat_lunak'), list) else str(media_data.get('perangkat_lunak', ''))
+        hard = '\n'.join(media_data.get('perangkat_keras', [])) if isinstance(media_data.get('perangkat_keras'), list) else str(media_data.get('perangkat_keras', ''))
+    else:
+        soft = '\n'.join(media_data) if isinstance(media_data, list) else str(media_data)
+        hard = '-'
+    media_table.rows[1].cells[0].text = soft
+    media_table.rows[1].cells[1].text = hard
+
+    # Referensi Table
+    doc.add_heading('F. Daftar Referensi', level=2)
+    ref_table = doc.add_table(rows=2, cols=2, style='Table Grid')
+    ref_table.rows[0].cells[0].text = 'Referensi Utama'
+    ref_table.rows[0].cells[1].text = 'Referensi Pendukung'
+    
+    ref_data = rps_data.get('referensi') or {}
+    if isinstance(ref_data, dict):
+        utama = '\n'.join(ref_data.get('utama', [])) if isinstance(ref_data.get('utama'), list) else str(ref_data.get('utama', ''))
+        pendukung = '\n'.join(ref_data.get('pendukung', [])) if isinstance(ref_data.get('pendukung'), list) else str(ref_data.get('pendukung', ''))
+    else:
+        utama = '\n'.join([f"{r.get('pengarang','')}. {r.get('tahun','')}. {r.get('judul','')}" for r in ref_data if isinstance(r, dict)])
+        pendukung = '-'
+    ref_table.rows[1].cells[0].text = utama
+    ref_table.rows[1].cells[1].text = pendukung
+
+    # Rencana Pembelajaran Table Columns
+    doc.add_heading('G. Rencana Kegiatan Pembelajaran Mingguan', level=2)
+    rp_table = doc.add_table(rows=1, cols=8, style='Table Grid')
+    
+    headers = [
+        'Mg Ke-',
+        'Sub-CP-MK (Kemampuan Akhir yg Diharapkan)',
+        'Materi Pembelajaran',
+        'Bentuk & Metode Pembelajaran',
+        'Estimasi Waktu',
+        'Pengalaman Belajar Mahasiswa',
+        'Kriteria & Bentuk Penilaian',
+        'Bobot (%)'
+    ]
+    for j, h in enumerate(headers):
         rp_table.rows[0].cells[j].text = h
+        
     for rp in (rps_data.get('rencana_pembelajaran') or []):
         if not isinstance(rp, dict):
             continue
         row = rp_table.add_row()
         row.cells[0].text = str(rp.get('minggu_ke', '')) or ''
-        row.cells[1].text = rp.get('sub_cpmk_kode', '') or ''
-        row.cells[2].text = rp.get('materi', '') or ''
         
-        metode = rp.get('metode', [])
-        if isinstance(metode, list):
-            row.cells[3].text = ', '.join([str(x) for x in metode])
-        else:
-            row.cells[3].text = str(metode or '')
-            
-        media = rp.get('media', [])
-        if isinstance(media, list):
-            row.cells[4].text = ', '.join([str(x) for x in media])
-        else:
-            row.cells[4].text = str(media or '')
-
-    # Penilaian
-    doc.add_heading('Penilaian', level=2)
-    pen_table = doc.add_table(rows=1, cols=3, style='Table Grid')
-    for j, h in enumerate(['Komponen', 'Bobot', 'Jenis']):
-        pen_table.rows[0].cells[j].text = h
-    for p in (rps_data.get('penilaian') or []):
-        if not isinstance(p, dict):
-            continue
-        row = pen_table.add_row()
-        row.cells[0].text = p.get('komponen', '') or ''
-        row.cells[1].text = str(p.get('bobot', '')) or ''
-        row.cells[2].text = p.get('jenis', '') or ''
+        sub_cpmk_text = f"{rp.get('sub_cpmk_kode', '')}\n{rp.get('sub_cpmk_deskripsi', '')}"
+        row.cells[1].text = sub_cpmk_text.strip() or ''
+        row.cells[2].text = rp.get('materi', '') or ''
+        row.cells[3].text = str(rp.get('metode', '')) or ''
+        row.cells[4].text = rp.get('estimasi_waktu', '') or ''
+        row.cells[5].text = rp.get('pengalaman_belajar', '') or ''
+        row.cells[6].text = rp.get('kriteria_penilaian', '') or ''
+        row.cells[7].text = f"{rp.get('bobot', '0')}%"
 
     doc.save(output_path)
 
@@ -288,7 +455,7 @@ async def export_rps(
     export_format: str = "pdf",
     db: AsyncSession = Depends(get_db),
 ):
-    from app.models import MataKuliah
+    from app.models import MataKuliah, Prodi
     result = await db.execute(select(RPS).where(RPS.id == rps_id))
     rps = result.scalar_one_or_none()
     if not rps:
@@ -298,6 +465,19 @@ async def export_rps(
     mk_result = await db.execute(select(MataKuliah).where(MataKuliah.id == rps.mata_kuliah_id))
     mk = mk_result.scalar_one_or_none()
     deskripsi_mk = mk.deskripsi if (mk and mk.deskripsi) else ""
+    
+    # Ambil data CPL Prodi & subset CPL yang dipetakan pada mata kuliah ini
+    prodi_result = await db.execute(select(Prodi).where(Prodi.id == rps.prodi_id))
+    prodi = prodi_result.scalar_one_or_none()
+    
+    all_cpls = prodi.capaian_pembelajaran_lulusan if (prodi and prodi.capaian_pembelajaran_lulusan) else []
+    course_cpl_codes = mk.cpl_prodi or [] if mk else []
+    course_cpls = [cpl for cpl in all_cpls if cpl.get("kode") in course_cpl_codes]
+    if not course_cpls:
+        course_cpls = all_cpls
+        
+    brand_name = settings.BRAND_CAMPUS_NAME
+    brand_logo = settings.BRAND_CAMPUS_LOGO_URL
     
     rps_data = {
         "identitas": rps.identitas or {},
@@ -317,11 +497,16 @@ async def export_rps(
     
     if export_format == "docx":
         filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.docx")
-        generate_docx(rps_data, filepath)
+        generate_docx(rps_data, filepath, course_cpls, brand_name, brand_logo)
         return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{filename}.docx")
     
     elif export_format == "pdf":
-        html_content = RPS_HTML_TEMPLATE.render(data=rps_data)
+        html_content = RPS_HTML_TEMPLATE.render(
+            data=rps_data,
+            course_cpls=course_cpls,
+            brand_name=brand_name,
+            brand_logo=brand_logo
+        )
         
         try:
             from xhtml2pdf import pisa

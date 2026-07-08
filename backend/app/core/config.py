@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./autorps.db"
     DATABASE_ECHO: bool = False
 
+    # Branding
+    BRAND_CAMPUS_NAME: str = "SEKOLAH TINGGI ILMU EKONOMI WIRA BHAKTI MAKASSAR"
+    BRAND_CAMPUS_LOGO_URL: str = ""
+
     # AI Provider (ollama, lmstudio, openai, 9router)
     AI_PROVIDER: str = "ollama"
     AI_BASE_URL: str = "http://localhost:11434"
@@ -71,6 +75,10 @@ def save_settings_to_env(updates: dict):
         settings.OLLAMA_MODEL = updates["AI_MODEL"]
     if "AI_API_KEY" in updates:
         settings.AI_API_KEY = updates["AI_API_KEY"]
+    if "BRAND_CAMPUS_NAME" in updates:
+        settings.BRAND_CAMPUS_NAME = updates["BRAND_CAMPUS_NAME"]
+    if "BRAND_CAMPUS_LOGO_URL" in updates:
+        settings.BRAND_CAMPUS_LOGO_URL = updates["BRAND_CAMPUS_LOGO_URL"]
 
     env_path = ".env"
     possible_paths = [

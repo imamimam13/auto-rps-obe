@@ -18,8 +18,24 @@ export default function Settings() {
   const [model, setModel] = useState('llama3.1:8b')
   const [apiKey, setApiKey] = useState('')
   const [connecting, setConnecting] = useState(false)
+  const [campusName, setCampusName] = useState('')
+  const [campusLogoUrl, setCampusLogoUrl] = useState('')
+  const [savingBranding, setSavingBranding] = useState(false)
 
-  useEffect(() => { checkAI() }, [])
+  useEffect(() => { 
+    checkAI()
+    loadBranding()
+  }, [])
+
+  async function loadBranding() {
+    try {
+      const res = await api.get('/api/v1/ollama/branding')
+      setCampusName(res.data.brand_campus_name || '')
+      setCampusLogoUrl(res.data.brand_campus_logo_url || '')
+    } catch {
+      // ignored
+    }
+  }
 
   async function checkAI() {
     try {
@@ -59,6 +75,21 @@ export default function Settings() {
       toast.error(e.response?.data?.detail || 'Gagal terhubung')
     } finally {
       setConnecting(false)
+    }
+  }
+
+  async function handleSaveBranding() {
+    setSavingBranding(true)
+    try {
+      await api.post('/api/v1/ollama/branding', {
+        brand_campus_name: campusName,
+        brand_campus_logo_url: campusLogoUrl,
+      })
+      toast.success('Identitas branding disimpan!')
+    } catch {
+      toast.error('Gagal menyimpan branding')
+    } finally {
+      setSavingBranding(false)
     }
   }
 
@@ -141,6 +172,43 @@ export default function Settings() {
           <button onClick={connectAI} disabled={connecting} className="macos-button w-full py-2 flex items-center justify-center gap-2">
             <Link className="w-4 h-4" />
             {connecting ? 'Menghubungkan...' : 'Hubungkan & Simpan'}
+          </button>
+        </div>
+      </div>
+
+      <div className="macos-card p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2.5 rounded-apple-lg bg-orange-50">
+            <SettingsIcon className="w-5 h-5 text-orange-500" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Identitas & Branding Kampus</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Ubah nama kampus dan logo yang muncul pada dokumen ekspor RPS.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="macos-label">Nama Perguruan Tinggi / Sekolah Tinggi</label>
+            <input 
+              className="macos-input" 
+              value={campusName} 
+              onChange={(e) => setCampusName(e.target.value)} 
+              placeholder="SEKOLAH TINGGI ILMU EKONOMI WIRA BHAKTI MAKASSAR" 
+            />
+          </div>
+          <div>
+            <label className="macos-label">URL Logo Kampus (Opsional)</label>
+            <input 
+              className="macos-input" 
+              value={campusLogoUrl} 
+              onChange={(e) => setCampusLogoUrl(e.target.value)} 
+              placeholder="https://example.com/logo.png" 
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Kosongkan jika ingin menggunakan logo default. URL gambar harus diawali dengan https://.</p>
+          </div>
+          <button onClick={handleSaveBranding} disabled={savingBranding} className="macos-button w-full py-2 flex items-center justify-center gap-2">
+            {savingBranding ? 'Menyimpan...' : 'Simpan Identitas'}
           </button>
         </div>
       </div>
