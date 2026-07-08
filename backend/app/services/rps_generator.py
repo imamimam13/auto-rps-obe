@@ -16,8 +16,91 @@ from app.prompts.rps_prompts import (
 )
 
 
+def repair_truncated_json(json_str: str) -> str:
+    """Balance open brackets, braces, and quotes in truncated JSON strings to make them parsable."""
+    json_str = json_str.strip()
+    if not json_str:
+        return json_str
+        
+    try:
+        json.loads(json_str)
+        return json_str
+    except ValueError:
+        pass
+
+    in_string = False
+    escape = False
+    stack = []
+    repaired_chars = []
+    
+    for char in json_str:
+        if escape:
+            escape = False
+            repaired_chars.append(char)
+            continue
+            
+        if char == '\\':
+            escape = True
+            repaired_chars.append(char)
+            continue
+            
+        if char == '"':
+            in_string = not in_string
+            repaired_chars.append(char)
+            continue
+            
+        if in_string:
+            repaired_chars.append(char)
+            continue
+            
+        if char in ('{', '['):
+            stack.append(char)
+        elif char in ('}', ']'):
+            if stack:
+                top = stack[-1]
+                if (char == '}' and top == '{') or (char == ']' and top == '['):
+                    stack.pop()
+                else:
+                    continue
+            else:
+                continue
+                
+        repaired_chars.append(char)
+
+    repaired_str = "".join(repaired_chars)
+    
+    if in_string:
+        repaired_str += '"'
+        
+    repaired_str = repaired_str.rstrip()
+    if repaired_str.endswith(','):
+        repaired_str = repaired_str[:-1].rstrip()
+        
+    while stack:
+        top = stack.pop()
+        repaired_str = repaired_str.rstrip()
+        if top == '{':
+            if repaired_str.endswith(':'):
+                repaired_str += ' null'
+            elif repaired_str.endswith(','):
+                repaired_str = repaired_str[:-1].rstrip()
+            repaired_str += '}'
+        elif top == '[':
+            if repaired_str.endswith(','):
+                repaired_str = repaired_str[:-1].rstrip()
+            repaired_str += ']'
+            
+    try:
+        json.loads(repaired_str)
+        return repaired_str
+    except ValueError:
+        pass
+        
+    return json_str
+
+
 def extract_json(text: str) -> Any:
-    """Robustly extract and parse JSON from LLM outputs, handling conversational text and code blocks."""
+    """Robustly extract and parse JSON from LLM outputs, handling conversational text, code blocks, and truncation."""
     text = text.strip()
     try:
         return json.loads(text)
@@ -31,25 +114,25 @@ def extract_json(text: str) -> Any:
         try:
             return json.loads(content)
         except json.JSONDecodeError:
-            pass
+            try:
+                repaired = repair_truncated_json(content)
+                return json.loads(repaired)
+            except Exception:
+                pass
             
-    # 2. Coba cari dengan mendeteksi posisi kurung kurawal/siku pertama dan terakhir (untuk menepis percakapan pembuka/penutup)
+    # 2. Coba cari dengan mendeteksi posisi kurung kurawal/siku pertama dan terakhir
     start_idx = -1
     for i, char in enumerate(text):
         if char in ('{', '['):
             start_idx = i
             break
-    end_idx = -1
-    for i in range(len(text) - 1, -1, -1):
-        if text[i] in ('}', ']'):
-            end_idx = i
-            break
             
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        candidate = text[start_idx:end_idx + 1]
+    if start_idx != -1:
+        candidate = text[start_idx:]
         try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
+            repaired = repair_truncated_json(candidate)
+            return json.loads(repaired)
+        except Exception:
             pass
             
     raise ValueError("Respon AI tidak berisi format JSON yang valid.")
