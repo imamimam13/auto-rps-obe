@@ -20,6 +20,9 @@ export default function Settings() {
   const [connecting, setConnecting] = useState(false)
   const [campusName, setCampusName] = useState('')
   const [campusLogoUrl, setCampusLogoUrl] = useState('')
+  const [koordinatorPengembang, setKoordinatorPengembang] = useState('')
+  const [koordinatorRmk, setKoordinatorRmk] = useState('')
+  const [kaProdi, setKaProdi] = useState('')
   const [savingBranding, setSavingBranding] = useState(false)
 
   useEffect(() => { 
@@ -32,6 +35,9 @@ export default function Settings() {
       const res = await api.get('/api/v1/ollama/branding')
       setCampusName(res.data.brand_campus_name || '')
       setCampusLogoUrl(res.data.brand_campus_logo_url || '')
+      setKoordinatorPengembang(res.data.default_koordinator_pengembang || '')
+      setKoordinatorRmk(res.data.default_koordinator_rmk || '')
+      setKaProdi(res.data.default_ka_prodi || '')
     } catch {
       // ignored
     }
@@ -84,6 +90,9 @@ export default function Settings() {
       await api.post('/api/v1/ollama/branding', {
         brand_campus_name: campusName,
         brand_campus_logo_url: campusLogoUrl,
+        default_koordinator_pengembang: koordinatorPengembang,
+        default_koordinator_rmk: koordinatorRmk,
+        default_ka_prodi: kaProdi,
       })
       toast.success('Identitas branding disimpan!')
     } catch {
@@ -206,6 +215,35 @@ export default function Settings() {
               placeholder="https://example.com/logo.png" 
             />
             <p className="text-[10px] text-gray-400 mt-1">Kosongkan jika ingin menggunakan logo default. URL gambar harus diawali dengan https://.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="macos-label">Koordinator Pengembang RPS</label>
+              <input 
+                className="macos-input" 
+                value={koordinatorPengembang} 
+                onChange={(e) => setKoordinatorPengembang(e.target.value)} 
+                placeholder="Nama Koordinator Pengembang" 
+              />
+            </div>
+            <div>
+              <label className="macos-label">Koordinator Rumpun MK (RMK)</label>
+              <input 
+                className="macos-input" 
+                value={koordinatorRmk} 
+                onChange={(e) => setKoordinatorRmk(e.target.value)} 
+                placeholder="Nama Koordinator RMK" 
+              />
+            </div>
+            <div>
+              <label className="macos-label">Ketua Program Studi (Ka Prodi)</label>
+              <input 
+                className="macos-input" 
+                value={kaProdi} 
+                onChange={(e) => setKaProdi(e.target.value)} 
+                placeholder="Nama Ka Prodi" 
+              />
+            </div>
           </div>
           <button onClick={handleSaveBranding} disabled={savingBranding} className="macos-button w-full py-2 flex items-center justify-center gap-2">
             {savingBranding ? 'Menyimpan...' : 'Simpan Identitas'}

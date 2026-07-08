@@ -72,6 +72,9 @@ async def configure_ai(config: AIConfig):
 class BrandingConfig(BaseModel):
     brand_campus_name: str
     brand_campus_logo_url: Optional[str] = ""
+    default_koordinator_pengembang: Optional[str] = ""
+    default_koordinator_rmk: Optional[str] = ""
+    default_ka_prodi: Optional[str] = ""
 
 
 @router.get("/branding")
@@ -79,6 +82,9 @@ async def get_branding():
     return {
         "brand_campus_name": settings.BRAND_CAMPUS_NAME,
         "brand_campus_logo_url": settings.BRAND_CAMPUS_LOGO_URL,
+        "default_koordinator_pengembang": settings.DEFAULT_KOORDINATOR_PENGEMBANG,
+        "default_koordinator_rmk": settings.DEFAULT_KOORDINATOR_RMK,
+        "default_ka_prodi": settings.DEFAULT_KA_PRODI,
     }
 
 
@@ -86,14 +92,23 @@ async def get_branding():
 async def update_branding(config: BrandingConfig):
     settings.BRAND_CAMPUS_NAME = config.brand_campus_name
     settings.BRAND_CAMPUS_LOGO_URL = config.brand_campus_logo_url or ""
+    settings.DEFAULT_KOORDINATOR_PENGEMBANG = config.default_koordinator_pengembang or ""
+    settings.DEFAULT_KOORDINATOR_RMK = config.default_koordinator_rmk or ""
+    settings.DEFAULT_KA_PRODI = config.default_ka_prodi or ""
 
     save_settings_to_env({
         "BRAND_CAMPUS_NAME": config.brand_campus_name,
         "BRAND_CAMPUS_LOGO_URL": config.brand_campus_logo_url or "",
+        "DEFAULT_KOORDINATOR_PENGEMBANG": config.default_koordinator_pengembang or "",
+        "DEFAULT_KOORDINATOR_RMK": config.default_koordinator_rmk or "",
+        "DEFAULT_KA_PRODI": config.default_ka_prodi or "",
     })
     return {
         "success": True,
         "brand_campus_name": settings.BRAND_CAMPUS_NAME,
         "brand_campus_logo_url": settings.BRAND_CAMPUS_LOGO_URL,
+        "default_koordinator_pengembang": settings.DEFAULT_KOORDINATOR_PENGEMBANG,
+        "default_koordinator_rmk": settings.DEFAULT_KOORDINATOR_RMK,
+        "default_ka_prodi": settings.DEFAULT_KA_PRODI,
     }
 

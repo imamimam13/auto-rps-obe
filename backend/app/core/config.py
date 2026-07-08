@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Branding
     BRAND_CAMPUS_NAME: str = "SEKOLAH TINGGI ILMU EKONOMI WIRA BHAKTI MAKASSAR"
     BRAND_CAMPUS_LOGO_URL: str = ""
+    DEFAULT_KOORDINATOR_PENGEMBANG: str = ""
+    DEFAULT_KOORDINATOR_RMK: str = ""
+    DEFAULT_KA_PRODI: str = ""
 
     # AI Provider (ollama, lmstudio, openai, 9router)
     AI_PROVIDER: str = "ollama"
@@ -79,6 +82,12 @@ def save_settings_to_env(updates: dict):
         settings.BRAND_CAMPUS_NAME = updates["BRAND_CAMPUS_NAME"]
     if "BRAND_CAMPUS_LOGO_URL" in updates:
         settings.BRAND_CAMPUS_LOGO_URL = updates["BRAND_CAMPUS_LOGO_URL"]
+    if "DEFAULT_KOORDINATOR_PENGEMBANG" in updates:
+        settings.DEFAULT_KOORDINATOR_PENGEMBANG = updates["DEFAULT_KOORDINATOR_PENGEMBANG"]
+    if "DEFAULT_KOORDINATOR_RMK" in updates:
+        settings.DEFAULT_KOORDINATOR_RMK = updates["DEFAULT_KOORDINATOR_RMK"]
+    if "DEFAULT_KA_PRODI" in updates:
+        settings.DEFAULT_KA_PRODI = updates["DEFAULT_KA_PRODI"]
 
     env_path = ".env"
     possible_paths = [

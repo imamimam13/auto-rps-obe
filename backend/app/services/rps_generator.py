@@ -92,7 +92,19 @@ class RPSGeneratorService:
         )
         
         try:
-            return extract_json(response)
+            rps_data = extract_json(response)
+            
+            # Post-process defaults if configured
+            from app.core.config import settings
+            if "identitas" in rps_data and isinstance(rps_data["identitas"], dict):
+                if settings.DEFAULT_KOORDINATOR_PENGEMBANG:
+                    rps_data["identitas"]["koordinator_pengembang_rps"] = settings.DEFAULT_KOORDINATOR_PENGEMBANG
+                if settings.DEFAULT_KOORDINATOR_RMK:
+                    rps_data["identitas"]["koordinator_rmk"] = settings.DEFAULT_KOORDINATOR_RMK
+                if settings.DEFAULT_KA_PRODI:
+                    rps_data["identitas"]["ka_prodi"] = settings.DEFAULT_KA_PRODI
+                    
+            return rps_data
         except Exception as e:
             raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
 
