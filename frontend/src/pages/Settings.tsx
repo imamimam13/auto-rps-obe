@@ -23,6 +23,7 @@ export default function Settings() {
   const [koordinatorPengembang, setKoordinatorPengembang] = useState('')
   const [koordinatorRmk, setKoordinatorRmk] = useState('')
   const [kaProdi, setKaProdi] = useState('')
+  const [rentangPenilaian, setRentangPenilaian] = useState('')
   const [savingBranding, setSavingBranding] = useState(false)
 
   useEffect(() => { 
@@ -38,6 +39,7 @@ export default function Settings() {
       setKoordinatorPengembang(res.data.default_koordinator_pengembang || '')
       setKoordinatorRmk(res.data.default_koordinator_rmk || '')
       setKaProdi(res.data.default_ka_prodi || '')
+      setRentangPenilaian(res.data.brand_rentang_penilaian || '')
     } catch {
       // ignored
     }
@@ -93,6 +95,7 @@ export default function Settings() {
         default_koordinator_pengembang: koordinatorPengembang,
         default_koordinator_rmk: koordinatorRmk,
         default_ka_prodi: kaProdi,
+        brand_rentang_penilaian: rentangPenilaian,
       })
       toast.success('Identitas branding disimpan!')
     } catch {
@@ -235,6 +238,16 @@ export default function Settings() {
                 placeholder="Nama Ka Prodi" 
               />
             </div>
+          </div>
+          <div>
+            <label className="macos-label">Rentang Penilaian (Grading Scale)</label>
+            <textarea 
+              className="macos-input h-24 py-2 font-mono text-[11px]" 
+              value={rentangPenilaian} 
+              onChange={(e) => setRentangPenilaian(e.target.value)} 
+              placeholder="A: 85 - 100&#10;B+: 80 - 84&#10;B: 75 - 79&#10;C+: 70 - 74&#10;C: 60 - 69&#10;D: 50 - 59&#10;E: < 50" 
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Masukkan rentang nilai per baris yang akan dicetak pada bagian Evaluasi & Penilaian RPS.</p>
           </div>
           <button onClick={handleSaveBranding} disabled={savingBranding} className="macos-button w-full py-2 flex items-center justify-center gap-2">
             {savingBranding ? 'Menyimpan...' : 'Simpan Identitas'}

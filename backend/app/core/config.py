@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     DEFAULT_KOORDINATOR_PENGEMBANG: str = ""
     DEFAULT_KOORDINATOR_RMK: str = ""
     DEFAULT_KA_PRODI: str = ""
+    BRAND_RENTANG_PENILAIAN: str = "A (85-100), B+ (80-84), B (75-79), C+ (70-74), C (60-69), D (50-59), E (<50)"
 
     # AI Provider (ollama, lmstudio, openai, 9router)
     AI_PROVIDER: str = "ollama"
@@ -88,6 +89,8 @@ def save_settings_to_env(updates: dict):
         settings.DEFAULT_KOORDINATOR_RMK = updates["DEFAULT_KOORDINATOR_RMK"]
     if "DEFAULT_KA_PRODI" in updates:
         settings.DEFAULT_KA_PRODI = updates["DEFAULT_KA_PRODI"]
+    if "BRAND_RENTANG_PENILAIAN" in updates:
+        settings.BRAND_RENTANG_PENILAIAN = updates["BRAND_RENTANG_PENILAIAN"]
 
     env_path = ".env"
     possible_paths = [

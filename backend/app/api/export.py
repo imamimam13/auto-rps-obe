@@ -286,6 +286,42 @@ RPS_HTML_TEMPLATE = Template("""
     </tr>
   </table>
 
+  <h2>Evaluasi & Penilaian</h2>
+  <table>
+    <tr>
+      <th width="40%">Komponen Penilaian</th>
+      <th width="20%">Bobot (%)</th>
+      <th width="40%">Rentang Nilai Akhir & Predikat</th>
+    </tr>
+    <tr>
+      <td>
+        {% if data.penilaian is iterable and data.penilaian is not string %}
+          <ul style="margin: 0; padding-left: 15px;">
+            {% for p in data.penilaian %}
+              <li>{{ p.komponen }} ({{ p.jenis }})</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td style="text-align: center;">
+        {% if data.penilaian is iterable and data.penilaian is not string %}
+          <ul style="margin: 0; list-style-type: none; padding: 0;">
+            {% for p in data.penilaian %}
+              <li>{{ (p.bobot * 100)|int }}%</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          -
+        {% endif %}
+      </td>
+      <td style="white-space: pre-line;">
+        {{ brand_rentang_penilaian }}
+      </td>
+    </tr>
+  </table>
+
   <h2>Rencana Kegiatan Pembelajaran Mingguan</h2>
   <table>
     <tr>
@@ -319,7 +355,7 @@ RPS_HTML_TEMPLATE = Template("""
 """)
 
 
-def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_name: str, brand_logo: str, prodi_name: str):
+def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_name: str, brand_logo: str, prodi_name: str, brand_rentang_penilaian: str):
     from docx import Document
     from docx.shared import Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -477,8 +513,28 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     ref_table.rows[1].cells[0].text = utama
     ref_table.rows[1].cells[1].text = pendukung
 
+    # Evaluasi & Penilaian
+    doc.add_heading('H. Evaluasi & Penilaian', level=2)
+    eva_table = doc.add_table(rows=2, cols=3, style='Table Grid')
+    eva_table.rows[0].cells[0].text = 'Komponen Penilaian'
+    eva_table.rows[0].cells[1].text = 'Bobot (%)'
+    eva_table.rows[0].cells[2].text = 'Rentang Nilai Akhir & Predikat'
+    
+    penilaian_list = rps_data.get('penilaian') or []
+    comp_texts = []
+    weight_texts = []
+    if isinstance(penilaian_list, list):
+        for p in penilaian_list:
+            if isinstance(p, dict):
+                comp_texts.append(f"{p.get('komponen', '')} ({p.get('jenis', '')})")
+                weight_texts.append(f"{int(float(p.get('bobot', 0)) * 100)}%")
+    
+    eva_table.rows[1].cells[0].text = '\n'.join(comp_texts) if comp_texts else '-'
+    eva_table.rows[1].cells[1].text = '\n'.join(weight_texts) if weight_texts else '-'
+    eva_table.rows[1].cells[2].text = brand_rentang_penilaian or '-'
+
     # Rencana Pembelajaran Table Columns
-    doc.add_heading('H. Rencana Kegiatan Pembelajaran Mingguan', level=2)
+    doc.add_heading('I. Rencana Kegiatan Pembelajaran Mingguan', level=2)
     rp_table = doc.add_table(rows=1, cols=8, style='Table Grid')
     
     headers = [
@@ -568,9 +624,13 @@ async def export_rps(
     filename = f"RPS_{rps.kode}_{rps.semester}_{rps.tahun_akademik}"
     filename = filename.replace("/", "-").replace("\\", "-")
     
+    brand_name = settings.BRAND_CAMPUS_NAME
+    brand_logo = settings.BRAND_CAMPUS_LOGO_URL
+    brand_rentang_penilaian = settings.BRAND_RENTANG_PENILAIAN
+    
     if export_format == "docx":
         filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.docx")
-        generate_docx(rps_data, filepath, course_cpls, brand_name, brand_logo, prodi_name)
+        generate_docx(rps_data, filepath, course_cpls, brand_name, brand_logo, prodi_name, brand_rentang_penilaian)
         return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{filename}.docx")
     
     elif export_format == "pdf":
@@ -579,7 +639,8 @@ async def export_rps(
             course_cpls=course_cpls,
             brand_name=brand_name,
             brand_logo=brand_logo,
-            prodi_name=prodi_name
+            prodi_name=prodi_name,
+            brand_rentang_penilaian=brand_rentang_penilaian
         )
         
         try:

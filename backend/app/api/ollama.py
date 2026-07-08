@@ -75,6 +75,7 @@ class BrandingConfig(BaseModel):
     default_koordinator_pengembang: Optional[str] = ""
     default_koordinator_rmk: Optional[str] = ""
     default_ka_prodi: Optional[str] = ""
+    brand_rentang_penilaian: Optional[str] = ""
 
 
 @router.get("/branding")
@@ -85,6 +86,7 @@ async def get_branding():
         "default_koordinator_pengembang": settings.DEFAULT_KOORDINATOR_PENGEMBANG,
         "default_koordinator_rmk": settings.DEFAULT_KOORDINATOR_RMK,
         "default_ka_prodi": settings.DEFAULT_KA_PRODI,
+        "brand_rentang_penilaian": settings.BRAND_RENTANG_PENILAIAN,
     }
 
 
@@ -95,6 +97,7 @@ async def update_branding(config: BrandingConfig):
     settings.DEFAULT_KOORDINATOR_PENGEMBANG = config.default_koordinator_pengembang or ""
     settings.DEFAULT_KOORDINATOR_RMK = config.default_koordinator_rmk or ""
     settings.DEFAULT_KA_PRODI = config.default_ka_prodi or ""
+    settings.BRAND_RENTANG_PENILAIAN = config.brand_rentang_penilaian or ""
 
     save_settings_to_env({
         "BRAND_CAMPUS_NAME": config.brand_campus_name,
@@ -102,6 +105,7 @@ async def update_branding(config: BrandingConfig):
         "DEFAULT_KOORDINATOR_PENGEMBANG": config.default_koordinator_pengembang or "",
         "DEFAULT_KOORDINATOR_RMK": config.default_koordinator_rmk or "",
         "DEFAULT_KA_PRODI": config.default_ka_prodi or "",
+        "BRAND_RENTANG_PENILAIAN": config.brand_rentang_penilaian or "",
     })
     return {
         "success": True,
@@ -110,5 +114,6 @@ async def update_branding(config: BrandingConfig):
         "default_koordinator_pengembang": settings.DEFAULT_KOORDINATOR_PENGEMBANG,
         "default_koordinator_rmk": settings.DEFAULT_KOORDINATOR_RMK,
         "default_ka_prodi": settings.DEFAULT_KA_PRODI,
+        "brand_rentang_penilaian": settings.BRAND_RENTANG_PENILAIAN,
     }
 
