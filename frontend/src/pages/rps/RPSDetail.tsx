@@ -5,6 +5,20 @@ import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 
+function formatApiError(e: any, fallback: string): string {
+  if (e?.response?.data?.detail) {
+    const detail = e.response.data.detail
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail)) {
+      return detail.map((err: any) => {
+        const path = err.loc ? err.loc.join('.') : 'field'
+        return `${path}: ${err.msg}`
+      }).join(', ')
+    }
+  }
+  return e?.message || fallback
+}
+
 export default function RPSDetail() {
   const { id } = useParams()
   const { isAdmin } = useAuth()
@@ -58,7 +72,7 @@ export default function RPSDetail() {
       toast.success(`Validasi OBE selesai: Skor ${res.data.score}`)
       loadData()
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Gagal validasi')
+      toast.error(formatApiError(e, 'Gagal validasi'))
     } finally {
       setValidating(false)
     }
@@ -75,7 +89,7 @@ export default function RPSDetail() {
       toast.success(`Status RPS diperbarui menjadi ${newStatus}`)
       loadData()
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Gagal memperbarui status')
+      toast.error(formatApiError(e, 'Gagal memperbarui status'))
     } finally {
       setUpdatingStatus(false)
     }
@@ -175,7 +189,7 @@ export default function RPSDetail() {
       if (e instanceof SyntaxError) {
         toast.error('Format JSON tidak valid! Periksa kembali kurung atau koma.')
       } else {
-        toast.error(e.response?.data?.detail || 'Gagal memperbarui RPS')
+        toast.error(formatApiError(e, 'Gagal memperbarui RPS'))
       }
     }
   }
@@ -221,7 +235,7 @@ export default function RPSDetail() {
       
       handleValidate()
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || e.message || 'Gagal memperbaiki RPS', { id: 'autofix' })
+      toast.error(formatApiError(e, 'Gagal memperbaiki RPS'), { id: 'autofix' })
     } finally {
       setFixing(false)
     }
