@@ -179,13 +179,24 @@ class RPSGeneratorService:
             
             # Post-process defaults if configured
             from app.core.config import settings
-            if "identitas" in rps_data and isinstance(rps_data["identitas"], dict):
-                if settings.DEFAULT_KOORDINATOR_PENGEMBANG:
-                    rps_data["identitas"]["koordinator_pengembang_rps"] = settings.DEFAULT_KOORDINATOR_PENGEMBANG
-                if settings.DEFAULT_KOORDINATOR_RMK:
-                    rps_data["identitas"]["koordinator_rmk"] = settings.DEFAULT_KOORDINATOR_RMK
-                if settings.DEFAULT_KA_PRODI:
-                    rps_data["identitas"]["ka_prodi"] = settings.DEFAULT_KA_PRODI
+            if "identitas" not in rps_data or not isinstance(rps_data["identitas"], dict):
+                rps_data["identitas"] = {}
+                
+            identitas = rps_data["identitas"]
+            identitas.setdefault("nama_mata_kuliah", mata_kuliah.get("nama", ""))
+            identitas.setdefault("kode_mata_kuliah", mata_kuliah.get("kode", ""))
+            identitas.setdefault("sks", mata_kuliah.get("sks", 3))
+            identitas.setdefault("semester", semester)
+            identitas.setdefault("prodi", "")
+            identitas.setdefault("fakultas", "")
+            identitas["tahun_akademik"] = tahun_akademik
+
+            if settings.DEFAULT_KOORDINATOR_PENGEMBANG:
+                identitas["koordinator_pengembang_rps"] = settings.DEFAULT_KOORDINATOR_PENGEMBANG
+            if settings.DEFAULT_KOORDINATOR_RMK:
+                identitas["koordinator_rmk"] = settings.DEFAULT_KOORDINATOR_RMK
+            if settings.DEFAULT_KA_PRODI:
+                identitas["ka_prodi"] = settings.DEFAULT_KA_PRODI
                     
             return rps_data
         except Exception as e:

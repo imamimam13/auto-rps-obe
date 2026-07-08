@@ -115,10 +115,15 @@ class RPSIdentitas(BaseModel):
     kode_mata_kuliah: str
     sks: int
     semester: int
-    prodi: str
-    fakultas: str
+    prodi: Optional[str] = ""
+    fakultas: Optional[str] = ""
     dosen_pengampu: Optional[List[Dict[str, Any]]] = []
-    tahun_akademik: str
+    tahun_akademik: Optional[str] = ""
+    tanggal_penyusunan: Optional[str] = ""
+    no_dokumen: Optional[str] = ""
+    koordinator_pengembang_rps: Optional[str] = ""
+    koordinator_rmk: Optional[str] = ""
+    ka_prodi: Optional[str] = ""
 
 
 class RPSCPMK(BaseModel):
