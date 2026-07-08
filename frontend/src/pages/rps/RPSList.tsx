@@ -92,7 +92,7 @@ export default function RPSList() {
   async function handleExport(id: number, format: string) {
     try {
       const res = await api.post(`/api/v1/export/${id}?export_format=${format}`, {}, { responseType: 'blob' })
-      const contentType = res.headers['content-type'] || ''
+      const contentType = (res.headers['content-type'] as string) || ''
       const blob = new Blob([res.data], { type: contentType })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')

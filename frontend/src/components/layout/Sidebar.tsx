@@ -13,7 +13,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/prodi', icon: GraduationCap, label: 'Program Studi' },
   { to: '/mata-kuliah', icon: BookOpen, label: 'Mata Kuliah' },
   { to: '/rps', icon: FileText, label: 'RPS' },

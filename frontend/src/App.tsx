@@ -17,6 +17,9 @@ import OBEAnalyzer from '@/pages/obe/OBEAnalyzer'
 import UserManagement from '@/pages/UserManagement'
 import Settings from '@/pages/Settings'
 
+import LandingPage from '@/pages/LandingPage'
+import RPSPublicPreview from '@/pages/RPSPublicPreview'
+
 function AppLayout() {
   const { user } = useAuth()
   if (!user) return null
@@ -27,7 +30,7 @@ function AppLayout() {
       <main className="flex-1 overflow-auto">
         <div className="p-6 max-w-7xl mx-auto">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/prodi" element={<ProdiList />} />
             <Route path="/prodi/:id" element={<ProdiDetail />} />
             <Route path="/mata-kuliah" element={<MataKuliahList />} />
@@ -54,6 +57,8 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/rps-preview/:id" element={<RPSPublicPreview />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/*" element={
           <ProtectedRoute>

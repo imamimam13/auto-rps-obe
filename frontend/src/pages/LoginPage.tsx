@@ -17,7 +17,7 @@ export default function LoginPage() {
     try {
       await login(username, password)
       toast.success('Login berhasil')
-      navigate('/')
+      navigate('/dashboard')
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Login gagal')
     } finally {
