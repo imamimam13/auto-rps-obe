@@ -290,43 +290,50 @@ export default function RPSDetail() {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl">
-      <div className="flex items-center justify-between">
-        <Link to="/rps" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-macos-blue transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Kembali
-        </Link>
-        <div className="flex items-center gap-2">
-          {rps.status === 'draft' && isAdmin && (
-            <button
-              onClick={() => handleUpdateStatus('review')}
-              disabled={updatingStatus}
-              className="macos-button flex items-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
-            >
-              Ajukan Review
-            </button>
-          )}
-          {(rps.status === 'draft' || rps.status === 'review') && (
-            <button
-              onClick={() => handleUpdateStatus('approved')}
-              disabled={updatingStatus}
-              className="macos-button flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
-            >
-              Setujui (Approve)
-            </button>
-          )}
-          {rps.status === 'approved' && (
-            <button
-              onClick={() => handleUpdateStatus('published')}
-              disabled={updatingStatus}
-              className="macos-button flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
-            >
-              Publikasikan
-            </button>
-          )}
-          {rps.status === 'draft' && isAdmin && (
-            <button onClick={openEditModal} className="macos-button-ghost flex items-center gap-1.5 text-sm">
-              <Sparkles className="w-4 h-4 text-purple-500" /> Edit RPS (JSON)
-            </button>
-          )}
+      {/* Header — two rows so buttons never overflow */}
+      <div className="space-y-2">
+        {/* Row 1: back + primary actions */}
+        <div className="flex items-center justify-between">
+          <Link to="/rps" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-macos-blue transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Kembali
+          </Link>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {rps.status === 'draft' && isAdmin && (
+              <button
+                onClick={() => handleUpdateStatus('review')}
+                disabled={updatingStatus}
+                className="macos-button flex items-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+              >
+                Ajukan Review
+              </button>
+            )}
+            {(rps.status === 'draft' || rps.status === 'review') && isAdmin && (
+              <button
+                onClick={() => handleUpdateStatus('approved')}
+                disabled={updatingStatus}
+                className="macos-button flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+              >
+                Setujui (Approve)
+              </button>
+            )}
+            {rps.status === 'approved' && isAdmin && (
+              <button
+                onClick={() => handleUpdateStatus('published')}
+                disabled={updatingStatus}
+                className="macos-button flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-apple-md font-medium"
+              >
+                Publikasikan
+              </button>
+            )}
+            {rps.status === 'draft' && isAdmin && (
+              <button onClick={openEditModal} className="macos-button flex items-center gap-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-apple-md font-medium">
+                <Sparkles className="w-4 h-4" /> Edit RPS
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Row 2: secondary actions */}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button onClick={handleValidate} disabled={validating} className="macos-button-ghost flex items-center gap-1.5 text-sm">
             <CheckSquare className="w-4 h-4" /> {validating ? 'Memvalidasi...' : 'Validasi OBE'}
           </button>
@@ -343,6 +350,7 @@ export default function RPSDetail() {
           )}
         </div>
       </div>
+
 
       {/* Identitas */}
       <div className="macos-card p-6">
