@@ -172,6 +172,8 @@ class RPSBase(BaseModel):
     tahun_akademik: str
     dosen_pengampu: Optional[List[Dict[str, Any]]] = []
     identitas: Optional[RPSIdentitas] = None
+    deskripsi_mata_kuliah: Optional[str] = ""
+    bahan_kajian: Optional[Union[List[str], str, Any]] = []
     cpmk: Optional[List[RPSCPMK]] = []
     sub_cpmk: Optional[List[RPSSubCPMK]] = []
     rencana_pembelajaran: Optional[List[RPSRencanaMingguan]] = []
@@ -188,6 +190,8 @@ class RPSCreate(RPSBase):
 class RPSUpdate(BaseModel):
     dosen_pengampu: Optional[List[Dict[str, Any]]] = None
     identitas: Optional[RPSIdentitas] = None
+    deskripsi_mata_kuliah: Optional[str] = None
+    bahan_kajian: Optional[Union[List[str], str, Any]] = None
     cpmk: Optional[List[RPSCPMK]] = None
     sub_cpmk: Optional[List[RPSSubCPMK]] = None
     rencana_pembelajaran: Optional[List[RPSRencanaMingguan]] = None

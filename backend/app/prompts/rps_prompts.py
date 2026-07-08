@@ -50,6 +50,10 @@ Buat RPS lengkap dengan format JSON berikut. Pastikan konten relevan dengan visi
     "ka_prodi": "Nama Ketua Program Studi"
   }},
   "deskripsi_mata_kuliah": "deskripsi lengkap sesuai CPL",
+  "bahan_kajian": [
+    "Bahan kajian / Pokok Bahasan 1...",
+    "Bahan kajian / Pokok Bahasan 2..."
+  ],
   "cpmk": [
     {{
       "kode": "CPMK1",

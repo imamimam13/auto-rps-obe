@@ -386,6 +386,32 @@ export default function RPSDetail() {
         </div>
       )}
 
+      {/* Deskripsi & Bahan Kajian */}
+      {(rps.deskripsi_mata_kuliah || (rps.bahan_kajian && rps.bahan_kajian.length > 0)) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {rps.deskripsi_mata_kuliah && (
+            <div className="macos-card p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Deskripsi Singkat Mata Kuliah</h3>
+              <p className="text-sm text-gray-600 leading-relaxed text-justify">{rps.deskripsi_mata_kuliah}</p>
+            </div>
+          )}
+          {rps.bahan_kajian && rps.bahan_kajian.length > 0 && (
+            <div className="macos-card p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Bahan Kajian / Pokok Bahasan</h3>
+              {Array.isArray(rps.bahan_kajian) ? (
+                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
+                  {rps.bahan_kajian.map((bk: any, idx: number) => (
+                    <li key={idx} className="leading-relaxed">{bk}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-600 leading-relaxed text-justify">{rps.bahan_kajian}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* CPMK */}
       {rps.cpmk?.length > 0 && (
         <div className="macos-card p-5">

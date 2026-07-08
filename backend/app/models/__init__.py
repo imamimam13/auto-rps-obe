@@ -84,6 +84,8 @@ class RPS(Base):
     
     # RPS Content (JSON for flexibility)
     identitas = Column(JSON)
+    deskripsi_mata_kuliah = Column(JSON)  # backward compatible representation
+    bahan_kajian = Column(JSON)
     cpmk = Column(JSON)
     sub_cpmk = Column(JSON)
     rencana_pembelajaran = Column(JSON)  # Mingguan

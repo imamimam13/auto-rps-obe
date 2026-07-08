@@ -157,6 +157,17 @@ RPS_HTML_TEMPLATE = Template("""
   <h2>Deskripsi Singkat Mata Kuliah</h2>
   <p style="text-align: justify; margin: 5px 0;">{{ data.deskripsi_mata_kuliah }}</p>
 
+  <h2>Bahan Kajian / Pokok Bahasan</h2>
+  {% if data.bahan_kajian is iterable and data.bahan_kajian is not string %}
+    <ul>
+      {% for bk in data.bahan_kajian %}
+        <li>{{ bk }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>{{ data.bahan_kajian or '-' }}</p>
+  {% endif %}
+
   <h2>Media Pembelajaran</h2>
   <table>
     <tr>
@@ -382,8 +393,17 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     doc.add_heading('D. Deskripsi Singkat MK', level=2)
     doc.add_paragraph(rps_data.get('deskripsi_mata_kuliah', ''))
 
+    # Bahan Kajian
+    doc.add_heading('E. Bahan Kajian / Pokok Bahasan', level=2)
+    bahan_kajian = rps_data.get('bahan_kajian', [])
+    if isinstance(bahan_kajian, list):
+        for bk in bahan_kajian:
+            doc.add_paragraph(str(bk), style='List Bullet')
+    else:
+        doc.add_paragraph(str(bahan_kajian or '-'))
+
     # Media Pembelajaran Table
-    doc.add_heading('E. Media Pembelajaran', level=2)
+    doc.add_heading('F. Media Pembelajaran', level=2)
     media_table = doc.add_table(rows=2, cols=2, style='Table Grid')
     media_table.rows[0].cells[0].text = 'Perangkat Lunak (Software)'
     media_table.rows[0].cells[1].text = 'Perangkat Keras (Hardware)'
@@ -399,7 +419,7 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     media_table.rows[1].cells[1].text = hard
 
     # Referensi Table
-    doc.add_heading('F. Daftar Referensi', level=2)
+    doc.add_heading('G. Daftar Referensi', level=2)
     ref_table = doc.add_table(rows=2, cols=2, style='Table Grid')
     ref_table.rows[0].cells[0].text = 'Referensi Utama'
     ref_table.rows[0].cells[1].text = 'Referensi Pendukung'
@@ -415,7 +435,7 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     ref_table.rows[1].cells[1].text = pendukung
 
     # Rencana Pembelajaran Table Columns
-    doc.add_heading('G. Rencana Kegiatan Pembelajaran Mingguan', level=2)
+    doc.add_heading('H. Rencana Kegiatan Pembelajaran Mingguan', level=2)
     rp_table = doc.add_table(rows=1, cols=8, style='Table Grid')
     
     headers = [

@@ -149,6 +149,8 @@ async def bulk_generate_rps(
                 tahun_akademik=data.tahun_akademik,
                 dosen_pengampu=data.dosen_pengampu or [],
                 identitas=rps_data.get("identitas"),
+                deskripsi_mata_kuliah=rps_data.get("deskripsi_mata_kuliah") or "",
+                bahan_kajian=rps_data.get("bahan_kajian") or [],
                 cpmk=rps_data.get("cpmk", []),
                 sub_cpmk=rps_data.get("sub_cpmk", []),
                 rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
