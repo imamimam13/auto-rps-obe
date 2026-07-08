@@ -15,6 +15,18 @@ export default function RPSDetail() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editJson, setEditJson] = useState('')
+  const [activeTab, setActiveTab] = useState<'form' | 'json'>('form')
+  const [formIdentitas, setFormIdentitas] = useState({
+    tanggal_penyusunan: '',
+    no_dokumen: '',
+    koordinator_pengembang_rps: '',
+    koordinator_rmk: '',
+    ka_prodi: '',
+    nama_mata_kuliah: '',
+    kode_mata_kuliah: '',
+    sks: 3,
+    semester: 3
+  })
   const [fixing, setFixing] = useState(false)
 
   useEffect(() => {
@@ -65,22 +77,48 @@ export default function RPSDetail() {
   function openEditModal() {
     if (!rps) return
     const editableData = {
-      identitas: rps.identitas,
-      cpmk: rps.cpmk,
-      sub_cpmk: rps.sub_cpmk,
-      rencana_pembelajaran: rps.rencana_pembelajaran,
-      metode_pembelajaran: rps.metode_pembelajaran,
-      media_pembelajaran: rps.media_pembelajaran,
-      penilaian: rps.penilaian,
-      referensi: rps.referensi,
+      identitas: rps.identitas || {},
+      cpmk: rps.cpmk || [],
+      sub_cpmk: rps.sub_cpmk || [],
+      rencana_pembelajaran: rps.rencana_pembelajaran || [],
+      metode_pembelajaran: rps.metode_pembelajaran || [],
+      media_pembelajaran: rps.media_pembelajaran || [],
+      penilaian: rps.penilaian || [],
+      referensi: rps.referensi || [],
     }
     setEditJson(JSON.stringify(editableData, null, 2))
+    setFormIdentitas({
+      tanggal_penyusunan: rps.identitas?.tanggal_penyusunan || '',
+      no_dokumen: rps.identitas?.no_dokumen || '',
+      koordinator_pengembang_rps: rps.identitas?.koordinator_pengembang_rps || '',
+      koordinator_rmk: rps.identitas?.koordinator_rmk || '',
+      ka_prodi: rps.identitas?.ka_prodi || '',
+      nama_mata_kuliah: rps.identitas?.nama_mata_kuliah || '',
+      kode_mata_kuliah: rps.identitas?.kode_mata_kuliah || '',
+      sks: rps.identitas?.sks || 3,
+      semester: rps.identitas?.semester || 3
+    })
+    setActiveTab('form')
     setShowEditModal(true)
   }
 
   async function handleSaveJson() {
     try {
-      const parsed = JSON.parse(editJson)
+      let parsed = JSON.parse(editJson)
+      if (activeTab === 'form') {
+        parsed.identitas = {
+          ...parsed.identitas,
+          tanggal_penyusunan: formIdentitas.tanggal_penyusunan,
+          no_dokumen: formIdentitas.no_dokumen,
+          koordinator_pengembang_rps: formIdentitas.koordinator_pengembang_rps,
+          koordinator_rmk: formIdentitas.koordinator_rmk,
+          ka_prodi: formIdentitas.ka_prodi,
+          nama_mata_kuliah: formIdentitas.nama_mata_kuliah,
+          kode_mata_kuliah: formIdentitas.kode_mata_kuliah,
+          sks: Number(formIdentitas.sks),
+          semester: Number(formIdentitas.semester)
+        }
+      }
       await api.put(`/api/v1/rps/${id}`, parsed)
       toast.success('RPS berhasil diperbarui!')
       setShowEditModal(false)
@@ -426,8 +464,8 @@ export default function RPSDetail() {
           <div className="macos-card p-6 w-full max-w-3xl h-[85vh] flex flex-col animate-scale-up space-y-4 bg-white/95 shadow-2xl rounded-apple-xl border border-white/20">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Edit Konten RPS (Format JSON)</h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">Ubah isi RPS secara langsung. Pastikan format JSON tetap valid.</p>
+                <h3 className="text-sm font-semibold text-gray-900">Edit Konten RPS</h3>
+                <p className="text-[11px] text-gray-400 mt-0.5">Ubah isi identitas dan otorisasi dengan mudah via form, atau edit JSON untuk konten lengkap.</p>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
@@ -437,16 +475,124 @@ export default function RPSDetail() {
               </button>
             </div>
 
-            <div className="flex-1 min-h-0">
-              <textarea
-                className="w-full h-full p-4 font-mono text-xs bg-gray-50 border border-gray-200 rounded-apple-lg focus:outline-none focus:ring-1 focus:ring-macos-blue resize-none"
-                value={editJson}
-                onChange={(e) => setEditJson(e.target.value)}
-                spellCheck={false}
-              />
+            {/* Tab Selector */}
+            <div className="flex gap-2 p-0.5 bg-gray-100 rounded-apple-lg self-start">
+              <button
+                onClick={() => setActiveTab('form')}
+                className={`text-xs px-3 py-1.5 rounded-apple-md font-medium transition-colors ${activeTab === 'form' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                Identitas & Otorisasi
+              </button>
+              <button
+                onClick={() => setActiveTab('json')}
+                className={`text-xs px-3 py-1.5 rounded-apple-md font-medium transition-colors ${activeTab === 'json' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                JSON Lengkap
+              </button>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {activeTab === 'form' ? (
+                <div className="space-y-4 pr-1 text-xs">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="macos-label">Nama Mata Kuliah</label>
+                      <input
+                        className="macos-input"
+                        value={formIdentitas.nama_mata_kuliah}
+                        onChange={(e) => setFormIdentitas({ ...formIdentitas, nama_mata_kuliah: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="macos-label">Kode Mata Kuliah</label>
+                      <input
+                        className="macos-input"
+                        value={formIdentitas.kode_mata_kuliah}
+                        onChange={(e) => setFormIdentitas({ ...formIdentitas, kode_mata_kuliah: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="macos-label">Bobot (SKS)</label>
+                      <input
+                        type="number"
+                        className="macos-input"
+                        value={formIdentitas.sks}
+                        onChange={(e) => setFormIdentitas({ ...formIdentitas, sks: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <label className="macos-label">Semester</label>
+                      <input
+                        type="number"
+                        className="macos-input"
+                        value={formIdentitas.semester}
+                        onChange={(e) => setFormIdentitas({ ...formIdentitas, semester: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="macos-label">Tanggal Penyusunan</label>
+                      <input
+                        className="macos-input"
+                        value={formIdentitas.tanggal_penyusunan}
+                        onChange={(e) => setFormIdentitas({ ...formIdentitas, tanggal_penyusunan: e.target.value })}
+                        placeholder="Contoh: 09 Agustus 2022"
+                      />
+                    </div>
+                    <div>
+                      <label className="macos-label">Nomor Dokumen</label>
+                      <input
+                        className="macos-input"
+                        value={formIdentitas.no_dokumen}
+                        onChange={(e) => setFormIdentitas({ ...formIdentitas, no_dokumen: e.target.value })}
+                        placeholder="Contoh: Dok-RPS-01"
+                      />
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-100 pt-3">
+                    <h4 className="text-xs font-semibold text-gray-900 mb-2">Tanda Tangan Otorisasi</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="macos-label">Nama Koordinator Pengembang RPS</label>
+                        <input
+                          className="macos-input"
+                          value={formIdentitas.koordinator_pengembang_rps}
+                          onChange={(e) => setFormIdentitas({ ...formIdentitas, koordinator_pengembang_rps: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="macos-label">Nama Koordinator Rumpun MK (RMK)</label>
+                        <input
+                          className="macos-input"
+                          value={formIdentitas.koordinator_rmk}
+                          onChange={(e) => setFormIdentitas({ ...formIdentitas, koordinator_rmk: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="macos-label">Nama Ketua Program Studi (Ka Prodi)</label>
+                        <input
+                          className="macos-input"
+                          value={formIdentitas.ka_prodi}
+                          onChange={(e) => setFormIdentitas({ ...formIdentitas, ka_prodi: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <textarea
+                  className="w-full h-full p-4 font-mono text-xs bg-gray-50 border border-gray-200 rounded-apple-lg focus:outline-none focus:ring-1 focus:ring-macos-blue resize-none"
+                  value={editJson}
+                  onChange={(e) => setEditJson(e.target.value)}
+                  spellCheck={false}
+                />
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
               <button
                 onClick={() => setShowEditModal(false)}
                 className="macos-button-ghost px-4 py-2 text-xs"
