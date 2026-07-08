@@ -90,7 +90,7 @@ export default function RPSPublicPreview() {
 
   function handleDownload(format: 'pdf' | 'docx') {
     if (!rps) return
-    const url = `${api.defaults.baseURL}/api/v1/export/${format}?rps_id=${rps.id}`
+    const url = `${api.defaults.baseURL}/api/v1/export/${rps.id}?export_format=${format}`
     window.open(url, '_blank')
   }
 

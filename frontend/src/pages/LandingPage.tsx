@@ -83,7 +83,7 @@ export default function LandingPage() {
 
   // Download handlers
   function handleDownload(rpsId: number, format: 'pdf' | 'docx') {
-    const url = `${api.defaults.baseURL}/api/v1/export/${format}?rps_id=${rpsId}`
+    const url = `${api.defaults.baseURL}/api/v1/export/${rpsId}?export_format=${format}`
     window.open(url, '_blank')
   }
 

@@ -335,9 +335,9 @@ export default function RPSDetail() {
             {/* Issues */}
             {rps.obe_validation_result.issues?.length > 0 ? (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-gray-700">Masalah / Kesenjangan ({rps.obe_validation_result.issues.length})</h4>
+                <h4 className="text-xs font-semibold text-gray-700">Masalah / Kesenjangan ({rps.obe_validation_result.issues?.length || 0})</h4>
                 <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                  {rps.obe_validation_result.issues.map((issue: any, idx: number) => (
+                  {rps.obe_validation_result.issues?.map((issue: any, idx: number) => (
                     <div key={idx} className={`p-2.5 rounded-apple-md text-xs space-y-1 ${
                       issue.severity === 'high' ? 'bg-red-50/70 text-red-700' : 'bg-yellow-50/70 text-yellow-700'
                     }`}>
@@ -363,9 +363,9 @@ export default function RPSDetail() {
             {/* Suggestions */}
             {rps.obe_validation_result.suggestions?.length > 0 ? (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-gray-700">Saran Perbaikan ({rps.obe_validation_result.suggestions.length})</h4>
+                <h4 className="text-xs font-semibold text-gray-700">Saran Perbaikan ({rps.obe_validation_result.suggestions?.length || 0})</h4>
                 <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                  {rps.obe_validation_result.suggestions.map((s: any, idx: number) => (
+                  {rps.obe_validation_result.suggestions?.map((s: any, idx: number) => (
                     <div key={idx} className="p-2.5 bg-blue-50/50 rounded-apple-md text-xs text-blue-700 space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="font-semibold capitalize">{s.bagian}</span>

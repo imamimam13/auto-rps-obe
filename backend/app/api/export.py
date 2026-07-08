@@ -513,6 +513,7 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
 
 
 @router.post("/{rps_id}")
+@router.get("/{rps_id}")
 async def export_rps(
     rps_id: int,
     export_format: str = "pdf",
