@@ -232,6 +232,34 @@ RPS_HTML_TEMPLATE = Template("""
     </tr>
   </table>
 
+  <h2>Rencana Kegiatan Pembelajaran Mingguan</h2>
+  <table>
+    <tr>
+      <th width="6%">Mg Ke-</th>
+      <th width="15%">Sub-CP-MK (Kemampuan Akhir yg Diharapkan)</th>
+      <th width="20%">Materi Pembelajaran</th>
+      <th width="14%">Bentuk & Metode Pembelajaran</th>
+      <th width="11%">Estimasi Waktu</th>
+      <th width="13%">Pengalaman Belajar Mahasiswa</th>
+      <th width="13%">Kriteria & Bentuk Penilaian</th>
+      <th width="8%">Bobot (%)</th>
+    </tr>
+    {% for r in data.rencana_pembelajaran %}
+    {% if r is mapping %}
+    <tr>
+      <td class="text-center" style="font-weight: bold;">{{ r.minggu_ke }}</td>
+      <td><strong>{{ r.sub_cpmk_kode }}</strong><br/>{{ r.sub_cpmk_deskripsi or '' }}</td>
+      <td>{{ r.materi }}</td>
+      <td>{{ r.metode }}</td>
+      <td>{{ r.estimasi_waktu or '' }}</td>
+      <td>{{ r.pengalaman_belajar or '' }}</td>
+      <td>{{ r.kriteria_penilaian or '' }}</td>
+      <td class="text-center">{{ r.bobot or '0' }}%</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+
   <h2>Daftar Referensi</h2>
   <table>
     <tr>
@@ -320,34 +348,6 @@ RPS_HTML_TEMPLATE = Template("""
         {{ brand_rentang_penilaian }}
       </td>
     </tr>
-  </table>
-
-  <h2>Rencana Kegiatan Pembelajaran Mingguan</h2>
-  <table>
-    <tr>
-      <th width="6%">Mg Ke-</th>
-      <th width="15%">Sub-CP-MK (Kemampuan Akhir yg Diharapkan)</th>
-      <th width="20%">Materi Pembelajaran</th>
-      <th width="14%">Bentuk & Metode Pembelajaran</th>
-      <th width="11%">Estimasi Waktu</th>
-      <th width="13%">Pengalaman Belajar Mahasiswa</th>
-      <th width="13%">Kriteria & Bentuk Penilaian</th>
-      <th width="8%">Bobot (%)</th>
-    </tr>
-    {% for r in data.rencana_pembelajaran %}
-    {% if r is mapping %}
-    <tr>
-      <td class="text-center" style="font-weight: bold;">{{ r.minggu_ke }}</td>
-      <td><strong>{{ r.sub_cpmk_kode }}</strong><br/>{{ r.sub_cpmk_deskripsi or '' }}</td>
-      <td>{{ r.materi }}</td>
-      <td>{{ r.metode }}</td>
-      <td>{{ r.estimasi_waktu or '' }}</td>
-      <td>{{ r.pengalaman_belajar or '' }}</td>
-      <td>{{ r.kriteria_penilaian or '' }}</td>
-      <td class="text-center">{{ r.bobot or '0' }}%</td>
-    </tr>
-    {% endif %}
-    {% endfor %}
   </table>
 
 </body>
@@ -497,44 +497,8 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     media_table.rows[1].cells[0].text = soft
     media_table.rows[1].cells[1].text = hard
 
-    # Referensi Table
-    doc.add_heading('G. Daftar Referensi', level=2)
-    ref_table = doc.add_table(rows=2, cols=2, style='Table Grid')
-    ref_table.rows[0].cells[0].text = 'Referensi Utama'
-    ref_table.rows[0].cells[1].text = 'Referensi Pendukung'
-    
-    ref_data = rps_data.get('referensi') or {}
-    if isinstance(ref_data, dict):
-        utama = '\n'.join(ref_data.get('utama', [])) if isinstance(ref_data.get('utama'), list) else str(ref_data.get('utama', ''))
-        pendukung = '\n'.join(ref_data.get('pendukung', [])) if isinstance(ref_data.get('pendukung'), list) else str(ref_data.get('pendukung', ''))
-    else:
-        utama = '\n'.join([f"{r.get('pengarang','')}. {r.get('tahun','')}. {r.get('judul','')}" for r in ref_data if isinstance(r, dict)])
-        pendukung = '-'
-    ref_table.rows[1].cells[0].text = utama
-    ref_table.rows[1].cells[1].text = pendukung
-
-    # Evaluasi & Penilaian
-    doc.add_heading('H. Evaluasi & Penilaian', level=2)
-    eva_table = doc.add_table(rows=2, cols=3, style='Table Grid')
-    eva_table.rows[0].cells[0].text = 'Komponen Penilaian'
-    eva_table.rows[0].cells[1].text = 'Bobot (%)'
-    eva_table.rows[0].cells[2].text = 'Rentang Nilai Akhir & Predikat'
-    
-    penilaian_list = rps_data.get('penilaian') or []
-    comp_texts = []
-    weight_texts = []
-    if isinstance(penilaian_list, list):
-        for p in penilaian_list:
-            if isinstance(p, dict):
-                comp_texts.append(f"{p.get('komponen', '')} ({p.get('jenis', '')})")
-                weight_texts.append(f"{int(float(p.get('bobot', 0)) * 100)}%")
-    
-    eva_table.rows[1].cells[0].text = '\n'.join(comp_texts) if comp_texts else '-'
-    eva_table.rows[1].cells[1].text = '\n'.join(weight_texts) if weight_texts else '-'
-    eva_table.rows[1].cells[2].text = brand_rentang_penilaian or '-'
-
-    # Rencana Pembelajaran Table Columns
-    doc.add_heading('I. Rencana Kegiatan Pembelajaran Mingguan', level=2)
+    # Rencana Pembelajaran Table
+    doc.add_heading('G. Rencana Kegiatan Pembelajaran Mingguan', level=2)
     rp_table = doc.add_table(rows=1, cols=8, style='Table Grid')
     
     headers = [
@@ -555,7 +519,6 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
             continue
         row = rp_table.add_row()
         row.cells[0].text = str(rp.get('minggu_ke', '')) or ''
-        
         sub_cpmk_text = f"{rp.get('sub_cpmk_kode', '')}\n{rp.get('sub_cpmk_deskripsi', '')}"
         row.cells[1].text = sub_cpmk_text.strip() or ''
         row.cells[2].text = rp.get('materi', '') or ''
@@ -564,6 +527,46 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
         row.cells[5].text = rp.get('pengalaman_belajar', '') or ''
         row.cells[6].text = rp.get('kriteria_penilaian', '') or ''
         row.cells[7].text = f"{rp.get('bobot', '0')}%"
+
+    doc.add_paragraph()  # Spacer
+
+    # Referensi Table
+    doc.add_heading('H. Daftar Referensi', level=2)
+    ref_table = doc.add_table(rows=2, cols=2, style='Table Grid')
+    ref_table.rows[0].cells[0].text = 'Referensi Utama'
+    ref_table.rows[0].cells[1].text = 'Referensi Pendukung'
+    
+    ref_data = rps_data.get('referensi') or {}
+    if isinstance(ref_data, dict):
+        utama = '\n'.join(ref_data.get('utama', [])) if isinstance(ref_data.get('utama'), list) else str(ref_data.get('utama', ''))
+        pendukung = '\n'.join(ref_data.get('pendukung', [])) if isinstance(ref_data.get('pendukung'), list) else str(ref_data.get('pendukung', ''))
+    else:
+        utama = '\n'.join([f"{r.get('pengarang','')}. {r.get('tahun','')}. {r.get('judul','')}" for r in ref_data if isinstance(r, dict)])
+        pendukung = '-'
+    ref_table.rows[1].cells[0].text = utama
+    ref_table.rows[1].cells[1].text = pendukung
+
+    doc.add_paragraph()  # Spacer
+
+    # Evaluasi & Penilaian
+    doc.add_heading('I. Evaluasi & Penilaian', level=2)
+    eva_table = doc.add_table(rows=2, cols=3, style='Table Grid')
+    eva_table.rows[0].cells[0].text = 'Komponen Penilaian'
+    eva_table.rows[0].cells[1].text = 'Bobot (%)'
+    eva_table.rows[0].cells[2].text = 'Rentang Nilai Akhir & Predikat'
+    
+    penilaian_list = rps_data.get('penilaian') or []
+    comp_texts = []
+    weight_texts = []
+    if isinstance(penilaian_list, list):
+        for p in penilaian_list:
+            if isinstance(p, dict):
+                comp_texts.append(f"{p.get('komponen', '')} ({p.get('jenis', '')})")
+                weight_texts.append(f"{int(float(p.get('bobot', 0)) * 100)}%")
+    
+    eva_table.rows[1].cells[0].text = '\n'.join(comp_texts) if comp_texts else '-'
+    eva_table.rows[1].cells[1].text = '\n'.join(weight_texts) if weight_texts else '-'
+    eva_table.rows[1].cells[2].text = brand_rentang_penilaian or '-'
 
     doc.save(output_path)
 
