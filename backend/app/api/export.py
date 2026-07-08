@@ -55,7 +55,7 @@ RPS_HTML_TEMPLATE = Template("""
     </tr>
     <tr>
       <td style="text-align: center; border: 1px solid #000; font-weight: bold; font-size: 11pt;">
-        JURUSAN / PROGRAM STUDI {{ data.identitas.prodi | upper if data.identitas else '' }}
+        JURUSAN / PROGRAM STUDI {{ prodi_name | upper }}
       </td>
     </tr>
   </table>
@@ -105,6 +105,22 @@ RPS_HTML_TEMPLATE = Template("""
       <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
         Tanda tangan<br/><strong>{{ data.identitas.ka_prodi if data.identitas else '-' }}</strong>
       </td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold; width: 25%;">Dosen Pengampu</td>
+      <td colspan="3">
+        {% if data.dosen_pengampu is iterable and data.dosen_pengampu is not string %}
+          {% for d in data.dosen_pengampu %}
+            {{ d.nama if d.nama else d }}{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        {% else %}
+          {{ data.dosen_pengampu or '-' }}
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td style="font-weight: bold;">Mata Kuliah Prasyarat</td>
+      <td colspan="3">{{ data.prasyarat or '-' }}</td>
     </tr>
   </table>
 
@@ -303,7 +319,7 @@ RPS_HTML_TEMPLATE = Template("""
 """)
 
 
-def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_name: str, brand_logo: str):
+def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_name: str, brand_logo: str, prodi_name: str):
     from docx import Document
     from docx.shared import Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -318,7 +334,7 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     # Cover Header Text
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_inst = p.add_run(f"{brand_name}\nPROGRAM STUDI {identitas.get('prodi', '').upper()}\n\n")
+    run_inst = p.add_run(f"{brand_name}\nPROGRAM STUDI {prodi_name.upper()}\n\n")
     run_inst.bold = True
     run_inst.font.size = Pt(13)
 
@@ -328,7 +344,7 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
 
     # Identitas Table with Otorisasi block
     doc.add_heading('A. Identitas & Otorisasi', level=2)
-    table = doc.add_table(rows=7, cols=4, style='Table Grid')
+    table = doc.add_table(rows=8, cols=4, style='Table Grid')
     
     table.rows[0].cells[0].text = 'Nama Mata Kuliah'
     table.rows[0].cells[1].text = identitas.get('nama_mata_kuliah', '')
@@ -362,8 +378,30 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     table.rows[5].cells[2].text = f"Tanda tangan\n\n\n{identitas.get('koordinator_rmk', '') or '-'}"
     table.rows[5].cells[3].text = f"Tanda tangan\n\n\n{identitas.get('ka_prodi', '') or '-'}"
 
+    # Dosen Pengampu (Row 6)
+    table.rows[6].cells[0].text = 'Dosen Pengampu'
+    table.rows[6].cells[1].merge(table.rows[6].cells[2])
+    table.rows[6].cells[1].merge(table.rows[6].cells[3])
+    dosen_list = rps_data.get('dosen_pengampu') or []
+    if isinstance(dosen_list, list):
+        dp_text = ", ".join([str(d.get('nama', '')).strip() if isinstance(d, dict) else str(d) for d in dosen_list if d])
+    else:
+        dp_text = str(dosen_list)
+    table.rows[6].cells[1].text = dp_text or '-'
+
+    # Mata Kuliah Prasyarat (Row 7)
+    table.rows[7].cells[0].text = 'Mata Kuliah Prasyarat'
+    table.rows[7].cells[1].merge(table.rows[7].cells[2])
+    table.rows[7].cells[1].merge(table.rows[7].cells[3])
+    table.rows[7].cells[1].text = rps_data.get('prasyarat', '-') or '-'
+
     # CPL-PRODI Mapped Table
-    doc.add_heading('B. Capaian Pembelajaran Lulusan (CPL-PRODI)', level=2)
+    # Capaian Pembelajaran (CP)
+    doc.add_heading('B. Capaian Pembelajaran (CP)', level=2)
+    
+    # 1. CPL-PRODI Table
+    p_cpl = doc.add_paragraph()
+    p_cpl.add_run('1. Capaian Pembelajaran Lulusan Program Studi (CPL-PRODI) Yang Dibebankan Pada Mata Kuliah').bold = True
     cpl_table = doc.add_table(rows=1, cols=2, style='Table Grid')
     cpl_table.rows[0].cells[0].text = 'Kode CPL'
     cpl_table.rows[0].cells[1].text = 'Deskripsi CPL yang Dibebankan'
@@ -373,8 +411,11 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
         row.cells[0].text = cpl.get('kode', '')
         row.cells[1].text = cpl.get('deskripsi', '')
 
-    # CPMK Mapped Table
-    doc.add_heading('C. Capaian Pembelajaran Mata Kuliah (CPMK)', level=2)
+    doc.add_paragraph() # Spacer
+
+    # 2. CPMK Table
+    p_cpmk = doc.add_paragraph()
+    p_cpmk.add_run('2. Capaian Pembelajaran Mata Kuliah (CPMK)').bold = True
     cpmk_table = doc.add_table(rows=1, cols=3, style='Table Grid')
     cpmk_table.rows[0].cells[0].text = 'Kode CPMK'
     cpmk_table.rows[0].cells[1].text = 'Deskripsi CPMK'
@@ -389,8 +430,10 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
         cpl_prodi = c.get('cpl_prodi', [])
         row.cells[2].text = ', '.join(cpl_prodi) if isinstance(cpl_prodi, list) else str(cpl_prodi or '')
 
+    doc.add_paragraph() # Spacer
+
     # Deskripsi
-    doc.add_heading('D. Deskripsi Singkat MK', level=2)
+    doc.add_heading('C. Deskripsi Singkat MK', level=2)
     doc.add_paragraph(rps_data.get('deskripsi_mata_kuliah', ''))
 
     # Bahan Kajian
@@ -496,8 +539,15 @@ async def export_rps(
     if not course_cpls:
         course_cpls = all_cpls
         
-    brand_name = settings.BRAND_CAMPUS_NAME
-    brand_logo = settings.BRAND_CAMPUS_LOGO_URL
+    # Retrieve prerequisites (prasyarat)
+    prasyarat_text = "-"
+    if mk and mk.prasyarat:
+        if isinstance(mk.prasyarat, list):
+            prasyarat_text = ", ".join(mk.prasyarat)
+        else:
+            prasyarat_text = str(mk.prasyarat)
+
+    prodi_name = prodi.nama if prodi else ""
     
     rps_data = {
         "identitas": rps.identitas or {},
@@ -509,6 +559,8 @@ async def export_rps(
         "media_pembelajaran": rps.media_pembelajaran or [],
         "penilaian": rps.penilaian or [],
         "referensi": rps.referensi or [],
+        "dosen_pengampu": rps.dosen_pengampu or [],
+        "prasyarat": prasyarat_text or "-",
     }
     
     os.makedirs(settings.EXPORT_DIR, exist_ok=True)
@@ -517,7 +569,7 @@ async def export_rps(
     
     if export_format == "docx":
         filepath = os.path.join(settings.EXPORT_DIR, f"{filename}.docx")
-        generate_docx(rps_data, filepath, course_cpls, brand_name, brand_logo)
+        generate_docx(rps_data, filepath, course_cpls, brand_name, brand_logo, prodi_name)
         return FileResponse(filepath, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{filename}.docx")
     
     elif export_format == "pdf":
@@ -525,7 +577,8 @@ async def export_rps(
             data=rps_data,
             course_cpls=course_cpls,
             brand_name=brand_name,
-            brand_logo=brand_logo
+            brand_logo=brand_logo,
+            prodi_name=prodi_name
         )
         
         try:
