@@ -129,15 +129,15 @@ class RPSIdentitas(BaseModel):
 class RPSCPMK(BaseModel):
     kode: str
     deskripsi: str
-    bobot: Union[float, int, str, Any]
-    cpl_prodi: List[Any]
+    bobot: Optional[Union[float, int, str, Any]] = 0.0
+    cpl_prodi: Optional[List[Any]] = []
 
 
 class RPSSubCPMK(BaseModel):
     kode: str
-    cpmk_kode: str
+    cpmk_kode: Optional[str] = ""
     deskripsi: str
-    indikator: List[Any]
+    indikator: Optional[List[Any]] = []
 
 
 class RPSRencanaMingguan(BaseModel):
@@ -159,10 +159,10 @@ class RPSRencanaMingguan(BaseModel):
 
 class RPSPenilaian(BaseModel):
     komponen: str
-    bobot: Union[float, int, str, Any]
-    jenis: str  # tugas, uts, uas, kehadiran, dll
-    kriteria: List[Any]
-    sub_cpmk_kode: List[Any]
+    bobot: Optional[Union[float, int, str, Any]] = 0.0
+    jenis: Optional[str] = "tugas"  # tugas, uts, uas, kehadiran, dll
+    kriteria: Optional[List[Any]] = []
+    sub_cpmk_kode: Optional[List[Any]] = []
 
 
 class RPSBase(BaseModel):
