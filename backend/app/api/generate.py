@@ -64,6 +64,7 @@ async def generate_rps(
             semester=data.semester,
             tahun_akademik=data.tahun_akademik,
             additional_context=data.additional_context,
+            dosen_pengampu=data.dosen_pengampu,
         )
         
         return {

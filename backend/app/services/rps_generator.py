@@ -149,6 +149,7 @@ class RPSGeneratorService:
         semester: int,
         tahun_akademik: str,
         additional_context: Optional[str] = None,
+        dosen_pengampu: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Generate complete RPS from prodi vision, mission, and course info"""
         
@@ -191,8 +192,18 @@ class RPSGeneratorService:
             identitas.setdefault("fakultas", "")
             identitas["tahun_akademik"] = tahun_akademik
 
-            if settings.DEFAULT_KOORDINATOR_PENGEMBANG:
+            # Automatically map dosen_pengampu as Koordinator Pengembang RPS
+            dosen_names = ""
+            if dosen_pengampu:
+                dosen_names = ", ".join([str(d.get("nama", "")).strip() for d in dosen_pengampu if d.get("nama")])
+            
+            if dosen_names:
+                identitas["koordinator_pengembang_rps"] = dosen_names
+            elif settings.DEFAULT_KOORDINATOR_PENGEMBANG:
                 identitas["koordinator_pengembang_rps"] = settings.DEFAULT_KOORDINATOR_PENGEMBANG
+            else:
+                identitas["koordinator_pengembang_rps"] = ""
+
             if settings.DEFAULT_KOORDINATOR_RMK:
                 identitas["koordinator_rmk"] = settings.DEFAULT_KOORDINATOR_RMK
             if settings.DEFAULT_KA_PRODI:
