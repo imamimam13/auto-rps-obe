@@ -461,7 +461,7 @@ export default function RPSDetail() {
       )}
 
       {/* CPMK */}
-      {rps.cpmk?.length > 0 && (
+      {Array.isArray(rps.cpmk) && rps.cpmk.length > 0 && (
         <div className="macos-card p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">CPMK ({rps.cpmk.length})</h3>
           <div className="space-y-2">
@@ -479,7 +479,7 @@ export default function RPSDetail() {
       )}
 
       {/* Rencana Pembelajaran */}
-      {rps.rencana_pembelajaran?.length > 0 && (
+      {Array.isArray(rps.rencana_pembelajaran) && rps.rencana_pembelajaran.length > 0 && (
         <div className="macos-card p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Rencana Kegiatan Pembelajaran (16 Minggu)</h3>
           <div className="overflow-x-auto">
@@ -519,7 +519,7 @@ export default function RPSDetail() {
       )}
 
       {/* Penilaian */}
-      {rps.penilaian?.length > 0 && (
+      {Array.isArray(rps.penilaian) && rps.penilaian.length > 0 && (
         <div className="macos-card p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Penilaian</h3>
           <div className="grid grid-cols-3 gap-3">
