@@ -344,8 +344,16 @@ RPS_HTML_TEMPLATE = Template("""
           -
         {% endif %}
       </td>
-      <td style="white-space: pre-line;">
-        {{ brand_rentang_penilaian }}
+      <td>
+        {% if brand_rentang_penilaian %}
+          <ul style="margin: 0; padding-left: 15px; list-style-type: none;">
+            {% for grade in brand_rentang_penilaian.split(',') %}
+              <li style="padding: 1px 0;">{{ grade.strip() }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          -
+        {% endif %}
       </td>
     </tr>
   </table>
@@ -566,7 +574,12 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     
     eva_table.rows[1].cells[0].text = '\n'.join(comp_texts) if comp_texts else '-'
     eva_table.rows[1].cells[1].text = '\n'.join(weight_texts) if weight_texts else '-'
-    eva_table.rows[1].cells[2].text = brand_rentang_penilaian or '-'
+    # Split comma-separated grading scale into vertical lines
+    if brand_rentang_penilaian:
+        grade_lines = [g.strip() for g in brand_rentang_penilaian.split(',') if g.strip()]
+        eva_table.rows[1].cells[2].text = '\n'.join(grade_lines)
+    else:
+        eva_table.rows[1].cells[2].text = '-'
 
     doc.save(output_path)
 
