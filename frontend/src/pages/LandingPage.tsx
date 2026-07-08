@@ -72,8 +72,9 @@ export default function LandingPage() {
     }
   }
 
-  // Filter & Search RPS
+  // Filter & Search RPS (Only show published ones on the public landing page)
   const filteredRPS = rpsList.filter(rps => {
+    if (rps.status !== 'published') return false
     const searchLower = searchQuery.toLowerCase()
     const nameMatch = rps.identitas?.nama_mata_kuliah?.toLowerCase().includes(searchLower)
     const codeMatch = rps.identitas?.kode_mata_kuliah?.toLowerCase().includes(searchLower)
