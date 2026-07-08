@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.models import User, UserRole
 from app.schemas.auth import (
     LoginRequest, TokenResponse, UserCreate, UserUpdate, UserResponse,
+    ChangePasswordRequest,
 )
 from app.core.auth import (
     create_access_token, verify_password, hash_password,
@@ -103,3 +104,34 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     await db.delete(user)
     await db.commit()
+
+
+@router.put("/users/{user_id}/password", response_model=dict)
+async def reset_user_password(
+    user_id: int,
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+):
+    """Admin reset password user lain."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()
+    return {"success": True, "message": "Password berhasil diubah"}
+
+
+@router.post("/me/change-password", response_model=dict)
+async def change_my_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """User ganti password sendiri."""
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one_or_none()
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()
+    return {"success": True, "message": "Password berhasil diubah"}
