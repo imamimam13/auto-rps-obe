@@ -16,6 +16,23 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
 
+        # Database Migrations: add ka_prodi and koordinator_rmk to prodi table
+        async with AsyncSessionLocal() as db:
+            try:
+                from sqlalchemy import text
+                await db.execute(text("ALTER TABLE prodi ADD COLUMN ka_prodi VARCHAR(200) DEFAULT ''"))
+                await db.commit()
+                print("✅ Migration: added ka_prodi to prodi table")
+            except Exception:
+                pass
+            try:
+                from sqlalchemy import text
+                await db.execute(text("ALTER TABLE prodi ADD COLUMN koordinator_rmk VARCHAR(200) DEFAULT ''"))
+                await db.commit()
+                print("✅ Migration: added koordinator_rmk to prodi table")
+            except Exception:
+                pass
+
         # Seed default admin
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(User).where(User.username == "admin"))

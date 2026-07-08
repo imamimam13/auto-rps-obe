@@ -8,6 +8,7 @@ interface Prodi {
   id: number; kode: string; nama: string; fakultas: string
   visi: string; misi: string; tujuan: string; sasaran: string
   capaian_pembelajaran_lulusan: any[]; status: string
+  ka_prodi?: string; koordinator_rmk?: string
 }
 
 export default function ProdiDetail() {
@@ -122,6 +123,14 @@ export default function ProdiDetail() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">{prodi.nama}</h1>
               <p className="text-sm text-gray-500">{prodi.kode} · {prodi.fakultas}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-400 font-medium">
+                {prodi.ka_prodi && (
+                  <span>Ka Prodi: <strong className="text-gray-600 font-semibold">{prodi.ka_prodi}</strong></span>
+                )}
+                {prodi.koordinator_rmk && (
+                  <span>Koordinator RMK: <strong className="text-gray-600 font-semibold">{prodi.koordinator_rmk}</strong></span>
+                )}
+              </div>
             </div>
           </div>
           <button

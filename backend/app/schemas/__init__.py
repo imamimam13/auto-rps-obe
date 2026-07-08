@@ -31,6 +31,8 @@ class ProdiBase(BaseModel):
     misi: str
     tujuan: Optional[str] = None
     sasaran: Optional[str] = None
+    ka_prodi: Optional[str] = ""
+    koordinator_rmk: Optional[str] = ""
     capaian_pembelajaran_lulusan: Optional[List[Dict[str, Any]]] = []
 
 
@@ -45,6 +47,8 @@ class ProdiUpdate(BaseModel):
     misi: Optional[str] = None
     tujuan: Optional[str] = None
     sasaran: Optional[str] = None
+    ka_prodi: Optional[str] = None
+    koordinator_rmk: Optional[str] = None
     capaian_pembelajaran_lulusan: Optional[List[Dict[str, Any]]] = None
     status: Optional[ProdiStatus] = None
 

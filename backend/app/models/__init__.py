@@ -34,6 +34,8 @@ class Prodi(Base):
     misi = Column(Text, nullable=False)
     tujuan = Column(Text)
     sasaran = Column(Text)
+    ka_prodi = Column(String(200), nullable=True)
+    koordinator_rmk = Column(String(200), nullable=True)
     capaian_pembelajaran_lulusan = Column(JSON)  # CPL
     status = Column(Enum(ProdiStatus), default=ProdiStatus.AKTIF)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -13,6 +13,8 @@ interface Prodi {
   misi: string
   status: string
   created_at: string
+  ka_prodi?: string
+  koordinator_rmk?: string
 }
 
 export default function ProdiList() {
@@ -27,6 +29,8 @@ export default function ProdiList() {
     fakultas: '',
     visi: '',
     misi: '',
+    ka_prodi: '',
+    koordinator_rmk: '',
   })
   const [pdfUrl, setPdfUrl] = useState('')
 
@@ -64,7 +68,7 @@ export default function ProdiList() {
 
   function openCreateForm() {
     setEditingId(null)
-    setFormData({ kode: '', nama: '', fakultas: '', visi: '', misi: '' })
+    setFormData({ kode: '', nama: '', fakultas: '', visi: '', misi: '', ka_prodi: '', koordinator_rmk: '' })
     setShowForm(true)
   }
 
@@ -76,6 +80,8 @@ export default function ProdiList() {
       fakultas: p.fakultas,
       visi: p.visi || '',
       misi: p.misi || '',
+      ka_prodi: p.ka_prodi || '',
+      koordinator_rmk: p.koordinator_rmk || '',
     })
     setShowForm(true)
   }
@@ -83,7 +89,7 @@ export default function ProdiList() {
   function closeForm() {
     setShowForm(false)
     setEditingId(null)
-    setFormData({ kode: '', nama: '', fakultas: '', visi: '', misi: '' })
+    setFormData({ kode: '', nama: '', fakultas: '', visi: '', misi: '', ka_prodi: '', koordinator_rmk: '' })
     setPdfUrl('')
   }
 
@@ -222,6 +228,26 @@ export default function ProdiList() {
                   required
                   placeholder="mis: Teknik Informatika"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="macos-label">Ketua Program Studi (Ka Prodi)</label>
+                  <input
+                    className="macos-input"
+                    value={formData.ka_prodi}
+                    onChange={(e) => setFormData({ ...formData, ka_prodi: e.target.value })}
+                    placeholder="Nama Ka Prodi"
+                  />
+                </div>
+                <div>
+                  <label className="macos-label">Koordinator Rumpun MK (RMK)</label>
+                  <input
+                    className="macos-input"
+                    value={formData.koordinator_rmk}
+                    onChange={(e) => setFormData({ ...formData, koordinator_rmk: e.target.value })}
+                    placeholder="Nama Koordinator RMK"
+                  />
+                </div>
               </div>
               <div>
                 <label className="macos-label">Visi</label>

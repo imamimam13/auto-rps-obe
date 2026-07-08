@@ -150,6 +150,8 @@ class RPSGeneratorService:
         tahun_akademik: str,
         additional_context: Optional[str] = None,
         dosen_pengampu: Optional[List[Dict[str, Any]]] = None,
+        ka_prodi: Optional[str] = None,
+        koordinator_rmk: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate complete RPS from prodi vision, mission, and course info"""
         
@@ -204,10 +206,19 @@ class RPSGeneratorService:
             else:
                 identitas["koordinator_pengembang_rps"] = ""
 
-            if settings.DEFAULT_KOORDINATOR_RMK:
+            if koordinator_rmk:
+                identitas["koordinator_rmk"] = koordinator_rmk
+            elif settings.DEFAULT_KOORDINATOR_RMK:
                 identitas["koordinator_rmk"] = settings.DEFAULT_KOORDINATOR_RMK
-            if settings.DEFAULT_KA_PRODI:
+            else:
+                identitas["koordinator_rmk"] = ""
+
+            if ka_prodi:
+                identitas["ka_prodi"] = ka_prodi
+            elif settings.DEFAULT_KA_PRODI:
                 identitas["ka_prodi"] = settings.DEFAULT_KA_PRODI
+            else:
+                identitas["ka_prodi"] = ""
                     
             return rps_data
         except Exception as e:

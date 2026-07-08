@@ -65,6 +65,8 @@ async def generate_rps(
             tahun_akademik=data.tahun_akademik,
             additional_context=data.additional_context,
             dosen_pengampu=data.dosen_pengampu,
+            ka_prodi=prodi.ka_prodi,
+            koordinator_rmk=prodi.koordinator_rmk,
         )
         
         return {
@@ -138,6 +140,8 @@ async def bulk_generate_rps(
                 semester=mk.semester,
                 tahun_akademik=data.tahun_akademik,
                 additional_context=data.additional_context,
+                ka_prodi=prodi.ka_prodi,
+                koordinator_rmk=prodi.koordinator_rmk,
             )
             
             # Save to database
