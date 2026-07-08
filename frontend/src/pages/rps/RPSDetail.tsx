@@ -154,31 +154,26 @@ export default function RPSDetail() {
 
   async function handleSaveJson() {
     try {
-      let parsed: any = {}
-      if (activeTab === 'json') {
-        parsed = JSON.parse(editJson)
-      } else {
-        parsed = {
-          identitas: {
-            ...rps?.identitas,
-            tanggal_penyusunan: formIdentitas.tanggal_penyusunan,
-            no_dokumen: formIdentitas.no_dokumen,
-            koordinator_pengembang_rps: formIdentitas.koordinator_pengembang_rps,
-            koordinator_rmk: formIdentitas.koordinator_rmk,
-            ka_prodi: formIdentitas.ka_prodi,
-            nama_mata_kuliah: formIdentitas.nama_mata_kuliah,
-            kode_mata_kuliah: formIdentitas.kode_mata_kuliah,
-            sks: Number(formIdentitas.sks),
-            semester: Number(formIdentitas.semester)
-          },
-          bahan_kajian: formBahanKajian,
-          cpmk: formCPMK,
-          sub_cpmk: formSubCPMK,
-          rencana_pembelajaran: formRencanaPembelajaran,
-          media_pembelajaran: formMedia,
-          referensi: formReferensi,
-          penilaian: formPenilaian
-        }
+      const parsed = {
+        identitas: {
+          ...rps?.identitas,
+          tanggal_penyusunan: formIdentitas.tanggal_penyusunan,
+          no_dokumen: formIdentitas.no_dokumen,
+          koordinator_pengembang_rps: formIdentitas.koordinator_pengembang_rps,
+          koordinator_rmk: formIdentitas.koordinator_rmk,
+          ka_prodi: formIdentitas.ka_prodi,
+          nama_mata_kuliah: formIdentitas.nama_mata_kuliah,
+          kode_mata_kuliah: formIdentitas.kode_mata_kuliah,
+          sks: Number(formIdentitas.sks),
+          semester: Number(formIdentitas.semester)
+        },
+        bahan_kajian: formBahanKajian,
+        cpmk: formCPMK,
+        sub_cpmk: formSubCPMK,
+        rencana_pembelajaran: formRencanaPembelajaran,
+        media_pembelajaran: formMedia,
+        referensi: formReferensi,
+        penilaian: formPenilaian
       }
       
       await api.put(`/api/v1/rps/${id}`, parsed)
@@ -186,11 +181,7 @@ export default function RPSDetail() {
       setShowEditModal(false)
       loadData()
     } catch (e: any) {
-      if (e instanceof SyntaxError) {
-        toast.error('Format JSON tidak valid! Periksa kembali kurung atau koma.')
-      } else {
-        toast.error(formatApiError(e, 'Gagal memperbarui RPS'))
-      }
+      toast.error(formatApiError(e, 'Gagal memperbarui RPS'))
     }
   }
 
@@ -568,7 +559,7 @@ export default function RPSDetail() {
             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Edit Konten RPS</h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">Ubah isi RPS dengan mudah via form per bagian, atau edit JSON untuk konten mentah.</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Ubah isi RPS langsung via form — pilih bagian yang ingin diedit dari tab di bawah.</p>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
@@ -581,13 +572,12 @@ export default function RPSDetail() {
             {/* Tab Selector */}
             <div className="flex flex-wrap gap-1 p-0.5 bg-gray-100 rounded-apple-lg self-start">
               {[
-                { id: 'identitas', label: 'Identitas & Otorisasi' },
-                { id: 'bahan_kajian', label: 'Bahan Kajian' },
-                { id: 'cpmk', label: 'CPMK' },
-                { id: 'sub_cpmk', label: 'Sub-CPMK' },
-                { id: 'rencana', label: 'Kegiatan Pembelajaran' },
-                { id: 'media_ref', label: 'Media, Ref & Nilai' },
-                { id: 'json', label: 'JSON Lengkap' }
+                { id: 'identitas', label: '📋 Identitas' },
+                { id: 'bahan_kajian', label: '📚 Bahan Kajian' },
+                { id: 'cpmk', label: '🎯 CPMK' },
+                { id: 'sub_cpmk', label: '📌 Sub-CPMK' },
+                { id: 'rencana', label: '🗓️ Kegiatan Minggu' },
+                { id: 'media_ref', label: '🔗 Media & Referensi' },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -1138,14 +1128,7 @@ export default function RPSDetail() {
                 </div>
               )}
 
-              {activeTab === 'json' && (
-                <textarea
-                  className="w-full h-full p-4 font-mono text-xs bg-gray-50 border border-gray-200 rounded-apple-lg focus:outline-none focus:ring-1 focus:ring-macos-blue resize-none"
-                  value={editJson}
-                  onChange={(e) => setEditJson(e.target.value)}
-                  spellCheck={false}
-                />
-              )}
+
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
