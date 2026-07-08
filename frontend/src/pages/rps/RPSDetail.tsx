@@ -229,6 +229,13 @@ export default function RPSDetail() {
       })
       
       const improvedData = reviewRes.data.data
+
+      // Normalize dosen_pengampu: AI may return strings instead of {nama, nidn} dicts
+      if (improvedData?.identitas?.dosen_pengampu) {
+        improvedData.identitas.dosen_pengampu = improvedData.identitas.dosen_pengampu.map(
+          (d: any) => typeof d === 'string' ? { nama: d, nidn: '' } : d
+        )
+      }
       
       await api.put(`/api/v1/rps/${id}`, improvedData)
       toast.success('RPS berhasil diperbaiki secara otomatis oleh AI!', { id: 'autofix' })

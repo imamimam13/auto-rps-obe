@@ -117,7 +117,7 @@ class RPSIdentitas(BaseModel):
     semester: int
     prodi: Optional[str] = ""
     fakultas: Optional[str] = ""
-    dosen_pengampu: Optional[List[Dict[str, Any]]] = []
+    dosen_pengampu: Optional[List[Union[Dict[str, Any], str, Any]]] = []
     tahun_akademik: Optional[str] = ""
     tanggal_penyusunan: Optional[str] = ""
     no_dokumen: Optional[str] = ""
@@ -170,7 +170,7 @@ class RPSBase(BaseModel):
     prodi_id: int
     semester: int
     tahun_akademik: str
-    dosen_pengampu: Optional[List[Dict[str, Any]]] = []
+    dosen_pengampu: Optional[List[Union[Dict[str, Any], str, Any]]] = []
     identitas: Optional[RPSIdentitas] = None
     deskripsi_mata_kuliah: Optional[str] = ""
     bahan_kajian: Optional[Union[List[str], str, Any]] = []
@@ -188,7 +188,7 @@ class RPSCreate(RPSBase):
 
 
 class RPSUpdate(BaseModel):
-    dosen_pengampu: Optional[List[Dict[str, Any]]] = None
+    dosen_pengampu: Optional[List[Union[Dict[str, Any], str, Any]]] = None
     identitas: Optional[RPSIdentitas] = None
     deskripsi_mata_kuliah: Optional[str] = None
     bahan_kajian: Optional[Union[List[str], str, Any]] = None
