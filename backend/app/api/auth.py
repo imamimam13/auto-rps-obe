@@ -48,12 +48,27 @@ async def create_user(
     if exists.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username sudah digunakan")
     
+    # Normalize empty strings to None to avoid unique constraint violations
+    email_val = data.email.strip() if (data.email and data.email.strip()) else None
+    nidn_val = data.nidn.strip() if (data.nidn and data.nidn.strip()) else None
+
+    # Check unique constraint manually to return user friendly messages
+    if email_val:
+        email_exists = await db.execute(select(User).where(User.email == email_val))
+        if email_exists.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Email sudah digunakan oleh user lain")
+            
+    if nidn_val:
+        nidn_exists = await db.execute(select(User).where(User.nidn == nidn_val))
+        if nidn_exists.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="NIDN sudah digunakan oleh user lain")
+    
     user = User(
         username=data.username,
         password_hash=hash_password(data.password),
-        email=data.email,
+        email=email_val,
         nama=data.nama,
-        nidn=data.nidn,
+        nidn=nidn_val,
         role=data.role,
         prodi_id=data.prodi_id,
     )
@@ -83,8 +98,13 @@ async def update_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+        
     for key, val in data.model_dump(exclude_unset=True).items():
-        setattr(user, key, val)
+        if key in ["email", "nidn"] and isinstance(val, str) and not val.strip():
+            setattr(user, key, None)
+        else:
+            setattr(user, key, val)
+            
     await db.commit()
     await db.refresh(user)
     return user

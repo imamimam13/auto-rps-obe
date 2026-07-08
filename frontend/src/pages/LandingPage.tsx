@@ -63,7 +63,7 @@ export default function LandingPage() {
         api.get('/api/v1/rps/?limit=1000')
       ])
 
-      setProdis(prodiRes.data || [])
+      setProdis(prodiRes.data?.items || [])
       setRpsList(rpsRes.data?.items || [])
     } catch (e) {
       console.error('Failed to load public directory data', e)
