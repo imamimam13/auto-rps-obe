@@ -216,16 +216,7 @@ export default function Settings() {
             />
             <p className="text-[10px] text-gray-400 mt-1">Kosongkan jika ingin menggunakan logo default. URL gambar harus diawali dengan https://.</p>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="macos-label">Koordinator Pengembang RPS</label>
-              <input 
-                className="macos-input" 
-                value={koordinatorPengembang} 
-                onChange={(e) => setKoordinatorPengembang(e.target.value)} 
-                placeholder="Nama Koordinator Pengembang" 
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="macos-label">Koordinator Rumpun MK (RMK)</label>
               <input 
