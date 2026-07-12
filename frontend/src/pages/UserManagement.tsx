@@ -253,8 +253,8 @@ export default function UserManagement() {
         </div>
       )}
 
-      <div className="macos-card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="macos-card overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50 text-gray-500">
               <th className="text-left p-4 font-medium">Username</th>

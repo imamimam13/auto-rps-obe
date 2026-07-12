@@ -79,7 +79,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card) => (
           <div key={card.label} className="macos-card p-5">
             <div className="flex items-center justify-between">
@@ -94,7 +94,7 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link to="/rps/generate/new" className="macos-card p-5 group cursor-pointer hover:shadow-apple-lg transition-all">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-apple-lg bg-gradient-to-br from-macos-blue to-blue-600">

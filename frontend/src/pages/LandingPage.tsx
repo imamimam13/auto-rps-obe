@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Search, GraduationCap, FileText, Download, Eye, ArrowRight } from 'lucide-react'
+import { Sparkles, Search, GraduationCap, FileText, Download, Eye, ArrowRight, X } from 'lucide-react'
 import api from '@/services/api'
 
 interface Prodi {
@@ -37,6 +37,7 @@ export default function LandingPage() {
   const [selectedProdiId, setSelectedProdiId] = useState<number | null>(null)
   const [campusName, setCampusName] = useState('SEKOLAH TINGGI ILMU EKONOMI WIRA BHAKTI')
   const [campusLogo, setCampusLogo] = useState('')
+  const [showProdiSidebar, setShowProdiSidebar] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -101,24 +102,24 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen w-screen bg-macos-bg flex items-center justify-center p-4 md:p-6 overflow-hidden relative">
+    <div className="min-h-screen w-full bg-macos-bg flex items-center justify-center p-0 md:p-6 overflow-hidden relative">
       {/* Dynamic macOS Blur Orbs */}
       <div className="absolute top-[-25%] left-[-15%] w-[60%] h-[60%] rounded-full bg-blue-400/20 blur-[130px] pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[-15%] w-[55%] h-[55%] rounded-full bg-purple-400/20 blur-[130px] pointer-events-none" />
 
       {/* Main Container Window */}
-      <div className="macos-window w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden animate-scale-in">
+      <div className="macos-window w-full h-screen md:h-[90vh] md:max-w-6xl flex flex-col overflow-hidden rounded-none md:rounded-apple-xl animate-scale-in">
         {/* macOS Style Titlebar */}
         <div className="flex items-center justify-between px-4 py-3 bg-white/70 border-b border-gray-200/50 backdrop-blur-md shrink-0">
           {/* Traffic Lights */}
-          <div className="macos-traffic shrink-0 flex items-center gap-1.5">
+          <div className="macos-traffic shrink-0 flex items-center gap-1.5 hidden md:flex">
             <span className="macos-dot close w-3 h-3 rounded-full bg-[#ff5f57]" />
             <span className="macos-dot minimize w-3 h-3 rounded-full bg-[#febc2e]" />
             <span className="macos-dot maximize w-3 h-3 rounded-full bg-[#28c840]" />
           </div>
           
           {/* Title */}
-          <div className="flex-1 text-center font-bold text-xs text-gray-500 tracking-wide flex items-center justify-center gap-2">
+          <div className="flex-1 text-center font-bold text-[10px] md:text-xs text-gray-500 tracking-wide flex items-center justify-center gap-2 px-2">
             {campusLogo ? (
               <img src={campusLogo} alt="Logo" className="w-4 h-4 object-contain" />
             ) : (
@@ -130,19 +131,40 @@ export default function LandingPage() {
           {/* Login Button */}
           <button
             onClick={() => navigate('/login')}
-            className="text-xs font-semibold bg-gray-950 hover:bg-gray-800 text-white px-3 py-1.5 rounded-apple shadow-sm hover:shadow-apple transition-all duration-150 flex items-center gap-1"
+            className="text-[10px] md:text-xs font-semibold bg-gray-950 hover:bg-gray-800 text-white px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-apple shadow-sm hover:shadow-apple transition-all duration-150 flex items-center gap-1 shrink-0"
           >
-            Portal Dosen <ArrowRight className="w-3.5 h-3.5" />
+            Portal Dosen <ArrowRight className="w-3 md:w-3.5 h-3 md:h-3.5" />
           </button>
         </div>
 
         {/* Window Content Layout */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Left Sidebar Backdrop on mobile */}
+          {showProdiSidebar && (
+            <div
+              className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-xs z-30 transition-opacity"
+              onClick={() => setShowProdiSidebar(false)}
+            />
+          )}
+
           {/* Left Sidebar - list of prodi */}
-          <aside className="w-72 border-r border-gray-200/50 bg-[rgba(240,240,243,0.7)] backdrop-blur-md flex flex-col shrink-0">
+          <aside
+            className={`fixed md:relative inset-y-0 left-0 z-40 md:z-0 w-72 md:w-72 border-r border-gray-200/50 bg-[rgba(240,240,243,0.95)] md:bg-[rgba(240,240,243,0.7)] backdrop-blur-md flex flex-col shrink-0 transition-transform duration-300 ${
+              showProdiSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            }`}
+          >
             {/* Sidebar Header Search */}
             <div className="p-4 border-b border-gray-200/40">
-              <h2 className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mb-3">PROGRAM STUDI</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-[10px] font-bold text-gray-400 tracking-widest uppercase">PROGRAM STUDI</h2>
+                <button
+                  onClick={() => setShowProdiSidebar(false)}
+                  className="md:hidden p-1 rounded-apple hover:bg-black/5 text-gray-500"
+                  aria-label="Tutup menu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                 <input
@@ -167,7 +189,10 @@ export default function LandingPage() {
                   return (
                     <button
                       key={prodi.id}
-                      onClick={() => setSelectedProdiId(prodi.id)}
+                      onClick={() => {
+                        setSelectedProdiId(prodi.id)
+                        setShowProdiSidebar(false)
+                      }}
                       className={`w-full text-left px-3.5 py-2.5 rounded-apple transition-all flex items-center gap-2.5 ${
                         isActive
                           ? 'bg-white text-gray-900 shadow-sm font-semibold border-l-4 border-macos-blue'
@@ -187,16 +212,25 @@ export default function LandingPage() {
           </aside>
 
           {/* Right Main Content Area - list of RPS */}
-          <main className="flex-1 bg-white/40 backdrop-blur-md p-6 flex flex-col overflow-hidden">
+          <main className="flex-1 bg-white/40 backdrop-blur-md p-4 md:p-6 flex flex-col overflow-hidden">
             {/* Toolbar Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200/50 pb-4 shrink-0">
-              <div>
-                <h3 className="text-sm font-bold text-gray-900">
-                  {prodis.find(p => p.id === selectedProdiId)?.nama || 'Pilih Program Studi'}
-                </h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  Daftar Rencana Pembelajaran Semester (RPS) Kurikulum OBE
-                </p>
+              <div className="flex items-center justify-between w-full md:w-auto">
+                <div className="flex-1 min-w-0 pr-2">
+                  <h3 className="text-sm font-bold text-gray-900 truncate">
+                    {prodis.find(p => p.id === selectedProdiId)?.nama || 'Pilih Program Studi'}
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                    Daftar Rencana Pembelajaran Semester (RPS) Kurikulum OBE
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowProdiSidebar(true)}
+                  className="md:hidden text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-apple shadow-sm flex items-center gap-1.5 shrink-0"
+                >
+                  <GraduationCap className="w-4 h-4 text-macos-blue" />
+                  Prodi
+                </button>
               </div>
 
               {/* RPS Search */}
