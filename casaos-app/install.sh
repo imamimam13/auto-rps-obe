@@ -49,12 +49,16 @@ cd backend
 python3 -m venv venv 2>/dev/null || true
 source venv/bin/activate 2>/dev/null || true
 pip install -r requirements.txt 2>&1
+if [ ! -f .env ]; then
 cat > .env << EOF
 DATABASE_URL=sqlite+aiosqlite:///./autorps.db
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.1:8b
 PORT=$BACKEND_PORT
 EOF
+else
+    echo "  .env sudah ada, mempertahankan konfigurasi..."
+fi
 cd ..
 
 echo "  Setup frontend..."
