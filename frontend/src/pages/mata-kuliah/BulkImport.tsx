@@ -31,23 +31,114 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
 
   function parseText(text: string) {
     const lines = text.trim().split('\n').filter(l => l.trim())
-    if (lines.length === 0) return
+    if (lines.length === 0) {
+      setPreview([])
+      return
+    }
 
-    const headerLine = lines[0].toLowerCase()
-    const hasHeader = headerLine.includes('kode') || headerLine.includes('nama') || headerLine.includes('sks')
+    const firstLine = lines[0].toLowerCase()
+    const hasHeader = firstLine.includes('kode') || firstLine.includes('nama') || firstLine.includes('sks')
     const dataLines = hasHeader ? lines.slice(1) : lines
+
+    let colIndices: Record<string, number> = {}
+    if (hasHeader) {
+      const headerParts = lines[0].split('|').map(p => p.trim().toLowerCase())
+      headerParts.forEach((part, index) => {
+        if (part.includes('kode')) colIndices['kode'] = index
+        else if (part.includes('nama_inggris') || part.includes('inggris')) colIndices['nama_inggris'] = index
+        else if (part.includes('nama')) colIndices['nama'] = index
+        else if (part.includes('sks_teori') || part.includes('teori')) colIndices['sks_teori'] = index
+        else if (part.includes('sks_praktik') || part.includes('praktik')) colIndices['sks_praktik'] = index
+        else if (part.includes('sks')) colIndices['sks'] = index
+        else if (part.includes('semester') || part.includes('sem')) colIndices['semester'] = index
+        else if (part.includes('deskripsi') || part.includes('desc')) colIndices['deskripsi'] = index
+      })
+    }
 
     const parsed = dataLines.map((line, i) => {
       const parts = line.split('|').map(p => p.trim())
+      
+      let kode = ''
+      let nama = ''
+      let sks: number | null = null
+      let sks_teori: number | null = null
+      let sks_praktik: number | null = null
+      let semester: number | null = null
+      let deskripsi = ''
+
+      if (hasHeader) {
+        if (colIndices['kode'] !== undefined) kode = parts[colIndices['kode']] || ''
+        if (colIndices['nama'] !== undefined) nama = parts[colIndices['nama']] || ''
+        if (colIndices['sks'] !== undefined) {
+          const val = parseInt(parts[colIndices['sks']])
+          if (!isNaN(val)) sks = val
+        }
+        if (colIndices['sks_teori'] !== undefined) {
+          const val = parseInt(parts[colIndices['sks_teori']])
+          if (!isNaN(val)) sks_teori = val
+        }
+        if (colIndices['sks_praktik'] !== undefined) {
+          const val = parseInt(parts[colIndices['sks_praktik']])
+          if (!isNaN(val)) sks_praktik = val
+        }
+        if (colIndices['semester'] !== undefined) {
+          const val = parseInt(parts[colIndices['semester']])
+          if (!isNaN(val)) semester = val
+        }
+        if (colIndices['deskripsi'] !== undefined) {
+          deskripsi = parts[colIndices['deskripsi']] || ''
+        }
+      } else {
+        // Fallback positional parsing: KODE | NAMA | SKS | SKS_TEORI | SKS_PRAKTIK | SEMESTER | DESKRIPSI
+        kode = parts[0] || ''
+        nama = parts[1] || ''
+        
+        const sksVal = parseInt(parts[2])
+        if (!isNaN(sksVal)) sks = sksVal
+        
+        const teoriVal = parseInt(parts[3])
+        if (!isNaN(teoriVal)) sks_teori = teoriVal
+        
+        const praktikVal = parseInt(parts[4])
+        if (!isNaN(praktikVal)) sks_praktik = praktikVal
+        
+        const semVal = parseInt(parts[5])
+        if (!isNaN(semVal)) semester = semVal
+        
+        deskripsi = parts[6] || ''
+      }
+
+      // Smart calculations / Fallbacks for SKS
+      if (sks === null) sks = 3
+      
+      if (sks_teori === null && sks_praktik === null) {
+        // Both missing: if SKS is 3, default to 2 theory, 1 practice. Otherwise, default to sks theory, 0 practice.
+        if (sks === 3) {
+          sks_teori = 2
+          sks_praktik = 1
+        } else {
+          sks_teori = sks
+          sks_praktik = 0
+        }
+      } else if (sks_teori !== null && sks_praktik === null) {
+        // sks_teori provided, sks_praktik missing
+        sks_praktik = Math.max(0, sks - sks_teori)
+      } else if (sks_praktik !== null && sks_teori === null) {
+        // sks_praktik provided, sks_teori missing
+        sks_teori = Math.max(0, sks - sks_praktik)
+      }
+
+      if (semester === null) semester = 1
+
       return {
-        kode: parts[0] || '',
-        nama: parts[1] || '',
-        sks: parseInt(parts[2]) || 3,
-        sks_teori: parseInt(parts[3]) || 2,
-        sks_praktik: parseInt(parts[4]) || 1,
-        semester: parseInt(parts[5]) || 1,
-        deskripsi: parts[6] || '',
-        _line: i + 1,
+        kode,
+        nama,
+        sks,
+        sks_teori,
+        sks_praktik,
+        semester,
+        deskripsi,
+        _line: i + (hasHeader ? 2 : 1),
       }
     })
     setPreview(parsed)
@@ -120,7 +211,8 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
         </div>
         <p className="text-xs text-gray-500 mb-3">
           Format: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">KODE | NAMA | SKS | SKS_TEORI | SKS_PRAKTIK | SEMESTER | DESKRIPSI</code>
-          <br />Pisahkan dengan pipe (<code className="bg-gray-100 px-1.5 py-0.5 rounded">|</code>), 1 baris = 1 mata kuliah
+          <br />Pisahkan dengan pipe (<code className="bg-gray-100 px-1.5 py-0.5 rounded">|</code>), 1 baris = 1 mata kuliah. 
+          SKS Praktik tidak wajib (otomatis dihitung dari SKS - SKS Teori jika tidak diisi).
         </p>
         <textarea
           className="macos-input font-mono text-xs min-h-[200px] resize-y"
@@ -148,7 +240,7 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
                   <th className="text-left py-2 pr-3">#</th>
                   <th className="text-left py-2 pr-3">Kode</th>
                   <th className="text-left py-2 pr-3">Nama</th>
-                  <th className="text-left py-2 pr-3">SKS</th>
+                  <th className="text-left py-2 pr-3">SKS (Teori/Prak)</th>
                   <th className="text-left py-2 pr-3">Sem</th>
                 </tr>
               </thead>
@@ -158,7 +250,7 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
                     <td className="py-2 pr-3 text-gray-400">{item._line}</td>
                     <td className="py-2 pr-3 font-mono text-gray-700">{item.kode || <span className="text-red-400">?</span>}</td>
                     <td className="py-2 pr-3 text-gray-700">{item.nama || <span className="text-red-400">?</span>}</td>
-                    <td className="py-2 pr-3">{item.sks}</td>
+                    <td className="py-2 pr-3">{item.sks} (T:{item.sks_teori} P:{item.sks_praktik})</td>
                     <td className="py-2 pr-3">{item.semester}</td>
                   </tr>
                 ))}
