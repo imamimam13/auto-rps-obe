@@ -116,7 +116,14 @@ Pastikan:
 4. Metode pembelajaran bervariasi dan student-centered
 5. Penilaian mencakup semua Sub-CPMK
 6. Bobot penilaian total = 1.0
-7. Gunakan taksonomi Bloom yang sesuai
+7. Gunakan taksonomi Bloom (C1-C6) secara tepat sesuai dengan Matriks Dimensi Pengetahuan & Proses Kognitif di bawah:
+   * Mengingat (C1): Membuat daftar (1.1), Menggambarkan (2.1), Menabulasi (3.1), Menggunakan secara tepat (4.1)
+   * Memahami (C2): Menyimpulkan (1.2), Menginterpretasikan (2.2), Memprediksi (3.2), Menjalankan (4.2)
+   * Menerapkan (C3): Mengklasifikasikan (1.3), Melakukan eksperimen (2.3), Menghitung (3.3), Menyusun (4.3)
+   * Menganalisis (C4): Menganalisa (1.4), Menjelaskan hubungan/struktur (2.4), Membedakan (3.4), Mencapai (4.4)
+   * Mengevaluasi (C5): Membandingkan (1.5), Mengevaluasi (2.5), Menyimpulkan kelebihan/kekurangan (3.5), Melakukan tindakan (4.5)
+   * Menciptakan (C6): Mengkombinasikan (1.6), Merancang/merumuskan (2.6), Membuat/memproduksi (3.6), Mengaktualisasikan (5.6)
+   Setiap deskripsi CPMK & Sub-CPMK wajib diawali dengan Kata Kerja Operasional (KKO) di atas yang mencerminkan level taksonomi Bloom secara tepat.
 8. PENTING: Nilai dalam array "cpl_prodi" pada objek CPMK harus persis sama dan HANYA menggunakan kode dari daftar "CPL (Capaian Pembelajaran Lulusan) Prodi" yang diberikan di atas (misalnya: CPL-01, CPL-02, dst.). Dilarang keras mengarang kode CPL baru.
 9. PENTING: Tentukan 1-4 poin Sustainable Development Goals (SDGs) yang paling relevan dengan materi/konten mata kuliah ini dari 17 poin SDGs yang ada. Masukkan dalam array "sdgs" berupa angka integer (1 sampai 17)."""  # noqa: E501
 
@@ -143,7 +150,16 @@ Buat 4-8 CPMK yang relevan. Output format JSON:
   ]
 }}
 
-Bobot total harus 1.0. Gunakan taksonomi Bloom (C1-C6, A1-A5, P1-P4).
+Ketentuan Penulisan & Level Taksonomi Bloom (Revisi):
+Wajib sesuaikan kata kerja operasional (KKO) di awal kalimat deskripsi CPMK dengan level "taksonomi_bloom" (C1 s.d C6) berdasarkan acuan berikut:
+- Mengingat (C1): Membuat daftar, Menggambarkan, Menabulasi, Menggunakan secara tepat.
+- Memahami (C2): Menyimpulkan, Menginterpretasikan, Memprediksi, Menjalankan.
+- Menerapkan (C3): Mengklasifikasikan, Melakukan eksperimen, Menghitung, Menyusun.
+- Menganalisis (C4): Menganalisa, Menjelaskan hubungan/struktur, Membedakan, Mencapai.
+- Mengevaluasi (C5): Membandingkan, Mengevaluasi, Menyimpulkan kelebihan/kekurangan, Melakukan tindakan.
+- Menciptakan (C6): Mengkombinasikan, Merancang/merumuskan, Membuat/memproduksi, Mengaktualisasikan.
+
+Bobot total harus 1.0. 
 PENTING: Nilai dalam array "cpl_prodi" harus persis sama dan HANYA menggunakan kode dari daftar CPL PRODI yang diberikan di atas (misalnya CPL-1, CPL-2, dst.). Dilarang keras mengarang kode CPL baru."""  # noqa: E501
 
 
@@ -165,6 +181,15 @@ Output format JSON:
     }}
   ]
 }}
+
+Ketentuan Kata Kerja Operasional (KKO) Sub-CPMK:
+Deskripsi Sub-CPMK wajib diawali dengan Kata Kerja Operasional (KKO) yang sesuai dengan level Bloom CPMK induknya:
+- Mengingat (C1): Membuat daftar, Menggambarkan, Menabulasi, Menggunakan secara tepat.
+- Memahami (C2): Menyimpulkan, Menginterpretasikan, Memprediksi, Menjalankan.
+- Menerapkan (C3): Mengklasifikasikan, Melakukan eksperimen, Menghitung, Menyusun.
+- Menganalisis (C4): Menganalisa, Menjelaskan hubungan/struktur, Membedakan, Mencapai.
+- Mengevaluasi (C5): Membandingkan, Mengevaluasi, Menyimpulkan kelebihan/kekurangan, Melakukan tindakan.
+- Menciptakan (C6): Mengkombinasikan, Merancang/merumuskan, Membuat/memproduksi, Mengaktualisasikan.
 
 Setiap CPMK minimal 2 Sub-CPMK. Indikator harus terukur dan spesifik."""  # noqa: E501
 
