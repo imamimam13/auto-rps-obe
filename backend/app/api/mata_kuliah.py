@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.core.database import get_db
@@ -126,6 +126,30 @@ async def bulk_create_mata_kuliah(
         "detail": created,
         "error_detail": errors,
     }
+
+
+@router.delete("/bulk", status_code=status.HTTP_200_OK)
+async def bulk_delete_mata_kuliah(
+    ids: List[int] = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db)
+):
+    """Bulk delete multiple mata kuliah by their IDs."""
+    if not ids:
+        raise HTTPException(status_code=400, detail="Tidak ada ID yang diberikan")
+    
+    deleted = 0
+    not_found = []
+    for mk_id in ids:
+        result = await db.execute(select(MataKuliah).where(MataKuliah.id == mk_id))
+        mk = result.scalar_one_or_none()
+        if mk:
+            await db.delete(mk)
+            deleted += 1
+        else:
+            not_found.append(mk_id)
+    
+    await db.commit()
+    return {"deleted": deleted, "not_found": not_found}
 
 
 @router.delete("/{mk_id}", status_code=status.HTTP_204_NO_CONTENT)

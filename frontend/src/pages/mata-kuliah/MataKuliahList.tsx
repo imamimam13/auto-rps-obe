@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, BookOpen, Sparkles, Upload, Edit2, Trash2, X } from 'lucide-react'
+import { Plus, Search, BookOpen, Sparkles, Upload, Edit2, Trash2, X, CheckSquare, Square, Trash } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { SDGS_LIST } from '@/utils/sdgsData'
@@ -32,6 +32,10 @@ export default function MataKuliahList() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [selectedSDGs, setSelectedSDGs] = useState<number[]>([])
+  // Bulk delete state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [formData, setFormData] = useState({
     kode: '',
     nama: '',
@@ -143,6 +147,42 @@ export default function MataKuliahList() {
     }
   }
 
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map((mk) => mk.id)))
+    }
+  }
+
+  function toggleSelect(id: number) {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  function exitBulkMode() {
+    setBulkMode(false)
+    setSelectedIds(new Set())
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Hapus ${selectedIds.size} mata kuliah terpilih? Tindakan ini tidak dapat dibatalkan.`)) return
+    setBulkDeleting(true)
+    try {
+      const res = await api.delete('/api/v1/mata-kuliah/bulk', { data: { ids: Array.from(selectedIds) } })
+      toast.success(`${res.data.deleted} mata kuliah berhasil dihapus`)
+      exitBulkMode()
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal menghapus')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   const filtered = mkList.filter(
     (mk) =>
       mk.nama?.toLowerCase().includes(search.toLowerCase()) ||
@@ -157,12 +197,26 @@ export default function MataKuliahList() {
           <p className="text-sm text-gray-500 mt-1">Kelola mata kuliah</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={openCreateForm} className="macos-button flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Tambah
-          </button>
-          <Link to="/mata-kuliah/bulk-import" className="macos-button-ghost flex items-center gap-2 text-sm">
-            <Upload className="w-4 h-4" /> Import Bulk
-          </Link>
+          {bulkMode ? (
+            <button onClick={exitBulkMode} className="macos-button-ghost flex items-center gap-2 text-sm">
+              <X className="w-4 h-4" /> Batal Pilih
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setBulkMode(true)}
+                className="macos-button-ghost flex items-center gap-2 text-sm"
+              >
+                <CheckSquare className="w-4 h-4" /> Pilih Massal
+              </button>
+              <button onClick={openCreateForm} className="macos-button flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Tambah
+              </button>
+              <Link to="/mata-kuliah/bulk-import" className="macos-button-ghost flex items-center gap-2 text-sm">
+                <Upload className="w-4 h-4" /> Import Bulk
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -251,6 +305,22 @@ export default function MataKuliahList() {
         </div>
       )}
 
+      {/* Select-all bar – visible only in bulk mode */}
+      {bulkMode && !loading && filtered.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 rounded-apple bg-blue-50 border border-blue-100">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-2 text-sm font-medium text-macos-blue"
+          >
+            {selectedIds.size === filtered.length
+              ? <CheckSquare className="w-4 h-4" />
+              : <Square className="w-4 h-4" />}
+            {selectedIds.size === filtered.length ? 'Batal pilih semua' : 'Pilih semua'}
+          </button>
+          <span className="text-xs text-gray-500 ml-auto">{selectedIds.size} dari {filtered.length} dipilih</span>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-12 text-gray-400">Memuat...</div>
       ) : filtered.length === 0 ? (
@@ -258,29 +328,95 @@ export default function MataKuliahList() {
       ) : (
         <div className="grid gap-3">
           {filtered.map((mk) => (
-            <div key={mk.id} className="macos-card p-4 flex items-center gap-4 group hover:border-macos-blue/20">
-              <Link to={`/mata-kuliah/${mk.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                <div className="p-3 rounded-apple-lg bg-orange-50">
-                  <BookOpen className="w-5 h-5 text-orange-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-gray-900 group-hover:text-macos-blue transition-colors">{mk.nama}</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">{mk.kode} · {mk.sks} SKS · Semester {mk.semester}</p>
-                </div>
-                <Link to={`/rps/generate/${mk.id}`} className="macos-button-ghost text-xs flex items-center gap-1.5 px-3 py-1.5">
-                  <Sparkles className="w-3.5 h-3.5" /> Generate RPS
+            <div
+              key={mk.id}
+              className={`macos-card p-4 flex items-center gap-4 group hover:border-macos-blue/20 transition-colors ${
+                bulkMode && selectedIds.has(mk.id) ? 'border-macos-blue/40 bg-blue-50/50' : ''
+              }`}
+            >
+              {/* Checkbox in bulk mode */}
+              {bulkMode && (
+                <button
+                  onClick={() => toggleSelect(mk.id)}
+                  className="flex-shrink-0 text-macos-blue"
+                >
+                  {selectedIds.has(mk.id)
+                    ? <CheckSquare className="w-5 h-5" />
+                    : <Square className="w-5 h-5 text-gray-300" />}
+                </button>
+              )}
+
+              {bulkMode ? (
+                <button
+                  onClick={() => toggleSelect(mk.id)}
+                  className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                >
+                  <div className="p-3 rounded-apple-lg bg-orange-50">
+                    <BookOpen className="w-5 h-5 text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900">{mk.nama}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{mk.kode} · {mk.sks} SKS · Semester {mk.semester}</p>
+                  </div>
+                </button>
+              ) : (
+                <Link to={`/mata-kuliah/${mk.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="p-3 rounded-apple-lg bg-orange-50">
+                    <BookOpen className="w-5 h-5 text-orange-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-macos-blue transition-colors">{mk.nama}</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{mk.kode} · {mk.sks} SKS · Semester {mk.semester}</p>
+                  </div>
+                  <Link to={`/rps/generate/${mk.id}`} className="macos-button-ghost text-xs flex items-center gap-1.5 px-3 py-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> Generate RPS
+                  </Link>
                 </Link>
-              </Link>
-              <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.preventDefault(); openEditForm(mk) }} className="p-2 rounded-apple hover:bg-blue-50 text-gray-400 hover:text-macos-blue" title="Edit">
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button onClick={(e) => { e.preventDefault(); handleDelete(mk.id, mk.nama) }} className="p-2 rounded-apple hover:bg-red-50 text-gray-400 hover:text-red-500" title="Hapus">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              )}
+
+              {!bulkMode && (
+                <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button onClick={(e) => { e.preventDefault(); openEditForm(mk) }} className="p-2 rounded-apple hover:bg-blue-50 text-gray-400 hover:text-macos-blue" title="Edit">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={(e) => { e.preventDefault(); handleDelete(mk.id, mk.nama) }} className="p-2 rounded-apple hover:bg-red-50 text-gray-400 hover:text-red-500" title="Hapus">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Floating bulk-delete action bar */}
+      {bulkMode && selectedIds.size > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 50,
+          }}
+          className="flex items-center gap-4 px-6 py-3 rounded-full shadow-2xl bg-gray-900 text-white border border-gray-700"
+        >
+          <span className="text-sm font-medium">{selectedIds.size} dipilih</span>
+          <div className="w-px h-4 bg-gray-600" />
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            className="flex items-center gap-2 text-sm font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+          >
+            <Trash className="w-4 h-4" />
+            {bulkDeleting ? 'Menghapus...' : 'Hapus Terpilih'}
+          </button>
+          <button
+            onClick={exitBulkMode}
+            className="p-1 rounded-full hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
