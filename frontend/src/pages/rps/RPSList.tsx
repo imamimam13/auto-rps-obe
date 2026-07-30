@@ -122,7 +122,13 @@ export default function RPSList() {
             additional_context: bulkConfig.additional_context || '',
             dosen_pengampu: [],
           })
-          done.push({ kode: mk.kode, nama: mk.nama, rps_id: res.data.rps_id })
+          done.push({
+            kode: mk.kode,
+            nama: mk.nama,
+            rps_id: res.data.rps_id,
+            sdgs: res.data.sdgs || [],
+            bloom_updated: res.data.bloom_updated,
+          })
         } catch (e: any) {
           const errMsg = e.response?.data?.detail || e.message || 'Gagal'
           errors.push({ kode: mk.kode, nama: mk.nama, error: errMsg })
@@ -380,7 +386,7 @@ export default function RPSList() {
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="bg-green-50 rounded-apple p-2">
                     <p className="text-lg font-bold text-green-600">{bulkProgress.done.length}</p>
-                    <p className="text-[10px] text-green-500">Berhasil</p>
+                    <p className="text-[10px] text-green-500">RPS Dibuat</p>
                   </div>
                   <div className="bg-yellow-50 rounded-apple p-2">
                     <p className="text-lg font-bold text-yellow-600">{bulkProgress.skipped.length}</p>
@@ -392,10 +398,42 @@ export default function RPSList() {
                   </div>
                 </div>
 
+                {/* SDGs + Bloom mini summary */}
+                {bulkProgress.done.length > 0 && (
+                  <div className="flex items-center gap-3 text-xs text-gray-500 bg-gray-50 rounded-apple px-3 py-2">
+                    <span>🌍 SDGs terdeteksi: <strong className="text-blue-600">{bulkProgress.done.filter((d: any) => d.sdgs?.length > 0).length}</strong> MK</span>
+                    <span className="text-gray-300">|</span>
+                    <span>🎯 Bloom diperbaiki: <strong className="text-indigo-600">{bulkProgress.done.filter((d: any) => d.bloom_updated).length}</strong> MK</span>
+                  </div>
+                )}
+
+                {/* Done list */}
+                {bulkProgress.done.length > 0 && (
+                  <div className="max-h-28 overflow-y-auto space-y-1">
+                    {bulkProgress.done.map((d: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                        <span className="text-green-500 flex-shrink-0">✓</span>
+                        <span className="font-mono text-gray-400 flex-shrink-0">{d.kode}</span>
+                        <span className="flex-1 truncate">{d.nama}</span>
+                        {d.sdgs?.length > 0 && (
+                          <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                            {d.sdgs.length} SDG
+                          </span>
+                        )}
+                        {d.bloom_updated && (
+                          <span className="text-[10px] bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                            Bloom ✓
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Error detail */}
                 {bulkProgress.errors.length > 0 && (
-                  <div className="bg-red-50 border border-red-100 rounded-apple p-3 max-h-32 overflow-y-auto">
-                    {bulkProgress.errors.map((e, i) => (
+                  <div className="bg-red-50 border border-red-100 rounded-apple p-3 max-h-28 overflow-y-auto">
+                    {bulkProgress.errors.map((e: any, i: number) => (
                       <p key={i} className="text-xs text-red-600 mb-1">
                         <span className="font-mono font-medium">{e.kode}</span> {e.nama}: {e.error}
                       </p>
