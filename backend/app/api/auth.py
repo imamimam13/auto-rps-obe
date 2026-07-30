@@ -36,7 +36,21 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(get_current_user)):
-    return user
+    try:
+        return UserResponse.model_validate(user)
+    except Exception as ex:
+        print(f"[get_me] Fallback for user {user.id}: {ex}")
+        return {
+            "id": user.id,
+            "username": user.username,
+            "nama": user.nama,
+            "email": user.email,
+            "nidn": user.nidn,
+            "role": getattr(user.role, "value", str(user.role)) if user.role else "admin",
+            "prodi_id": user.prodi_id,
+            "is_active": user.is_active,
+            "created_at": user.created_at,
+        }
 
 
 @router.post("/users", response_model=UserResponse)
@@ -85,7 +99,25 @@ async def list_users(
     admin: User = Depends(get_admin_user),
 ):
     result = await db.execute(select(User))
-    return result.scalars().all()
+    users = result.scalars().all()
+    out = []
+    for u in users:
+        try:
+            out.append(UserResponse.model_validate(u))
+        except Exception as ex:
+            print(f"[list_users] Fallback for user {u.id}: {ex}")
+            out.append({
+                "id": u.id,
+                "username": u.username,
+                "nama": u.nama,
+                "email": u.email,
+                "nidn": u.nidn,
+                "role": getattr(u.role, "value", str(u.role)) if u.role else "dosen",
+                "prodi_id": u.prodi_id,
+                "is_active": u.is_active,
+                "created_at": u.created_at,
+            })
+    return out
 
 
 @router.post("/users/bulk", response_model=BulkUserResult, status_code=201)
