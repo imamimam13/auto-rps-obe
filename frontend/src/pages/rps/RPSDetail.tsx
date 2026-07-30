@@ -53,6 +53,7 @@ export default function RPSDetail() {
   const [formSDGs, setFormSDGs] = useState<number[]>([])
   const [fixing, setFixing] = useState(false)
   const [analyzingSDGs, setAnalyzingSDGs] = useState(false)
+  const [analyzingBloom, setAnalyzingBloom] = useState(false)
 
   useEffect(() => {
     if (id) loadData()
@@ -88,6 +89,28 @@ export default function RPSDetail() {
       toast.error(formatApiError(e, 'Gagal menganalisis SDGs dengan AI'), { id: toastId })
     } finally {
       setAnalyzingSDGs(false)
+    }
+  }
+
+  async function handleAnalyzeBloom() {
+    setAnalyzingBloom(true)
+    const toastId = toast.loading('Menganalisis dan menyelaraskan KKO taksonomi Bloom dengan AI...')
+    try {
+      const res = await api.post(`/api/v1/rps/${id}/analyze-bloom`)
+      toast.success(res.data.message || 'Analisis Bloom selesai!', { id: toastId })
+      if (res.data.reasoning) {
+        toast((t) => (
+          <div className="text-xs max-w-sm">
+            <p className="font-semibold mb-1 text-macos-blue">Hasil Analisis Taksonomi Bloom:</p>
+            <p className="text-gray-600 leading-normal">{res.data.reasoning}</p>
+          </div>
+        ), { duration: 9000 })
+      }
+      loadData()
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Gagal mendeteksi taksonomi Bloom'), { id: toastId })
+    } finally {
+      setAnalyzingBloom(false)
     }
   }
 
@@ -559,11 +582,30 @@ export default function RPSDetail() {
       {/* CPMK */}
       {Array.isArray(rps.cpmk) && rps.cpmk.length > 0 && (
         <div className="macos-card p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">CPMK ({rps.cpmk.length})</h3>
+          <div className="flex items-center justify-between mb-3 border-b border-gray-100/50 pb-2.5">
+            <h3 className="text-sm font-semibold text-gray-900">CPMK ({rps.cpmk.length})</h3>
+            <button
+              onClick={handleAnalyzeBloom}
+              disabled={analyzingBloom}
+              className="macos-button py-1 px-2.5 text-[10px] flex items-center gap-1 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {analyzingBloom ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Sparkles className="w-3 h-3 text-purple-500" />
+              )}
+              Deteksi & Perbaiki Bloom AI
+            </button>
+          </div>
           <div className="space-y-2">
             {rps.cpmk.map((c: any, i: number) => (
               <div key={i} className="flex items-start gap-3 p-3 bg-gray-50/50 rounded-apple-lg">
-                <span className="text-xs font-mono font-bold text-macos-blue bg-blue-50 px-2 py-0.5 rounded shrink-0">{c.kode}</span>
+                <div className="flex flex-col gap-1 items-center shrink-0">
+                  <span className="text-xs font-mono font-bold text-macos-blue bg-blue-50 px-2 py-0.5 rounded">{c.kode}</span>
+                  {c.taksonomi_bloom && (
+                    <span className="text-[9px] font-mono font-bold text-purple-600 bg-purple-50 px-1 py-0.5 rounded border border-purple-100">{c.taksonomi_bloom}</span>
+                  )}
+                </div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-700">{c.deskripsi}</p>
                   <p className="text-xs text-gray-400 mt-1">Bobot: {c.bobot} | CPL: {c.cpl_prodi?.join(', ')}</p>

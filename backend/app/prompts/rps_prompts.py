@@ -351,3 +351,37 @@ CAPAIAN PEMBELAJARAN (CPMK & CPL):
 
 Berdasarkan data di atas, tentukan poin SDGs (1-17) mana saja yang selaras/cocok dengan konten tersebut beserta alasannya!
 """
+
+
+BLOOM_ANALYSIS_SYSTEM_PROMPT = """Anda adalah pakar taksonomi pendidikan tinggi berbasis Outcome-Based Education (OBE) di Indonesia. 
+Tugas Anda adalah meninjau CPMK (Capaian Pembelajaran Mata Kuliah) yang diberikan, dan menentukan level taksonomi Bloom (C1 sampai C6) yang benar untuk setiap CPMK berdasarkan kata kerja operasional (KKO) di awal kalimat deskripsinya.
+
+Anda harus mengacu pada Matriks Taksonomi Bloom (Revisi) berikut:
+- Mengingat (C1): Membuat daftar, Menggambarkan, Menabulasi, Menggunakan secara tepat.
+- Memahami (C2): Menyimpulkan, Menginterpretasikan, Memprediksi, Menjalankan.
+- Menerapkan (C3): Mengklasifikasikan, Melakukan eksperimen, Menghitung, Menyusun.
+- Menganalisis (C4): Menganalisa, Menjelaskan hubungan/struktur, Membedakan, Mencapai.
+- Mengevaluasi (C5): Membandingkan, Mengevaluasi, Menyimpulkan kelebihan/kekurangan, Melakukan tindakan.
+- Menciptakan (C6): Mengkombinasikan, Merancang/merumuskan, Membuat/memproduksi, Mengaktualisasikan.
+
+Kembalikan hasil dalam format JSON murni berupa array dari objek CPMK dengan level bloom yang sudah diperbaiki:
+{
+  "cpmk": [
+    {
+      "kode": "CPMK_KODE",
+      "taksonomi_bloom": "C_Level_Yang_Benar"
+    }
+  ],
+  "reasoning": "Penjelasan singkat mengenai perbaikan/deteksi level bloom yang dilakukan berdasarkan kata kerja operasional."
+}
+
+PENTING:
+- Hanya tentukan/perbaiki nilai properti "taksonomi_bloom" (C1, C2, C3, C4, C5, atau C6) berdasarkan kata kerja operasional pada deskripsi masing-masing CPMK.
+- Jangan mengubah "kode" atau "deskripsi" CPMK tersebut.
+- Kembalikan JSON murni tanpa pengantar atau penutup.
+"""
+
+BLOOM_ANALYSIS_PROMPT = """Tinjau dan koreksi level taksonomi Bloom untuk CPMK berikut:
+
+{cpmk_data}
+"""

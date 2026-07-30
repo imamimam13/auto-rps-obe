@@ -231,3 +231,86 @@ async def analyze_rps_sdgs(rps_id: int, db: AsyncSession = Depends(get_db)):
             status_code=500,
             detail=f"Gagal melakukan analisis SDGs dengan AI: {str(e)}"
         )
+
+
+@router.post("/{rps_id}/analyze-bloom")
+async def analyze_rps_bloom(rps_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(RPS).where(RPS.id == rps_id))
+    rps = result.scalar_one_or_none()
+    if not rps:
+        raise HTTPException(status_code=404, detail="RPS not found")
+        
+    cpmk_list = rps.cpmk or []
+    if not cpmk_list:
+        return {
+            "status": "success",
+            "cpmk": [],
+            "reasoning": "RPS tidak memiliki data CPMK untuk dianalisis.",
+            "message": "Tidak ada CPMK"
+        }
+        
+    # Serialize CPMKs for prompt
+    import json
+    cpmk_data_str = json.dumps([
+        {"kode": c.get("kode", ""), "deskripsi": c.get("deskripsi", ""), "taksonomi_bloom": c.get("taksonomi_bloom", "")}
+        for c in cpmk_list
+    ], indent=2)
+    
+    from app.services.ollama_service import ai_service
+    from app.prompts.rps_prompts import BLOOM_ANALYSIS_SYSTEM_PROMPT, BLOOM_ANALYSIS_PROMPT
+    
+    prompt = BLOOM_ANALYSIS_PROMPT.format(cpmk_data=cpmk_data_str)
+    
+    try:
+        response_text = await ai_service.generate(
+            prompt=prompt,
+            system_prompt=BLOOM_ANALYSIS_SYSTEM_PROMPT,
+            temperature=0.2,
+            format="json"
+        )
+        
+        # Clean potential markdown wrappers
+        cleaned = response_text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+        
+        data = json.loads(cleaned)
+        corrected_list = data.get("cpmk", [])
+        
+        # Create a mapping of code -> corrected bloom level
+        bloom_map = {c.get("kode"): c.get("taksonomi_bloom") for c in corrected_list if c.get("kode")}
+        
+        # Apply corrections to rps.cpmk
+        updated_cpmk = []
+        changed = False
+        for c in cpmk_list:
+            code = c.get("kode")
+            new_bloom = bloom_map.get(code)
+            if new_bloom and new_bloom in ("C1", "C2", "C3", "C4", "C5", "C6"):
+                if c.get("taksonomi_bloom") != new_bloom:
+                    c["taksonomi_bloom"] = new_bloom
+                    changed = True
+            updated_cpmk.append(c)
+            
+        if changed:
+            # SQLAlchemy JSON column needs assignment or flag_modified to detect changes
+            from sqlalchemy.orm.attributes import flag_modified
+            rps.cpmk = updated_cpmk
+            flag_modified(rps, "cpmk")
+            await db.commit()
+            await db.refresh(rps)
+            
+        return {
+            "status": "success",
+            "cpmk": rps.cpmk,
+            "reasoning": data.get("reasoning", ""),
+            "message": "Deteksi dan perbaikan taksonomi Bloom selesai!" if changed else "Taksonomi Bloom sudah sesuai, tidak ada perubahan."
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal melakukan analisis taksonomi Bloom dengan AI: {str(e)}"
+        )
