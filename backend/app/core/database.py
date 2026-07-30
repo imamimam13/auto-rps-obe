@@ -61,6 +61,9 @@ async def init_db():
                 if "sdgs" not in cols_mk:
                     await session.execute(text("ALTER TABLE mata_kuliah ADD COLUMN sdgs JSON"))
                     await session.commit()
+                # Add composite unique index for SQLite
+                await session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_mata_kuliah_kode_prodi ON mata_kuliah (kode, prodi_id)"))
+                await session.commit()
             else:
                 # PostgreSQL migration path
                 # Check rps table columns
@@ -69,7 +72,7 @@ async def init_db():
                 ))
                 cols = [row[0] for row in res.fetchall()]
                 if "bahan_kajian" not in cols:
-                    await session.execute(text("ALTER TABLE rps ADD COLUMN rps ADD COLUMN bahan_kajian JSON" if "alter" not in "alter" else "ALTER TABLE rps ADD COLUMN bahan_kajian JSON"))
+                    await session.execute(text("ALTER TABLE rps ADD COLUMN bahan_kajian JSON"))
                     await session.commit()
                 if "deskripsi_mata_kuliah" not in cols:
                     await session.execute(text("ALTER TABLE rps ADD COLUMN deskripsi_mata_kuliah JSON"))
@@ -88,6 +91,17 @@ async def init_db():
                     await session.execute(text("ALTER TABLE mata_kuliah ADD COLUMN sdgs JSON"))
                     await session.commit()
                     print("[DATABASE] Successfully added 'sdgs' column to 'mata_kuliah' table (PostgreSQL).")
+                    
+                # Migrate unique constraint to composite in PostgreSQL
+                res_con = await session.execute(text(
+                    "SELECT constraint_name FROM information_schema.table_constraints "
+                    "WHERE table_name='mata_kuliah' AND constraint_name='uq_mata_kuliah_kode_prodi'"
+                ))
+                if not res_con.scalar():
+                    await session.execute(text("ALTER TABLE mata_kuliah DROP CONSTRAINT IF EXISTS mata_kuliah_kode_key"))
+                    await session.execute(text("ALTER TABLE mata_kuliah ADD CONSTRAINT uq_mata_kuliah_kode_prodi UNIQUE (kode, prodi_id)"))
+                    await session.commit()
+                    print("[DATABASE] Successfully migrated 'mata_kuliah' unique constraint to composite (kode, prodi_id) (PostgreSQL).")
                     
         except Exception as e:
             print(f"[DATABASE MIGRATION WARNING] {e}")

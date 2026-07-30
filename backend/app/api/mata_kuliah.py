@@ -102,12 +102,12 @@ async def bulk_create_mata_kuliah(
     errors = []
     for item in data:
         try:
-            # Check if kode already exists to avoid aborting the database transaction
+            # Check if kode already exists in the same prodi to avoid aborting the database transaction
             existing_result = await db.execute(
-                select(MataKuliah).where(MataKuliah.kode == item.kode)
+                select(MataKuliah).where(MataKuliah.kode == item.kode, MataKuliah.prodi_id == prodi_id)
             )
             if existing_result.scalar_one_or_none():
-                errors.append({"kode": item.kode, "nama": item.nama, "error": f"Mata kuliah dengan kode '{item.kode}' sudah terdaftar"})
+                errors.append({"kode": item.kode, "nama": item.nama, "error": f"Mata kuliah dengan kode '{item.kode}' sudah terdaftar di program studi ini"})
                 continue
                 
             async with db.begin_nested():

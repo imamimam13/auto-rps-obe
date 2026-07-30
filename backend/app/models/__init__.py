@@ -49,7 +49,7 @@ class MataKuliah(Base):
     __tablename__ = "mata_kuliah"
     
     id = Column(Integer, primary_key=True, index=True)
-    kode = Column(String(20), unique=True, index=True, nullable=False)
+    kode = Column(String(20), index=True, nullable=False)
     nama = Column(String(200), nullable=False)
     nama_inggris = Column(String(200))
     sks = Column(Integer, default=3)
@@ -71,6 +71,10 @@ class MataKuliah(Base):
     
     prodi = relationship("Prodi", back_populates="mata_kuliah")
     rps = relationship("RPS", back_populates="mata_kuliah")
+
+    __table_args__ = (
+        UniqueConstraint('kode', 'prodi_id', name='uq_mata_kuliah_kode_prodi'),
+    )
 
 
 class RPS(Base):
