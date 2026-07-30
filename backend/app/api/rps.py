@@ -241,25 +241,32 @@ async def analyze_rps_bloom(rps_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="RPS not found")
         
     cpmk_list = rps.cpmk or []
+    sub_cpmk_list = rps.sub_cpmk or []
     if not cpmk_list:
         return {
             "status": "success",
             "cpmk": [],
+            "sub_cpmk": [],
             "reasoning": "RPS tidak memiliki data CPMK untuk dianalisis.",
             "message": "Tidak ada CPMK"
         }
         
-    # Serialize CPMKs for prompt
+    # Serialize CPMKs and Sub-CPMKs for prompt
     import json
     cpmk_data_str = json.dumps([
         {"kode": c.get("kode", ""), "deskripsi": c.get("deskripsi", ""), "taksonomi_bloom": c.get("taksonomi_bloom", "")}
         for c in cpmk_list
     ], indent=2)
     
+    sub_cpmk_data_str = json.dumps([
+        {"kode": s.get("kode", ""), "cpmk_kode": s.get("cpmk_kode", ""), "deskripsi": s.get("deskripsi", "")}
+        for s in sub_cpmk_list
+    ], indent=2)
+    
     from app.services.ollama_service import ai_service
     from app.prompts.rps_prompts import BLOOM_ANALYSIS_SYSTEM_PROMPT, BLOOM_ANALYSIS_PROMPT
     
-    prompt = BLOOM_ANALYSIS_PROMPT.format(cpmk_data=cpmk_data_str)
+    prompt = BLOOM_ANALYSIS_PROMPT.format(cpmk_data=cpmk_data_str, sub_cpmk_data=sub_cpmk_data_str)
     
     try:
         response_text = await ai_service.generate(
@@ -278,36 +285,77 @@ async def analyze_rps_bloom(rps_id: int, db: AsyncSession = Depends(get_db)):
         cleaned = cleaned.strip()
         
         data = json.loads(cleaned)
-        corrected_list = data.get("cpmk", [])
-        
-        # Create a mapping of code -> corrected bloom level
-        bloom_map = {c.get("kode"): c.get("taksonomi_bloom") for c in corrected_list if c.get("kode")}
+        corrected_cpmk = data.get("cpmk", [])
+        corrected_sub_cpmk = data.get("sub_cpmk", [])
         
         # Apply corrections to rps.cpmk
         updated_cpmk = []
         changed = False
-        for c in cpmk_list:
+        for idx, c in enumerate(cpmk_list):
             code = c.get("kode")
-            new_bloom = bloom_map.get(code)
-            if new_bloom and new_bloom in ("C1", "C2", "C3", "C4", "C5", "C6"):
-                if c.get("taksonomi_bloom") != new_bloom:
-                    c["taksonomi_bloom"] = new_bloom
-                    changed = True
+            
+            # Find matching corrected item (by code or fallback to positional index)
+            corrected_item = None
+            for item in corrected_cpmk:
+                if item.get("kode") == code:
+                    corrected_item = item
+                    break
+            if not corrected_item and idx < len(corrected_cpmk):
+                corrected_item = corrected_cpmk[idx]
+                
+            if corrected_item:
+                new_bloom = corrected_item.get("taksonomi_bloom")
+                new_desc = corrected_item.get("deskripsi")
+                
+                if new_bloom and new_bloom in ("C1", "C2", "C3", "C4", "C5", "C6"):
+                    if c.get("taksonomi_bloom") != new_bloom:
+                        c["taksonomi_bloom"] = new_bloom
+                        changed = True
+                if new_desc and new_desc.strip():
+                    if c.get("deskripsi") != new_desc:
+                        c["deskripsi"] = new_desc.strip()
+                        changed = True
             updated_cpmk.append(c)
+            
+        # Apply corrections to rps.sub_cpmk
+        updated_sub_cpmk = []
+        for idx, s in enumerate(sub_cpmk_list):
+            code = s.get("kode")
+            
+            corrected_item = None
+            for item in corrected_sub_cpmk:
+                if item.get("kode") == code:
+                    corrected_item = item
+                    break
+            if not corrected_item and idx < len(corrected_sub_cpmk):
+                corrected_item = corrected_sub_cpmk[idx]
+                
+            if corrected_item:
+                new_desc = corrected_item.get("deskripsi")
+                if new_desc and new_desc.strip():
+                    if s.get("deskripsi") != new_desc:
+                        s["deskripsi"] = new_desc.strip()
+                        changed = True
+            updated_sub_cpmk.append(s)
             
         if changed:
             # SQLAlchemy JSON column needs assignment or flag_modified to detect changes
             from sqlalchemy.orm.attributes import flag_modified
             rps.cpmk = updated_cpmk
             flag_modified(rps, "cpmk")
+            
+            rps.sub_cpmk = updated_sub_cpmk
+            flag_modified(rps, "sub_cpmk")
+            
             await db.commit()
             await db.refresh(rps)
             
         return {
             "status": "success",
             "cpmk": rps.cpmk,
+            "sub_cpmk": rps.sub_cpmk,
             "reasoning": data.get("reasoning", ""),
-            "message": "Deteksi dan perbaikan taksonomi Bloom selesai!" if changed else "Taksonomi Bloom sudah sesuai, tidak ada perubahan."
+            "message": "Deteksi dan perbaikan taksonomi Bloom (CPMK & Sub-CPMK) selesai!" if changed else "Taksonomi Bloom sudah sesuai, tidak ada perubahan."
         }
     except Exception as e:
         raise HTTPException(
