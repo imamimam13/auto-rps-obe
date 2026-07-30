@@ -77,17 +77,36 @@ export default function ProdiDetail() {
 
   async function handleMapCPL() {
     if (!prodi) return
-    setMappingCpl(true)
-    const toastId = toast.loading('Memetakan CPL ke semua Mata Kuliah dengan AI...')
-    try {
-      await api.post(`/api/v1/prodi/${prodi.id}/map-cpl-ai`)
-      toast.success('Berhasil memetakan CPL ke semua Mata Kuliah!', { id: toastId })
-      loadData()
-    } catch (e: any) {
-      toast.error('Gagal memetakan CPL: ' + (e.response?.data?.detail || e.message), { id: toastId })
-    } finally {
-      setMappingCpl(false)
+    if (mkList.length === 0) {
+      toast.error('Tidak ada mata kuliah untuk dipetakan')
+      return
     }
+    setMappingCpl(true)
+    const toastId = toast.loading('Memulai pemetaan CPL ke semua Mata Kuliah...')
+    
+    let successCount = 0
+    let failCount = 0
+    
+    for (let i = 0; i < mkList.length; i++) {
+      const mk = mkList[i]
+      toast.loading(`Memetakan CPL (${i + 1}/${mkList.length}): ${mk.nama}...`, { id: toastId })
+      try {
+        await api.post(`/api/v1/prodi/${prodi.id}/map-cpl-ai?mata_kuliah_id=${mk.id}`)
+        successCount++
+      } catch (e) {
+        console.error(`Gagal memetakan CPL untuk ${mk.nama}:`, e)
+        failCount++
+      }
+    }
+    
+    if (failCount === 0) {
+      toast.success(`Berhasil memetakan CPL untuk seluruh ${successCount} Mata Kuliah!`, { id: toastId })
+    } else {
+      toast.success(`Pemetaan selesai: ${successCount} berhasil, ${failCount} gagal.`, { id: toastId })
+    }
+    
+    loadData()
+    setMappingCpl(false)
   }
 
   async function handleGenerateCPL() {

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from app.core.database import get_db
 from app.models import Prodi, MataKuliah
 from app.schemas import (
@@ -81,6 +81,7 @@ async def delete_prodi(prodi_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/{prodi_id}/map-cpl-ai")
 async def map_cpl_to_mata_kuliah_ai(
     prodi_id: int,
+    mata_kuliah_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ):
     import json
@@ -93,10 +94,17 @@ async def map_cpl_to_mata_kuliah_ai(
     if not cpl_list:
         raise HTTPException(status_code=400, detail="Prodi belum memiliki CPL. Silakan isi CPL prodi terlebih dahulu.")
         
-    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.prodi_id == prodi_id))
-    mata_kuliah_list = mk_result.scalars().all()
-    if not mata_kuliah_list:
-        raise HTTPException(status_code=404, detail="Tidak ada mata kuliah ditemukan di prodi ini")
+    if mata_kuliah_id:
+        result_mk = await db.execute(select(MataKuliah).where(MataKuliah.id == mata_kuliah_id, MataKuliah.prodi_id == prodi_id))
+        mk_item = result_mk.scalar_one_or_none()
+        if not mk_item:
+            raise HTTPException(status_code=404, detail="Mata kuliah tidak ditemukan")
+        mata_kuliah_list = [mk_item]
+    else:
+        mk_result = await db.execute(select(MataKuliah).where(MataKuliah.prodi_id == prodi_id))
+        mata_kuliah_list = mk_result.scalars().all()
+        if not mata_kuliah_list:
+            raise HTTPException(status_code=404, detail="Tidak ada mata kuliah ditemukan di prodi ini")
         
     from app.services.ollama_service import ollama_service
     from app.services.rps_generator import extract_json
