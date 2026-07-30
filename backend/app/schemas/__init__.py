@@ -67,19 +67,19 @@ class ProdiResponse(ProdiBase):
 class MataKuliahBase(BaseModel):
     kode: str = Field(..., max_length=20)
     nama: str = Field(..., max_length=200)
-    nama_inggris: Optional[str] = None
-    sks: int = 3
-    sks_teori: int = 2
-    sks_praktik: int = 1
-    semester: int
-    prasyarat: Optional[List[str]] = []
-    cpl_prodi: Optional[List[str]] = []
-    cpmk: Optional[List[Dict[str, Any]]] = []
-    sub_cpmk: Optional[List[Dict[str, Any]]] = []
-    deskripsi: Optional[str] = None
-    buku_teks: Optional[List[Dict[str, str]]] = []
-    buku_rujukan: Optional[List[Dict[str, str]]] = []
-    sdgs: Optional[List[int]] = []
+    nama_inggris: Optional[Any] = None
+    sks: Optional[Any] = 3
+    sks_teori: Optional[Any] = 2
+    sks_praktik: Optional[Any] = 1
+    semester: Optional[Any] = 1
+    prasyarat: Optional[Any] = []
+    cpl_prodi: Optional[Any] = []
+    cpmk: Optional[Any] = []
+    sub_cpmk: Optional[Any] = []
+    deskripsi: Optional[Any] = None
+    buku_teks: Optional[Any] = []
+    buku_rujukan: Optional[Any] = []
+    sdgs: Optional[Any] = []
 
 
 class MataKuliahCreate(MataKuliahBase):
@@ -93,21 +93,26 @@ class MataKuliahUpdate(BaseModel):
     sks_teori: Optional[int] = None
     sks_praktik: Optional[int] = None
     semester: Optional[int] = None
-    prasyarat: Optional[List[str]] = None
-    cpl_prodi: Optional[List[str]] = None
-    cpmk: Optional[List[Dict[str, Any]]] = None
-    sub_cpmk: Optional[List[Dict[str, Any]]] = None
+    prasyarat: Optional[Any] = None
+    cpl_prodi: Optional[Any] = None
+    cpmk: Optional[Any] = None
+    sub_cpmk: Optional[Any] = None
     deskripsi: Optional[str] = None
-    buku_teks: Optional[List[Dict[str, str]]] = None
-    buku_rujukan: Optional[List[Dict[str, str]]] = None
-    status: Optional[MataKuliahStatus] = None
-    sdgs: Optional[List[int]] = None
+    buku_teks: Optional[Any] = None
+    buku_rujukan: Optional[Any] = None
+    status: Optional[Any] = None
+    sdgs: Optional[Any] = None
 
 
 class MataKuliahResponse(MataKuliahBase):
     id: int
     prodi_id: int
-    status: MataKuliahStatus
+    status: Any = "aktif"
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
+
+    class Config:
+        from_attributes = True
     created_at: datetime
     updated_at: Optional[datetime] = None
 

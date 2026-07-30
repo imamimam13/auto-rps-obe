@@ -55,8 +55,8 @@ class MataKuliah(Base):
     sks = Column(Integer, default=3)
     sks_teori = Column(Integer, default=2)
     sks_praktik = Column(Integer, default=1)
-    semester = Column(Integer, nullable=False)
-    prodi_id = Column(Integer, ForeignKey("prodi.id"), nullable=False)
+    semester = Column(Integer, index=True, nullable=False)
+    prodi_id = Column(Integer, ForeignKey("prodi.id"), index=True, nullable=False)
     prasyarat = Column(JSON)  # List of mata kuliah kode
     cpl_prodi = Column(JSON)  # CPL yang berkontribusi
     cpmk = Column(JSON)  # Capaian Pembelajaran Mata Kuliah
@@ -65,7 +65,7 @@ class MataKuliah(Base):
     buku_teks = Column(JSON)
     buku_rujukan = Column(JSON)
     sdgs = Column(JSON)  # List of SDG numbers (1-17)
-    status = Column(Enum(MataKuliahStatus), default=MataKuliahStatus.AKTIF)
+    status = Column(Enum(MataKuliahStatus), index=True, default=MataKuliahStatus.AKTIF)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -82,12 +82,12 @@ class RPS(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     kode = Column(String(50), unique=True, index=True, nullable=False)
-    mata_kuliah_id = Column(Integer, ForeignKey("mata_kuliah.id"), nullable=False)
-    prodi_id = Column(Integer, ForeignKey("prodi.id"), nullable=False)
-    semester = Column(Integer, nullable=False)
+    mata_kuliah_id = Column(Integer, ForeignKey("mata_kuliah.id"), index=True, nullable=False)
+    prodi_id = Column(Integer, ForeignKey("prodi.id"), index=True, nullable=False)
+    semester = Column(Integer, index=True, nullable=False)
     tahun_akademik = Column(String(20), nullable=False)
     dosen_pengampu = Column(JSON)  # List of dosen
-    status = Column(Enum(RPSStatus), default=RPSStatus.DRAFT)
+    status = Column(Enum(RPSStatus), index=True, default=RPSStatus.DRAFT)
     
     # RPS Content (JSON for flexibility)
     identitas = Column(JSON)

@@ -38,8 +38,29 @@ async def list_mata_kuliah(
     count_result = await db.execute(count_query)
     total = count_result.scalar()
     
+    items_out = []
+    for m in items:
+        try:
+            items_out.append(MataKuliahResponse.model_validate(m))
+        except Exception as ex:
+            print(f"[list_mata_kuliah] Error validating MK id {m.id}: {ex}")
+            items_out.append({
+                "id": m.id,
+                "kode": m.kode,
+                "nama": m.nama,
+                "nama_inggris": m.nama_inggris,
+                "sks": m.sks or 3,
+                "sks_teori": m.sks_teori or 2,
+                "sks_praktik": m.sks_praktik or 1,
+                "semester": m.semester or 1,
+                "prodi_id": m.prodi_id,
+                "deskripsi": m.deskripsi or "",
+                "status": str(m.status).lower() if m.status else "aktif",
+                "sdgs": m.sdgs or [],
+            })
+
     return PaginatedResponse(
-        items=[MataKuliahResponse.model_validate(m) for m in items],
+        items=items_out,
         total=total,
         page=page,
         size=size,
