@@ -51,7 +51,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     nama: str
     nidn: Optional[str] = None
-    role: UserRole
+    role: Any
     prodi_id: Optional[int] = None
     is_active: bool
     created_at: Optional[datetime] = None

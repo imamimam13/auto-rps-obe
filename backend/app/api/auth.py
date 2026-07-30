@@ -26,8 +26,9 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Akun tidak aktif")
 
+    role_val = getattr(user.role, "value", str(user.role))
     token = create_access_token(
-        data={"sub": str(user.id), "role": user.role.value},
+        data={"sub": str(user.id), "role": role_val},
         expires_delta=timedelta(days=7),
     )
     return TokenResponse(access_token=token, user=user)

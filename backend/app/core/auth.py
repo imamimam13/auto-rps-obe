@@ -53,6 +53,7 @@ async def get_current_user(
 
 
 async def get_admin_user(user: User = Depends(get_current_user)) -> User:
-    if user.role != UserRole.ADMIN:
+    role_str = getattr(user.role, "value", str(user.role)).lower()
+    if role_str != "admin":
         raise HTTPException(status_code=403, detail="Hanya untuk admin")
     return user
