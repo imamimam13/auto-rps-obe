@@ -66,20 +66,26 @@ if [ ! -d "venv" ] && [ ! -d ".venv" ]; then
     python3 -m venv venv 2>/dev/null || true
 fi
 
-# Resolve explicit python & pip binaries in venv
-if [ -f "venv/bin/python" ]; then
-    VENV_PYTHON="venv/bin/python"
-    VENV_PIP="venv/bin/pip"
-elif [ -f ".venv/bin/python" ]; then
-    VENV_PYTHON=".venv/bin/python"
-    VENV_PIP=".venv/bin/pip"
+# Resolve absolute path for Python & Pip binaries
+if [ -f "$INSTALL_DIR/backend/venv/bin/python3" ]; then
+    PY_BIN="$INSTALL_DIR/backend/venv/bin/python3"
+    PIP_BIN="$INSTALL_DIR/backend/venv/bin/pip3"
+elif [ -f "$INSTALL_DIR/backend/venv/bin/python" ]; then
+    PY_BIN="$INSTALL_DIR/backend/venv/bin/python"
+    PIP_BIN="$INSTALL_DIR/backend/venv/bin/pip"
+elif [ -f "$INSTALL_DIR/backend/.venv/bin/python3" ]; then
+    PY_BIN="$INSTALL_DIR/backend/.venv/bin/python3"
+    PIP_BIN="$INSTALL_DIR/backend/.venv/bin/pip3"
+elif [ -f "$INSTALL_DIR/backend/.venv/bin/python" ]; then
+    PY_BIN="$INSTALL_DIR/backend/.venv/bin/python"
+    PIP_BIN="$INSTALL_DIR/backend/.venv/bin/pip"
 else
-    VENV_PYTHON="python3"
-    VENV_PIP="pip3"
+    PY_BIN="$(command -v python3)"
+    PIP_BIN="$(command -v pip3)"
 fi
 
-echo "  Menginstall dependencies backend menggunakan $VENV_PIP ..."
-"$VENV_PIP" install -r requirements.txt 2>&1
+echo "  Menginstall dependencies backend menggunakan $PIP_BIN ..."
+"$PIP_BIN" install -r requirements.txt 2>&1
 
 if [ ! -f .env ]; then
 cat > .env << EOF
@@ -112,9 +118,9 @@ elif [ -f "backend/autorps.db" ] && [ ! -f "autorps.db" ]; then
 fi
 
 cd "$INSTALL_DIR/backend"
-nohup "./$VENV_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
+nohup "$PY_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
 BACKEND_PID=$!
-echo "  Backend  → PID $BACKEND_PID (menggunakan $VENV_PYTHON)"
+echo "  Backend  → PID $BACKEND_PID (menggunakan $PY_BIN)"
 cd "$INSTALL_DIR"
 
 cd "$INSTALL_DIR/frontend"
