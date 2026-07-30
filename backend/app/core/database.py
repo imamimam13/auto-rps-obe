@@ -7,6 +7,37 @@ class Base(DeclarativeBase):
     pass
 
 
+import os
+import shutil
+from pathlib import Path
+
+# Auto-sync database file if starting working directory changed (e.g. root vs backend folder)
+if settings.DATABASE_URL.startswith("sqlite"):
+    try:
+        backend_dir = Path(__file__).resolve().parent.parent.parent  # /.../backend
+        root_dir = backend_dir.parent  # /.../auto-rps-obe
+        home_dir = Path.home()
+        
+        target_db = backend_dir / "autorps.db"
+        candidate_paths = [
+            root_dir / "autorps.db",
+            home_dir / "auto-rps-obe" / "autorps.db",
+            home_dir / "autorps.db",
+            Path.cwd() / "autorps.db",
+        ]
+        
+        target_size = target_db.stat().st_size if target_db.exists() else 0
+        for cand in candidate_paths:
+            if cand.resolve() != target_db.resolve() and cand.exists():
+                cand_size = cand.stat().st_size
+                if cand_size > target_size and cand_size > 12288:  # > 12KB (contains actual user data)
+                    print(f"[DATABASE RECOVERY] Copying existing database with data ({cand_size} bytes) from {cand} to {target_db}...")
+                    shutil.copy2(cand, target_db)
+                    shutil.copy2(cand, root_dir / "autorps.db")
+                    break
+    except Exception as e:
+        print(f"[DATABASE RECOVERY] Notice: {e}")
+
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False

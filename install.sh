@@ -82,6 +82,14 @@ echo -e "${YELLOW}[4/4] Menjalankan aplikasi...${NC}"
 pkill -f "uvicorn app.main" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
 
+# Auto-sync database file location
+if [ -f "autorps.db" ] && [ ! -f "backend/autorps.db" ]; then
+    echo "  Memulihkan database dari root..."
+    cp "autorps.db" "backend/autorps.db"
+elif [ -f "backend/autorps.db" ] && [ ! -f "autorps.db" ]; then
+    cp "backend/autorps.db" "autorps.db"
+fi
+
 cd backend
 if [ -d "venv" ]; then
     source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
