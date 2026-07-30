@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2 } from 'lu
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
+import { SDGS_LIST, getSDGById } from '@/utils/sdgsData'
 
 function formatApiError(e: any, fallback: string): string {
   if (e?.response?.data?.detail) {
@@ -48,6 +49,7 @@ export default function RPSDetail() {
   const [formMedia, setFormMedia] = useState<any>({ software: [], hardware: [] })
   const [formReferensi, setFormReferensi] = useState<any>({ utama: [], pendukung: [] })
   const [formPenilaian, setFormPenilaian] = useState<any[]>([])
+  const [formSDGs, setFormSDGs] = useState<number[]>([])
   const [fixing, setFixing] = useState(false)
 
   useEffect(() => {
@@ -148,6 +150,7 @@ export default function RPSDetail() {
     }
     
     setFormPenilaian(rps.penilaian || [])
+    setFormSDGs(rps.sdgs || [])
     setActiveTab('identitas')
     setShowEditModal(true)
   }
@@ -173,7 +176,8 @@ export default function RPSDetail() {
         rencana_pembelajaran: formRencanaPembelajaran,
         media_pembelajaran: formMedia,
         referensi: formReferensi,
-        penilaian: formPenilaian
+        penilaian: formPenilaian,
+        sdgs: formSDGs
       }
       
       await api.put(`/api/v1/rps/${id}`, parsed)
@@ -365,6 +369,32 @@ export default function RPSDetail() {
           </div>
         )}
       </div>
+
+      {/* SDGs connection */}
+      {rps.sdgs && rps.sdgs.length > 0 && (
+        <div className="macos-card p-5 animate-fade-in">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Sustainable Development Goals (SDGs) Terkait</h3>
+          <div className="flex flex-wrap gap-2">
+            {rps.sdgs.map((sdgId: number) => {
+              const sdg = getSDGById(sdgId)
+              if (!sdg) return null
+              return (
+                <div
+                  key={sdgId}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-apple text-xs font-semibold text-white shadow-xs transition-all hover:brightness-110 cursor-help"
+                  style={{ backgroundColor: sdg.color }}
+                  title={sdg.description}
+                >
+                  <span className="bg-black/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono">
+                    {sdg.id}
+                  </span>
+                  <span>{sdg.name}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* OBE Validation Result Card */}
       {rps.obe_validated && rps.obe_validation_result && (
@@ -578,6 +608,7 @@ export default function RPSDetail() {
                 { id: 'sub_cpmk', label: '📌 Sub-CPMK' },
                 { id: 'rencana', label: '🗓️ Kegiatan Minggu' },
                 { id: 'media_ref', label: '🔗 Media & Referensi' },
+                { id: 'sdgs', label: '🌐 SDGs' },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -1124,6 +1155,38 @@ export default function RPSDetail() {
                         + Tambah Komponen Penilaian
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'sdgs' && (
+                <div className="space-y-4 pr-1 text-xs">
+                  <h3 className="text-sm font-semibold text-gray-900">Sustainable Development Goals (SDGs)</h3>
+                  <p className="text-xs text-gray-500">Pilih poin SDGs yang selaras dengan mata kuliah/RPS ini:</p>
+                  <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50/50 rounded-apple-lg border border-gray-200/50 max-h-[350px] overflow-y-auto">
+                    {SDGS_LIST.map((sdg) => {
+                      const isChecked = formSDGs.includes(sdg.id)
+                      return (
+                        <label key={sdg.id} className="flex items-start gap-2.5 p-2 rounded-apple hover:bg-gray-100/50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setFormSDGs(prev =>
+                                prev.includes(sdg.id) ? prev.filter(x => x !== sdg.id) : [...prev, sdg.id]
+                              )
+                            }}
+                            className="mt-0.5 rounded border-gray-300 text-macos-blue focus:ring-macos-blue w-3.5 h-3.5"
+                          />
+                          <div className="flex-1">
+                            <span className="font-semibold block text-xs" style={{ color: sdg.color }}>
+                              {sdg.id}. {sdg.name}
+                            </span>
+                            <span className="text-[10px] text-gray-400 block mt-0.5 leading-tight">{sdg.description}</span>
+                          </div>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
               )}

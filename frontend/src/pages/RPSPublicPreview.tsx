@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, FileText, Sparkles, BookOpen, GraduationCap, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Sparkles, BookOpen, GraduationCap, CheckCircle, Globe } from 'lucide-react'
 import api from '@/services/api'
+import { getSDGById } from '@/utils/sdgsData'
 
 interface RPS {
   id: number
@@ -49,6 +50,7 @@ interface RPS {
     utama?: string[] | string
     pendukung?: string[] | string
   } | string[] | any
+  sdgs?: number[]
 }
 
 export default function RPSPublicPreview() {
@@ -264,6 +266,35 @@ export default function RPSPublicPreview() {
             </div>
           </div>
         </div>
+
+        {/* SDGs connection */}
+        {rps.sdgs && rps.sdgs.length > 0 && (
+          <div className="bg-white rounded-apple-xl border border-gray-100 p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-macos-blue" />
+              Sustainable Development Goals (SDGs) Terkait
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {rps.sdgs.map((sdgId: number) => {
+                const sdg = getSDGById(sdgId)
+                if (!sdg) return null
+                return (
+                  <div
+                    key={sdgId}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-apple text-xs font-semibold text-white shadow-xs transition-all hover:brightness-110 cursor-help"
+                    style={{ backgroundColor: sdg.color }}
+                    title={sdg.description}
+                  >
+                    <span className="bg-black/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono">
+                      {sdg.id}
+                    </span>
+                    <span>{sdg.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Deskripsi & Bahan Kajian */}
         {(rps.deskripsi_mata_kuliah || (rps.bahan_kajian && rps.bahan_kajian.length > 0)) && (

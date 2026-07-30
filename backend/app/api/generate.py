@@ -162,6 +162,7 @@ async def bulk_generate_rps(
                 media_pembelajaran=rps_data.get("media_pembelajaran", []),
                 penilaian=rps_data.get("penilaian", []),
                 referensi=rps_data.get("referensi", []),
+                sdgs=rps_data.get("sdgs") or mk.sdgs or [],
                 status="draft",
             )
             db.add(rps)

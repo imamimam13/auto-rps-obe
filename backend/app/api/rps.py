@@ -96,6 +96,7 @@ async def create_rps(data: RPSCreate, db: AsyncSession = Depends(get_db)):
         media_pembelajaran=data.media_pembelajaran or [],
         penilaian=[p if isinstance(p, dict) else p.model_dump() for p in (data.penilaian or [])],
         referensi=data.referensi or [],
+        sdgs=data.sdgs or [],
     )
     db.add(rps)
     await db.commit()
@@ -113,7 +114,7 @@ async def update_rps(rps_id: int, data: RPSUpdate, db: AsyncSession = Depends(ge
     update_data = data.model_dump(exclude_unset=True)
     
     # Handle nested JSON fields
-    json_fields = ["identitas", "deskripsi_mata_kuliah", "bahan_kajian", "cpmk", "sub_cpmk", "rencana_pembelajaran", "metode_pembelajaran", "media_pembelajaran", "penilaian", "referensi"]
+    json_fields = ["identitas", "deskripsi_mata_kuliah", "bahan_kajian", "cpmk", "sub_cpmk", "rencana_pembelajaran", "metode_pembelajaran", "media_pembelajaran", "penilaian", "referensi", "sdgs"]
     for field in json_fields:
         if field in update_data:
             setattr(rps, field, update_data[field])

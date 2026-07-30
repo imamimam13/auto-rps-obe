@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Search, BookOpen, Sparkles, Upload, Edit2, Trash2, X } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
+import { SDGS_LIST } from '@/utils/sdgsData'
 
 interface MK {
   id: number
@@ -14,6 +15,7 @@ interface MK {
   semester: number
   prodi_id: number
   deskripsi: string
+  sdgs?: number[]
 }
 
 interface Prodi {
@@ -29,6 +31,7 @@ export default function MataKuliahList() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [selectedSDGs, setSelectedSDGs] = useState<number[]>([])
   const [formData, setFormData] = useState({
     kode: '',
     nama: '',
@@ -69,6 +72,7 @@ export default function MataKuliahList() {
       sks_praktik: formData.sks_praktik,
       semester: formData.semester,
       sks: formData.sks_teori + formData.sks_praktik,
+      sdgs: selectedSDGs,
     }
     try {
       if (editingId) {
@@ -97,6 +101,7 @@ export default function MataKuliahList() {
       prodi_id: '',
       deskripsi: '',
     })
+    setSelectedSDGs([])
     setShowForm(true)
   }
 
@@ -112,7 +117,14 @@ export default function MataKuliahList() {
       prodi_id: mk.prodi_id.toString(),
       deskripsi: mk.deskripsi || '',
     })
+    setSelectedSDGs(mk.sdgs || [])
     setShowForm(true)
+  }
+
+  function handleSDGChange(id: number) {
+    setSelectedSDGs((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
   }
 
   function closeForm() {
@@ -208,6 +220,27 @@ export default function MataKuliahList() {
               <div>
                 <label className="macos-label">Deskripsi</label>
                 <textarea className="macos-input min-h-[80px]" value={formData.deskripsi} onChange={(e) => setFormData({ ...formData, deskripsi: e.target.value })} placeholder="Deskripsi mata kuliah..." />
+              </div>
+              <div>
+                <label className="macos-label">SDGs Terkait (Sustainable Development Goals)</label>
+                <div className="grid grid-cols-2 gap-2 mt-1.5 max-h-36 overflow-y-auto p-2 bg-gray-50/50 rounded-apple-lg border border-gray-200/50">
+                  {SDGS_LIST.map((sdg) => {
+                    const isChecked = selectedSDGs.includes(sdg.id)
+                    return (
+                      <label key={sdg.id} className="flex items-start gap-1.5 text-[11px] cursor-pointer hover:bg-gray-100/50 p-1 rounded-apple">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleSDGChange(sdg.id)}
+                          className="mt-0.5 rounded border-gray-300 text-macos-blue focus:ring-macos-blue w-3 h-3"
+                        />
+                        <span className="leading-tight select-none" style={{ color: sdg.color, fontWeight: isChecked ? 600 : 400 }}>
+                          {sdg.id}. {sdg.name}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={closeForm} className="macos-button-ghost">Batal</button>

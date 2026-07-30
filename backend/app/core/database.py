@@ -50,5 +50,16 @@ async def init_db():
                 await session.execute(text("ALTER TABLE rps ADD COLUMN deskripsi_mata_kuliah JSON"))
                 await session.commit()
                 print("[DATABASE] Successfully added 'deskripsi_mata_kuliah' column to 'rps' table.")
+            if "sdgs" not in cols:
+                await session.execute(text("ALTER TABLE rps ADD COLUMN sdgs JSON"))
+                await session.commit()
+                print("[DATABASE] Successfully added 'sdgs' column to 'rps' table.")
+                
+            res_mk = await session.execute(text("PRAGMA table_info(mata_kuliah)"))
+            cols_mk = [row[1] for row in res_mk.fetchall()]
+            if "sdgs" not in cols_mk:
+                await session.execute(text("ALTER TABLE mata_kuliah ADD COLUMN sdgs JSON"))
+                await session.commit()
+                print("[DATABASE] Successfully added 'sdgs' column to 'mata_kuliah' table.")
         except Exception as e:
             print(f"[DATABASE MIGRATION WARNING] {e}")

@@ -182,6 +182,7 @@ class RPSGeneratorService:
             
             # Post-process defaults if configured
             from app.core.config import settings
+            rps_data.setdefault("sdgs", [])
             if "identitas" not in rps_data or not isinstance(rps_data["identitas"], dict):
                 rps_data["identitas"] = {}
                 

@@ -36,13 +36,26 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
       return
     }
 
-    const firstLine = lines[0].toLowerCase()
-    const hasHeader = firstLine.includes('kode') || firstLine.includes('nama') || firstLine.includes('sks')
+    // Auto-detect delimiter
+    let delimiter = '|'
+    const firstLineText = lines[0] || ''
+    const pipeCount = (firstLineText.match(/\|/g) || []).length
+    const semicolonCount = (firstLineText.match(/;/g) || []).length
+    const commaCount = (firstLineText.match(/,/g) || []).length
+
+    if (semicolonCount > pipeCount && semicolonCount > commaCount) {
+      delimiter = ';'
+    } else if (commaCount > pipeCount && commaCount > semicolonCount) {
+      delimiter = ','
+    }
+
+    const firstLineLower = firstLineText.toLowerCase()
+    const hasHeader = firstLineLower.includes('kode') || firstLineLower.includes('nama') || firstLineLower.includes('sks')
     const dataLines = hasHeader ? lines.slice(1) : lines
 
     let colIndices: Record<string, number> = {}
     if (hasHeader) {
-      const headerParts = lines[0].split('|').map(p => p.trim().toLowerCase())
+      const headerParts = lines[0].split(delimiter).map(p => p.trim().toLowerCase())
       headerParts.forEach((part, index) => {
         if (part.includes('kode')) colIndices['kode'] = index
         else if (part.includes('nama_inggris') || part.includes('inggris')) colIndices['nama_inggris'] = index
@@ -56,7 +69,7 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
     }
 
     const parsed = dataLines.map((line, i) => {
-      const parts = line.split('|').map(p => p.trim())
+      const parts = line.split(delimiter).map(p => p.trim())
       
       let kode = ''
       let nama = ''
@@ -211,8 +224,8 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
         </div>
         <p className="text-xs text-gray-500 mb-3">
           Format: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">KODE | NAMA | SKS | SKS_TEORI | SKS_PRAKTIK | SEMESTER | DESKRIPSI</code>
-          <br />Pisahkan dengan pipe (<code className="bg-gray-100 px-1.5 py-0.5 rounded">|</code>), 1 baris = 1 mata kuliah. 
-          SKS Praktik tidak wajib (otomatis dihitung dari SKS - SKS Teori jika tidak diisi).
+          <br />Mendukung pemisah pipa (<code className="bg-gray-100 px-1.5 py-0.5 rounded">|</code>), semicolon (<code className="bg-gray-100 px-1.5 py-0.5 rounded">;</code>), atau koma (<code className="bg-gray-100 px-1.5 py-0.5 rounded">,</code>) secara otomatis. 
+          1 baris = 1 mata kuliah. SKS Praktik/Semester/Deskripsi tidak wajib.
         </p>
         <textarea
           className="macos-input font-mono text-xs min-h-[200px] resize-y"

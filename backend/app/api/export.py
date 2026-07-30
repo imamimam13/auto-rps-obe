@@ -12,6 +12,26 @@ from jinja2 import Template
 
 router = APIRouter(prefix="/export", tags=["Export"])
 
+SDGS_MAP = {
+    1: "Tanpa Kemiskinan (No Poverty)",
+    2: "Tanpa Kelaparan (Zero Hunger)",
+    3: "Kehidupan Sehat dan Sejahtera (Good Health and Well-being)",
+    4: "Pendidikan Berkualitas (Quality Education)",
+    5: "Kesetaraan Gender (Gender Equality)",
+    6: "Air Bersih dan Sanitasi Layak (Clean Water and Sanitation)",
+    7: "Energi Bersih dan Terjangkau (Affordable and Clean Energy)",
+    8: "Pekerjaan Layak dan Pertumbuhan Ekonomi (Decent Work and Economic Growth)",
+    9: "Industri, Inovasi, dan Infrastruktur (Industry, Innovation, and Infrastructure)",
+    10: "Berkurangnya Kesenjangan (Reduced Inequality)",
+    11: "Kota dan Pemukiman yang Berkelanjutan (Sustainable Cities and Communities)",
+    12: "Konsumsi dan Produksi yang Bertanggung Jawab (Responsible Consumption and Production)",
+    13: "Penanganan Perubahan Iklim (Climate Action)",
+    14: "Ekosistem Lautan (Life Below Water)",
+    15: "Ekosistem Daratan (Life on Land)",
+    16: "Perdamaian, Keadilan, dan Kelembagaan yang Tangguh (Peace, Justice, dan Strong Institutions)",
+    17: "Kemitraan untuk Mencapai Tujuan (Partnerships for the Goals)"
+}
+
 
 RPS_HTML_TEMPLATE = Template("""
 <!DOCTYPE html>
@@ -123,6 +143,25 @@ RPS_HTML_TEMPLATE = Template("""
       <td colspan="3">{{ data.prasyarat or '-' }}</td>
     </tr>
   </table>
+
+  {% if data.sdgs %}
+  <table style="width: 100%; margin-bottom: 15px;">
+    <tr>
+      <td style="font-weight: bold; background-color: #f2f2f2; padding: 6px;" colspan="2">
+        Hubungan dengan Sustainable Development Goals (SDGs)
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding: 8px;">
+        <ul style="margin: 0; padding-left: 20px;">
+          {% for sdg in data.sdgs %}
+            <li><strong>SDG {{ sdg.id }}</strong>: {{ sdg.nama }}</li>
+          {% endfor %}
+        </ul>
+      </td>
+    </tr>
+  </table>
+  {% endif %}
 
   <h2>Capaian Pembelajaran (CP)</h2>
   
@@ -439,6 +478,17 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
     table.rows[7].cells[1].merge(table.rows[7].cells[3])
     table.rows[7].cells[1].text = rps_data.get('prasyarat', '-') or '-'
 
+    # Keterkaitan SDGs
+    if rps_data.get('sdgs'):
+        doc.add_paragraph()
+        p_sdg_title = doc.add_paragraph()
+        run_sdg_title = p_sdg_title.add_run('Keterkaitan dengan Sustainable Development Goals (SDGs):')
+        run_sdg_title.bold = True
+        for sdg in rps_data['sdgs']:
+            p_sdg = doc.add_paragraph(style='List Bullet')
+            p_sdg.add_run(f"SDG {sdg['id']}: ").bold = True
+            p_sdg.add_run(sdg['nama'])
+
     # CPL-PRODI Mapped Table
     # Capaian Pembelajaran (CP)
     doc.add_heading('B. Capaian Pembelajaran (CP)', level=2)
@@ -634,6 +684,7 @@ async def export_rps(
         "referensi": rps.referensi or [],
         "dosen_pengampu": rps.dosen_pengampu or [],
         "prasyarat": prasyarat_text or "-",
+        "sdgs": [{"id": s, "nama": SDGS_MAP[s]} for s in (rps.sdgs or []) if s in SDGS_MAP] or [],
     }
     
     os.makedirs(settings.EXPORT_DIR, exist_ok=True)

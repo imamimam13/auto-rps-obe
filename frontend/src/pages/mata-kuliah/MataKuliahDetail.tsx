@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, BookOpen, Sparkles, FileText } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
+import { getSDGById } from '@/utils/sdgsData'
 
 export default function MataKuliahDetail() {
   const { id } = useParams()
@@ -68,6 +69,31 @@ export default function MataKuliahDetail() {
           </div>
         </div>
       </div>
+      
+      {mk.sdgs && mk.sdgs.length > 0 && (
+        <div className="macos-card p-5 animate-fade-in">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Sustainable Development Goals (SDGs) Terkait</h3>
+          <div className="flex flex-wrap gap-2">
+            {mk.sdgs.map((sdgId: number) => {
+              const sdg = getSDGById(sdgId)
+              if (!sdg) return null
+              return (
+                <div
+                  key={sdgId}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-apple text-xs font-semibold text-white shadow-xs transition-all hover:brightness-110 cursor-help"
+                  style={{ backgroundColor: sdg.color }}
+                  title={sdg.description}
+                >
+                  <span className="bg-black/20 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono">
+                    {sdg.id}
+                  </span>
+                  <span>{sdg.name}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {mk.cpmk?.length > 0 && (
         <div className="macos-card p-5">

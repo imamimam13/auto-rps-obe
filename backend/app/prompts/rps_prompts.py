@@ -105,7 +105,8 @@ Buat RPS lengkap dengan format JSON berikut. Pastikan konten relevan dengan visi
     "pendukung": [
       "Nama Pengarang. Tahun. Judul Buku Rujukan. Kota: Penerbit."
     ]
-  }}
+  }},
+  "sdgs": [4, 8]
 }}
 
 Pastikan:
@@ -116,7 +117,8 @@ Pastikan:
 5. Penilaian mencakup semua Sub-CPMK
 6. Bobot penilaian total = 1.0
 7. Gunakan taksonomi Bloom yang sesuai
-8. PENTING: Nilai dalam array "cpl_prodi" pada objek CPMK harus persis sama dan HANYA menggunakan kode dari daftar "CPL (Capaian Pembelajaran Lulusan) Prodi" yang diberikan di atas (misalnya: CPL-01, CPL-02, dst.). Dilarang keras mengarang kode CPL baru."""  # noqa: E501
+8. PENTING: Nilai dalam array "cpl_prodi" pada objek CPMK harus persis sama dan HANYA menggunakan kode dari daftar "CPL (Capaian Pembelajaran Lulusan) Prodi" yang diberikan di atas (misalnya: CPL-01, CPL-02, dst.). Dilarang keras mengarang kode CPL baru.
+9. PENTING: Tentukan 1-4 poin Sustainable Development Goals (SDGs) yang paling relevan dengan materi/konten mata kuliah ini dari 17 poin SDGs yang ada. Masukkan dalam array "sdgs" berupa angka integer (1 sampai 17)."""  # noqa: E501
 
 
 CPMK_GENERATION_PROMPT = """Berdasarkan informasi berikut, buatlah CPMK (Capaian Pembelajaran Mata Kuliah) yang sesuai:

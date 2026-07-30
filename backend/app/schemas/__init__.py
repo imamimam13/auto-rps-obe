@@ -79,6 +79,7 @@ class MataKuliahBase(BaseModel):
     deskripsi: Optional[str] = None
     buku_teks: Optional[List[Dict[str, str]]] = []
     buku_rujukan: Optional[List[Dict[str, str]]] = []
+    sdgs: Optional[List[int]] = []
 
 
 class MataKuliahCreate(MataKuliahBase):
@@ -100,6 +101,7 @@ class MataKuliahUpdate(BaseModel):
     buku_teks: Optional[List[Dict[str, str]]] = None
     buku_rujukan: Optional[List[Dict[str, str]]] = None
     status: Optional[MataKuliahStatus] = None
+    sdgs: Optional[List[int]] = None
 
 
 class MataKuliahResponse(MataKuliahBase):
@@ -185,6 +187,7 @@ class RPSBase(BaseModel):
     media_pembelajaran: Optional[Union[List[Any], Dict[str, Any], Any]] = None
     penilaian: Optional[List[RPSPenilaian]] = []
     referensi: Optional[Union[List[Any], Dict[str, Any], Any]] = None
+    sdgs: Optional[List[int]] = []
 
 
 class RPSCreate(RPSBase):
@@ -204,6 +207,7 @@ class RPSUpdate(BaseModel):
     penilaian: Optional[List[RPSPenilaian]] = None
     referensi: Optional[Union[List[Any], Dict[str, Any], Any]] = None
     status: Optional[RPSStatus] = None
+    sdgs: Optional[List[int]] = None
 
 
 class RPSResponse(RPSBase):

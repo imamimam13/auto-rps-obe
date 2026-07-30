@@ -64,6 +64,7 @@ class MataKuliah(Base):
     deskripsi = Column(Text)
     buku_teks = Column(JSON)
     buku_rujukan = Column(JSON)
+    sdgs = Column(JSON)  # List of SDG numbers (1-17)
     status = Column(Enum(MataKuliahStatus), default=MataKuliahStatus.AKTIF)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -95,6 +96,7 @@ class RPS(Base):
     media_pembelajaran = Column(JSON)
     penilaian = Column(JSON)  # Bobot, jenis, kriteria
     referensi = Column(JSON)
+    sdgs = Column(JSON)  # List of SDG numbers (1-17)
     
     # OBE Validation
     obe_validated = Column(Boolean, default=False)
