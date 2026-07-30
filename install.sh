@@ -21,6 +21,15 @@ if ! command -v python3 &> /dev/null; then
     if [ "$OS" = "Darwin" ]; then brew install python@3.12
     else sudo apt update && sudo apt install -y python3 python3-pip python3-venv; fi
 fi
+
+if [ "$OS" != "Darwin" ]; then
+    # Ensure python3-venv and python3-pip exist on Debian/Ubuntu
+    if command -v apt &> /dev/null; then
+        sudo apt update &>/dev/null || true
+        sudo apt install -y python3-pip python3-venv python3-full &>/dev/null || true
+    fi
+fi
+
 if ! command -v node &> /dev/null; then
     echo "  Instal Node.js..."
     if [ "$OS" = "Darwin" ]; then brew install node
@@ -50,17 +59,28 @@ else
 fi
 
 echo "  Setup backend (install Python packages)..."
-cd backend
-if [ -d "venv" ]; then
-    source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
-elif [ -d ".venv" ]; then
-    source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate 2>/dev/null || true
-else
+cd "$INSTALL_DIR/backend"
+
+if [ ! -d "venv" ] && [ ! -d ".venv" ]; then
+    echo "  Membuat virtual environment (venv)..."
     python3 -m venv venv 2>/dev/null || true
-    source venv/bin/activate 2>/dev/null || source .venv/Scripts/activate 2>/dev/null || true
 fi
 
-pip install -r requirements.txt 2>&1
+# Resolve explicit python & pip binaries in venv
+if [ -f "venv/bin/python" ]; then
+    VENV_PYTHON="venv/bin/python"
+    VENV_PIP="venv/bin/pip"
+elif [ -f ".venv/bin/python" ]; then
+    VENV_PYTHON=".venv/bin/python"
+    VENV_PIP=".venv/bin/pip"
+else
+    VENV_PYTHON="python3"
+    VENV_PIP="pip3"
+fi
+
+echo "  Menginstall dependencies backend menggunakan $VENV_PIP ..."
+"$VENV_PIP" install -r requirements.txt 2>&1
+
 if [ ! -f .env ]; then
 cat > .env << EOF
 DATABASE_URL=sqlite+aiosqlite:///./autorps.db
@@ -71,12 +91,12 @@ EOF
 else
     echo "  .env sudah ada, mempertahankan konfigurasi..."
 fi
-cd ..
+cd "$INSTALL_DIR"
 
 echo "  Setup frontend (install Node packages)..."
-cd frontend
+cd "$INSTALL_DIR/frontend"
 npm install 2>&1
-cd ..
+cd "$INSTALL_DIR"
 
 echo -e "${YELLOW}[4/4] Menjalankan aplikasi...${NC}"
 pkill -9 -f "uvicorn app.main" 2>/dev/null || true
@@ -91,31 +111,17 @@ elif [ -f "backend/autorps.db" ] && [ ! -f "autorps.db" ]; then
     cp "backend/autorps.db" "autorps.db"
 fi
 
-# Resolve exact Python binary path inside virtualenv
-PYTHON_EXEC=""
-if [ -f "backend/venv/bin/python3" ]; then
-    PYTHON_EXEC="backend/venv/bin/python3"
-elif [ -f "backend/venv/bin/python" ]; then
-    PYTHON_EXEC="backend/venv/bin/python"
-elif [ -f "backend/.venv/bin/python3" ]; then
-    PYTHON_EXEC="backend/.venv/bin/python3"
-elif [ -f "backend/.venv/bin/python" ]; then
-    PYTHON_EXEC="backend/.venv/bin/python"
-else
-    PYTHON_EXEC="python3"
-fi
-
-cd backend
-nohup "../$PYTHON_EXEC" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
+cd "$INSTALL_DIR/backend"
+nohup "./$VENV_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
 BACKEND_PID=$!
-echo "  Backend  → PID $BACKEND_PID (menggunakan $PYTHON_EXEC)"
-cd ..
+echo "  Backend  → PID $BACKEND_PID (menggunakan $VENV_PYTHON)"
+cd "$INSTALL_DIR"
 
-cd frontend
+cd "$INSTALL_DIR/frontend"
 nohup npx vite --host 0.0.0.0 --port $FRONTEND_PORT > /tmp/auto-rps-frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo "  Frontend → PID $FRONTEND_PID"
-cd ..
+cd "$INSTALL_DIR"
 
 sleep 3
 
