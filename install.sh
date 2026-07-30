@@ -51,8 +51,15 @@ fi
 
 echo "  Setup backend (install Python packages)..."
 cd backend
-python3 -m venv venv 2>/dev/null || true
-source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
+if [ -d "venv" ]; then
+    source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
+elif [ -d ".venv" ]; then
+    source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate 2>/dev/null || true
+else
+    python3 -m venv venv 2>/dev/null || true
+    source venv/bin/activate 2>/dev/null || source .venv/Scripts/activate 2>/dev/null || true
+fi
+
 pip install -r requirements.txt 2>&1
 if [ ! -f .env ]; then
 cat > .env << EOF
@@ -76,8 +83,12 @@ pkill -f "uvicorn app.main" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
 
 cd backend
-source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
-nohup uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
+if [ -d "venv" ]; then
+    source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
+elif [ -d ".venv" ]; then
+    source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate 2>/dev/null || true
+fi
+nohup python -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
 BACKEND_PID=$!
 echo "  Backend  → PID $BACKEND_PID"
 cd ..
