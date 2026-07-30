@@ -102,9 +102,17 @@ async def bulk_create_mata_kuliah(
     errors = []
     for item in data:
         try:
-            mk = MataKuliah(**item.model_dump())
-            db.add(mk)
-            await db.flush()
+            # Check if kode already exists to avoid aborting the database transaction
+            existing_result = await db.execute(
+                select(MataKuliah).where(MataKuliah.kode == item.kode)
+            )
+            if existing_result.scalar_one_or_none():
+                errors.append({"kode": item.kode, "nama": item.nama, "error": f"Mata kuliah dengan kode '{item.kode}' sudah terdaftar"})
+                continue
+                
+            async with db.begin_nested():
+                mk = MataKuliah(**item.model_dump())
+                db.add(mk)
             created.append({"kode": item.kode, "nama": item.nama, "id": mk.id})
         except Exception as e:
             errors.append({"kode": item.kode, "nama": item.nama, "error": str(e)})
