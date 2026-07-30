@@ -43,7 +43,56 @@ async def init_db():
             is_sqlite = engine.url.drivername.startswith("sqlite")
             
             if is_sqlite:
-                # SQLite migration path
+                # Check index list to find if old global unique constraint exists on 'kode'
+                res_idx = await session.execute(text("PRAGMA index_list(mata_kuliah)"))
+                indices = res_idx.fetchall()
+                has_global_unique = False
+                for idx in indices:
+                    idx_name = idx[1]
+                    is_unique = idx[2]
+                    if is_unique and "uq" not in idx_name and "prodi" not in idx_name:
+                        res_info = await session.execute(text(f"PRAGMA index_info({idx_name})"))
+                        cols = [r[2] for r in res_info.fetchall()]
+                        if cols == ["kode"]:
+                            has_global_unique = True
+                            break
+                            
+                if has_global_unique:
+                    print("[DATABASE] SQLite global unique index on 'kode' detected. Recreating table to apply composite constraint...")
+                    await session.execute(text("PRAGMA foreign_keys=OFF"))
+                    await session.execute(text("ALTER TABLE mata_kuliah RENAME TO _mata_kuliah_old"))
+                    
+                    # Create the new tables
+                    async with engine.begin() as conn:
+                        await conn.run_sync(Base.metadata.create_all)
+                        
+                    # Copy data (select only columns that exist in the old table)
+                    res_old_cols = await session.execute(text("PRAGMA table_info(_mata_kuliah_old)"))
+                    old_cols = [row[1] for row in res_old_cols.fetchall()]
+                    
+                    # Build dynamic columns copy
+                    columns_to_copy = [
+                        "id", "kode", "nama", "nama_inggris", "sks", "sks_teori", "sks_praktik", 
+                        "semester", "prodi_id", "prasyarat", "cpl_prodi", "cpmk", "sub_cpmk", 
+                        "deskripsi", "buku_teks", "buku_rujukan", "status", "created_at", "updated_at"
+                    ]
+                    # Only copy columns that actually existed in the old table
+                    valid_cols = [c for c in columns_to_copy if c in old_cols]
+                    if "sdgs" in old_cols:
+                        valid_cols.append("sdgs")
+                        
+                    cols_str = ", ".join(valid_cols)
+                    
+                    await session.execute(text(f"""
+                        INSERT INTO mata_kuliah ({cols_str})
+                        SELECT {cols_str} FROM _mata_kuliah_old
+                    """))
+                    await session.execute(text("DROP TABLE _mata_kuliah_old"))
+                    await session.execute(text("PRAGMA foreign_keys=ON"))
+                    await session.commit()
+                    print("[DATABASE] SQLite table recreation completed successfully!")
+
+                # SQLite column migration path for rps
                 res = await session.execute(text("PRAGMA table_info(rps)"))
                 cols = [row[1] for row in res.fetchall()]
                 if "bahan_kajian" not in cols:
