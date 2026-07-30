@@ -79,8 +79,9 @@ npm install 2>&1
 cd ..
 
 echo -e "${YELLOW}[4/4] Menjalankan aplikasi...${NC}"
-pkill -f "uvicorn app.main" 2>/dev/null || true
-pkill -f "vite" 2>/dev/null || true
+pkill -9 -f "uvicorn app.main" 2>/dev/null || true
+pkill -9 -f "vite" 2>/dev/null || true
+sleep 2
 
 # Auto-sync database file location
 if [ -f "autorps.db" ] && [ ! -f "backend/autorps.db" ]; then
@@ -90,15 +91,24 @@ elif [ -f "backend/autorps.db" ] && [ ! -f "autorps.db" ]; then
     cp "backend/autorps.db" "autorps.db"
 fi
 
-cd backend
-if [ -d "venv" ]; then
-    source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null || true
-elif [ -d ".venv" ]; then
-    source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate 2>/dev/null || true
+# Resolve exact Python binary path inside virtualenv
+PYTHON_EXEC=""
+if [ -f "backend/venv/bin/python3" ]; then
+    PYTHON_EXEC="backend/venv/bin/python3"
+elif [ -f "backend/venv/bin/python" ]; then
+    PYTHON_EXEC="backend/venv/bin/python"
+elif [ -f "backend/.venv/bin/python3" ]; then
+    PYTHON_EXEC="backend/.venv/bin/python3"
+elif [ -f "backend/.venv/bin/python" ]; then
+    PYTHON_EXEC="backend/.venv/bin/python"
+else
+    PYTHON_EXEC="python3"
 fi
-nohup python -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
+
+cd backend
+nohup "../$PYTHON_EXEC" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
 BACKEND_PID=$!
-echo "  Backend  → PID $BACKEND_PID"
+echo "  Backend  → PID $BACKEND_PID (menggunakan $PYTHON_EXEC)"
 cd ..
 
 cd frontend
@@ -129,7 +139,10 @@ else
     echo -e "${RED}║  ❌  INSTALASI GAGAL                ║${NC}"
     echo -e "${RED}╚══════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "  Cek log:"
+    echo -e "  Pesan Error Backend (/tmp/auto-rps-backend.log):"
+    tail -n 15 /tmp/auto-rps-backend.log 2>/dev/null || true
+    echo ""
+    echo -e "  Cek log lengkap:"
     echo -e "  Backend:  ${YELLOW}cat /tmp/auto-rps-backend.log${NC}"
     echo -e "  Frontend: ${YELLOW}cat /tmp/auto-rps-frontend.log${NC}"
 fi
