@@ -177,18 +177,18 @@ class RPSBase(BaseModel):
     prodi_id: int
     semester: int
     tahun_akademik: str
-    dosen_pengampu: Optional[List[Union[Dict[str, Any], str, Any]]] = []
-    identitas: Optional[RPSIdentitas] = None
-    deskripsi_mata_kuliah: Optional[str] = ""
-    bahan_kajian: Optional[Union[List[str], str, Any]] = []
-    cpmk: Optional[List[RPSCPMK]] = []
-    sub_cpmk: Optional[List[RPSSubCPMK]] = []
-    rencana_pembelajaran: Optional[List[RPSRencanaMingguan]] = []
-    metode_pembelajaran: Optional[List[str]] = []
-    media_pembelajaran: Optional[Union[List[Any], Dict[str, Any], Any]] = None
-    penilaian: Optional[List[RPSPenilaian]] = []
-    referensi: Optional[Union[List[Any], Dict[str, Any], Any]] = None
-    sdgs: Optional[List[int]] = []
+    dosen_pengampu: Optional[Any] = []
+    identitas: Optional[Any] = None
+    deskripsi_mata_kuliah: Optional[Any] = ""
+    bahan_kajian: Optional[Any] = []
+    cpmk: Optional[Any] = []
+    sub_cpmk: Optional[Any] = []
+    rencana_pembelajaran: Optional[Any] = []
+    metode_pembelajaran: Optional[Any] = []
+    media_pembelajaran: Optional[Any] = None
+    penilaian: Optional[Any] = []
+    referensi: Optional[Any] = None
+    sdgs: Optional[Any] = []
 
 
 class RPSCreate(RPSBase):
@@ -196,32 +196,32 @@ class RPSCreate(RPSBase):
 
 
 class RPSUpdate(BaseModel):
-    dosen_pengampu: Optional[List[Union[Dict[str, Any], str, Any]]] = None
-    identitas: Optional[RPSIdentitas] = None
-    deskripsi_mata_kuliah: Optional[str] = None
-    bahan_kajian: Optional[Union[List[str], str, Any]] = None
-    cpmk: Optional[List[RPSCPMK]] = None
-    sub_cpmk: Optional[List[RPSSubCPMK]] = None
-    rencana_pembelajaran: Optional[List[RPSRencanaMingguan]] = None
-    metode_pembelajaran: Optional[List[str]] = None
-    media_pembelajaran: Optional[Union[List[Any], Dict[str, Any], Any]] = None
-    penilaian: Optional[List[RPSPenilaian]] = None
-    referensi: Optional[Union[List[Any], Dict[str, Any], Any]] = None
-    status: Optional[RPSStatus] = None
-    sdgs: Optional[List[int]] = None
+    dosen_pengampu: Optional[Any] = None
+    identitas: Optional[Any] = None
+    deskripsi_mata_kuliah: Optional[Any] = None
+    bahan_kajian: Optional[Any] = None
+    cpmk: Optional[Any] = None
+    sub_cpmk: Optional[Any] = None
+    rencana_pembelajaran: Optional[Any] = None
+    metode_pembelajaran: Optional[Any] = None
+    media_pembelajaran: Optional[Any] = None
+    penilaian: Optional[Any] = None
+    referensi: Optional[Any] = None
+    status: Optional[Any] = None
+    sdgs: Optional[Any] = None
 
 
 class RPSResponse(RPSBase):
     id: int
     kode: str
-    status: RPSStatus
-    obe_validated: bool
-    obe_validation_result: Optional[Dict[str, Any]] = None
-    obe_score: Optional[float] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    approved_at: Optional[datetime] = None
-    approved_by: Optional[int] = None
+    status: Any = "draft"
+    obe_validated: Optional[Any] = False
+    obe_validation_result: Optional[Any] = None
+    obe_score: Optional[Any] = None
+    created_at: Optional[Any] = None
+    updated_at: Optional[Any] = None
+    approved_at: Optional[Any] = None
+    approved_by: Optional[Any] = None
 
     class Config:
         from_attributes = True

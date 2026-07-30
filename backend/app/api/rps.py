@@ -50,8 +50,33 @@ async def list_rps(
     count_result = await db.execute(count_query)
     total = count_result.scalar()
     
+    items_out = []
+    for r in items:
+        try:
+            items_out.append(RPSResponse.model_validate(r))
+        except Exception as ex:
+            print(f"[list_rps] Error validating RPS id {r.id}: {ex}")
+            items_out.append({
+                "id": r.id,
+                "kode": r.kode or "",
+                "mata_kuliah_id": r.mata_kuliah_id,
+                "prodi_id": r.prodi_id,
+                "semester": r.semester,
+                "tahun_akademik": r.tahun_akademik or "",
+                "status": getattr(r.status, "value", str(r.status)) if r.status else "draft",
+                "dosen_pengampu": r.dosen_pengampu or [],
+                "identitas": r.identitas or {},
+                "cpmk": r.cpmk or [],
+                "sub_cpmk": r.sub_cpmk or [],
+                "sdgs": r.sdgs or [],
+                "obe_validated": r.obe_validated or False,
+                "obe_score": r.obe_score,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
+            })
+
     return PaginatedResponse(
-        items=[RPSResponse.model_validate(r) for r in items],
+        items=items_out,
         total=total,
         page=page,
         size=size,
