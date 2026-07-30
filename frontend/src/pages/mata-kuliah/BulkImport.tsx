@@ -122,7 +122,9 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
       }
 
       // Smart calculations / Fallbacks for SKS
-      if (sks === null) sks = 3
+      if (sks === null || isNaN(sks)) sks = 3
+      if (sks_teori !== null && isNaN(sks_teori)) sks_teori = null
+      if (sks_praktik !== null && isNaN(sks_praktik)) sks_praktik = null
       
       if (sks_teori === null && sks_praktik === null) {
         // Both missing: if SKS is 3, default to 2 theory, 1 practice. Otherwise, default to sks theory, 0 practice.
@@ -141,7 +143,7 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
         sks_teori = Math.max(0, sks - sks_praktik)
       }
 
-      if (semester === null) semester = 1
+      if (semester === null || isNaN(semester)) semester = 1
 
       return {
         kode,
@@ -176,7 +178,11 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
         toast.success(`${res.data.created} berhasil, ${res.data.errors} gagal`)
       }
     } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Gagal import')
+      const detail = e.response?.data?.detail
+      const msg = Array.isArray(detail)
+        ? detail.map((d: any) => `${d.loc ? d.loc.join('.') + ': ' : ''}${d.msg || JSON.stringify(d)}`).join(', ')
+        : (typeof detail === 'object' ? JSON.stringify(detail) : (detail || e.message || 'Gagal import'))
+      toast.error(msg)
     } finally {
       setSubmitting(false)
     }
