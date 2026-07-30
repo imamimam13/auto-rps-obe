@@ -43,7 +43,7 @@ function AppLayout() {
           <span className="font-semibold text-sm text-gray-900">Auto RPS</span>
         </div>
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-macos-blue to-purple-400 flex items-center justify-center text-white text-xs font-semibold">
-          {user?.nama.charAt(0).toUpperCase()}
+          {(user?.nama || 'U').charAt(0).toUpperCase()}
         </div>
       </header>
 

@@ -231,7 +231,7 @@ export default function RPSPublicPreview() {
                 rps.dosen_pengampu.map((d, i) => (
                   <div key={i} className="flex items-center gap-2 bg-gray-50 px-2.5 py-1.5 rounded-apple-md">
                     <div className="w-5 h-5 rounded-full bg-macos-blue/10 text-macos-blue font-bold flex items-center justify-center text-[10px]">
-                      {d.nama.charAt(0)}
+                      {(d.nama || 'D').charAt(0)}
                     </div>
                     <div>
                       <p className="font-semibold">{d.nama}</p>

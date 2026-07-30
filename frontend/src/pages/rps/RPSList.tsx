@@ -204,10 +204,15 @@ export default function RPSList() {
     const mk = r.identitas?.nama_mata_kuliah || ''
     const matchKode = code.toLowerCase().includes(searchLower)
     const matchMK = mk.toLowerCase().includes(searchLower)
-    const matchDosen = r.dosen_pengampu?.some((d: any) => {
-      const name = d?.nama || ''
-      return name.toLowerCase().includes(searchLower)
-    }) || false
+    let matchDosen = false
+    if (Array.isArray(r.dosen_pengampu)) {
+      matchDosen = r.dosen_pengampu.some((d: any) => {
+        const name = typeof d === 'string' ? d : (d?.nama || '')
+        return name.toLowerCase().includes(searchLower)
+      })
+    } else if (typeof r.dosen_pengampu === 'string') {
+      matchDosen = r.dosen_pengampu.toLowerCase().includes(searchLower)
+    }
     return matchKode || matchMK || matchDosen
   })
 
@@ -250,7 +255,13 @@ export default function RPSList() {
         <div className="grid gap-3">
           {filtered.map((rps) => {
             const StatusIcon = statusIcons[rps.status] || Clock
-            const dosenNames = rps.dosen_pengampu?.map((d: any) => d.nama).join(', ') || '-'
+            let dosenNames = '-'
+            if (Array.isArray(rps.dosen_pengampu)) {
+              const names = rps.dosen_pengampu.map((d: any) => typeof d === 'string' ? d : (d?.nama || '')).filter(Boolean)
+              if (names.length > 0) dosenNames = names.join(', ')
+            } else if (typeof rps.dosen_pengampu === 'string' && rps.dosen_pengampu.trim()) {
+              dosenNames = rps.dosen_pengampu
+            }
             return (
               <div key={rps.id} className="macos-card p-4 flex items-center gap-4 group">
                 <div className="p-3 rounded-apple-lg bg-green-50">

@@ -101,11 +101,11 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       <div className="px-4 py-4 border-t border-white/30 space-y-3">
         <div className="flex items-center gap-2.5 px-1">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-macos-blue to-purple-400 flex items-center justify-center text-white text-xs font-semibold">
-            {user?.nama.charAt(0).toUpperCase()}
+            {(user?.nama || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">{user?.nama}</p>
-            <p className="text-[10px] text-gray-400 capitalize">{user?.role}</p>
+            <p className="text-xs font-medium text-gray-900 truncate">{user?.nama || 'User'}</p>
+            <p className="text-[10px] text-gray-400 capitalize">{user?.role || ''}</p>
           </div>
         </div>
         <button
