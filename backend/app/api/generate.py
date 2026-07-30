@@ -85,6 +85,83 @@ async def generate_rps(
 
 
 
+@router.post("/rps-one", response_model=dict)
+async def generate_and_save_one_rps(
+    data: RPSGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate + save RPS for a single mata kuliah. Designed for sequential pipeline calls from frontend."""
+    prodi_result = await db.execute(select(Prodi).where(Prodi.id == data.prodi_id))
+    prodi = prodi_result.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Prodi not found")
+
+    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.id == data.mata_kuliah_id))
+    mk = mk_result.scalar_one_or_none()
+    if not mk:
+        raise HTTPException(status_code=404, detail="Mata kuliah not found")
+
+    mata_kuliah_data = {
+        "kode": mk.kode,
+        "nama": mk.nama,
+        "sks": mk.sks,
+        "sks_teori": mk.sks_teori,
+        "sks_praktik": mk.sks_praktik,
+        "deskripsi": mk.deskripsi or "",
+    }
+
+    all_cpl = prodi.capaian_pembelajaran_lulusan or []
+    course_cpl_codes = mk.cpl_prodi or []
+    if course_cpl_codes:
+        filtered_cpl = [c for c in all_cpl if c.get("kode") in course_cpl_codes]
+        cpl_to_use = filtered_cpl if filtered_cpl else all_cpl
+    else:
+        cpl_to_use = all_cpl
+
+    try:
+        rps_data = await rps_generator_service.generate_complete_rps(
+            visi_prodi=prodi.visi,
+            misi_prodi=prodi.misi,
+            cpl_prodi=cpl_to_use,
+            mata_kuliah=mata_kuliah_data,
+            semester=data.semester,
+            tahun_akademik=data.tahun_akademik,
+            additional_context=data.additional_context,
+            dosen_pengampu=data.dosen_pengampu,
+            ka_prodi=prodi.ka_prodi,
+            koordinator_rmk=prodi.koordinator_rmk,
+        )
+
+        rps = RPS(
+            kode=f"RPS-{mk.kode}-{mk.semester}",
+            mata_kuliah_id=mk.id,
+            prodi_id=prodi.id,
+            semester=data.semester,
+            tahun_akademik=data.tahun_akademik,
+            dosen_pengampu=data.dosen_pengampu or [],
+            identitas=rps_data.get("identitas"),
+            deskripsi_mata_kuliah=rps_data.get("deskripsi_mata_kuliah") or "",
+            bahan_kajian=rps_data.get("bahan_kajian") or [],
+            cpmk=rps_data.get("cpmk", []),
+            sub_cpmk=rps_data.get("sub_cpmk", []),
+            rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
+            metode_pembelajaran=rps_data.get("metode_pembelajaran", []),
+            media_pembelajaran=rps_data.get("media_pembelajaran", []),
+            penilaian=rps_data.get("penilaian", []),
+            referensi=rps_data.get("referensi", []),
+            sdgs=rps_data.get("sdgs") or mk.sdgs or [],
+            status="draft",
+        )
+        db.add(rps)
+        await db.commit()
+        await db.refresh(rps)
+        return {"success": True, "rps_id": rps.id, "mk": mk.nama, "kode": mk.kode}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
+
+
 @router.post("/bulk-rps", response_model=dict)
 async def bulk_generate_rps(
     data: BulkGenerateRequest,

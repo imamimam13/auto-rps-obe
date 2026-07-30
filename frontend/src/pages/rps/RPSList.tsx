@@ -28,11 +28,22 @@ export default function RPSList() {
   const [prodis, setProdis] = useState<any[]>([])
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [bulkGenerating, setBulkGenerating] = useState(false)
+  const [bulkStopped, setBulkStopped] = useState(false)
+  const bulkStopRef = { current: false }
+  const [bulkProgress, setBulkProgress] = useState<{
+    current: number
+    total: number
+    currentName: string
+    done: { kode: string; nama: string; rps_id: number }[]
+    errors: { kode: string; nama: string; error: string }[]
+    skipped: { kode: string; nama: string }[]
+  } | null>(null)
   const [bulkConfig, setBulkConfig] = useState({
     prodi_id: '',
     tahun_akademik: '2025/2026',
     semester: '',
     additional_context: '',
+    skip_existing: true,
   })
 
   useEffect(() => {
@@ -55,20 +66,74 @@ export default function RPSList() {
       return
     }
     setBulkGenerating(true)
+    bulkStopRef.current = false
+    setBulkStopped(false)
+    setBulkProgress(null)
+
     try {
-      const res = await api.post('/api/v1/generate/bulk-rps', {
-        prodi_id: Number(bulkConfig.prodi_id),
-        semester: bulkConfig.semester ? Number(bulkConfig.semester) : null,
-        tahun_akademik: bulkConfig.tahun_akademik,
-        additional_context: bulkConfig.additional_context || '',
-      })
-      const { created, total, errors, error_detail } = res.data
-      toast.success(`Berhasil generate ${created} dari ${total} RPS!`)
-      if (errors > 0) {
-        console.error('Bulk generate errors:', error_detail)
-        toast.error(`${errors} mata kuliah gagal di-generate`)
+      // 1. Fetch all mata kuliah for the prodi
+      let url = `/api/v1/mata-kuliah/?prodi_id=${bulkConfig.prodi_id}&size=200`
+      if (bulkConfig.semester) url += `&semester=${bulkConfig.semester}`
+      const mkRes = await api.get(url)
+      const mkList: any[] = mkRes.data.items || []
+
+      if (mkList.length === 0) {
+        toast.error('Tidak ada mata kuliah ditemukan untuk prodi ini')
+        setBulkGenerating(false)
+        return
       }
-      setShowBulkModal(false)
+
+      // 2. Fetch existing RPS for this prodi to know which to skip
+      let existingMkIds = new Set<number>()
+      if (bulkConfig.skip_existing) {
+        const rpsRes = await api.get(`/api/v1/rps/?prodi_id=${bulkConfig.prodi_id}&size=500`)
+        const existingRps: any[] = rpsRes.data.items || []
+        existingMkIds = new Set(existingRps.map((r: any) => r.mata_kuliah_id))
+      }
+
+      const done: any[] = []
+      const errors: any[] = []
+      const skipped: any[] = []
+
+      setBulkProgress({ current: 0, total: mkList.length, currentName: '', done, errors, skipped })
+
+      // 3. Sequential pipeline — one request at a time
+      for (let i = 0; i < mkList.length; i++) {
+        if (bulkStopRef.current) {
+          setBulkStopped(true)
+          break
+        }
+
+        const mk = mkList[i]
+        setBulkProgress({ current: i + 1, total: mkList.length, currentName: mk.nama, done: [...done], errors: [...errors], skipped: [...skipped] })
+
+        // Skip if RPS already exists for this MK
+        if (bulkConfig.skip_existing && existingMkIds.has(mk.id)) {
+          skipped.push({ kode: mk.kode, nama: mk.nama })
+          continue
+        }
+
+        try {
+          const res = await api.post('/api/v1/generate/rps-one', {
+            mata_kuliah_id: mk.id,
+            prodi_id: Number(bulkConfig.prodi_id),
+            semester: mk.semester,
+            tahun_akademik: bulkConfig.tahun_akademik,
+            additional_context: bulkConfig.additional_context || '',
+            dosen_pengampu: [],
+          })
+          done.push({ kode: mk.kode, nama: mk.nama, rps_id: res.data.rps_id })
+        } catch (e: any) {
+          const errMsg = e.response?.data?.detail || e.message || 'Gagal'
+          errors.push({ kode: mk.kode, nama: mk.nama, error: errMsg })
+        }
+
+        setBulkProgress({ current: i + 1, total: mkList.length, currentName: mk.nama, done: [...done], errors: [...errors], skipped: [...skipped] })
+      }
+
+      // 4. Done
+      setBulkProgress(prev => prev ? { ...prev, currentName: '' } : prev)
+      toast.success(`Selesai! ${done.length} RPS dibuat, ${skipped.length} dilewati, ${errors.length} gagal`)
       loadData()
     } catch (e: any) {
       toast.error(e.response?.data?.detail || e.message || 'Gagal bulk generate RPS')
@@ -223,87 +288,156 @@ export default function RPSList() {
       {/* Bulk Modal */}
       {showBulkModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-          <div className="macos-card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-up space-y-5 bg-white/95 shadow-2xl rounded-apple-xl border border-white/20">
+          <div className="macos-card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-up space-y-5 bg-white/95 shadow-2xl rounded-apple-xl border border-white/20">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-purple-50 rounded-apple-lg">
                 <Sparkles className="w-5 h-5 text-purple-500 animate-pulse" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Bulk Generate RPS</h3>
-                <p className="text-[11px] text-gray-400 mt-0.5">Generate RPS untuk semua mata kuliah prodi sekaligus.</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Generate RPS satu per satu secara berurutan (pipeline).</p>
               </div>
             </div>
 
-            <div className="space-y-3.5 pt-2">
-              <div>
-                <label className="macos-label">Pilih Program Studi *</label>
-                <select
-                  className="macos-input"
-                  value={bulkConfig.prodi_id}
-                  onChange={(e) => setBulkConfig({ ...bulkConfig, prodi_id: e.target.value })}
-                  required
-                >
-                  <option value="">-- Pilih Program Studi --</option>
-                  {prodis.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
-                  ))}
-                </select>
+            {/* Config form — hide while running */}
+            {!bulkGenerating && !bulkProgress && (
+              <div className="space-y-3.5 pt-2">
+                <div>
+                  <label className="macos-label">Pilih Program Studi *</label>
+                  <select
+                    className="macos-input"
+                    value={bulkConfig.prodi_id}
+                    onChange={(e) => setBulkConfig({ ...bulkConfig, prodi_id: e.target.value })}
+                    required
+                  >
+                    <option value="">-- Pilih Program Studi --</option>
+                    {prodis.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="macos-label">Tahun Akademik</label>
+                  <input
+                    className="macos-input"
+                    value={bulkConfig.tahun_akademik}
+                    onChange={(e) => setBulkConfig({ ...bulkConfig, tahun_akademik: e.target.value })}
+                    placeholder="2025/2026"
+                  />
+                </div>
+                <div>
+                  <label className="macos-label">Filter Semester (Opsional)</label>
+                  <input
+                    type="number"
+                    className="macos-input"
+                    value={bulkConfig.semester}
+                    onChange={(e) => setBulkConfig({ ...bulkConfig, semester: e.target.value })}
+                    placeholder="Semua Semester"
+                    min={1}
+                    max={14}
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Kosongkan untuk semua semester.</p>
+                </div>
+                <div>
+                  <label className="macos-label">Konteks Tambahan (Opsional)</label>
+                  <textarea
+                    className="macos-input min-h-[70px] resize-none"
+                    value={bulkConfig.additional_context}
+                    onChange={(e) => setBulkConfig({ ...bulkConfig, additional_context: e.target.value })}
+                    placeholder="Informasi tambahan untuk membimbing AI..."
+                  />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={bulkConfig.skip_existing}
+                    onChange={e => setBulkConfig({ ...bulkConfig, skip_existing: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-500"
+                  />
+                  <span className="text-xs text-gray-700">Lewati mata kuliah yang sudah ada RPS-nya</span>
+                </label>
               </div>
+            )}
 
-              <div>
-                <label className="macos-label">Tahun Akademik</label>
-                <input
-                  className="macos-input"
-                  value={bulkConfig.tahun_akademik}
-                  onChange={(e) => setBulkConfig({ ...bulkConfig, tahun_akademik: e.target.value })}
-                  placeholder="2025/2026"
-                />
-              </div>
+            {/* Progress view */}
+            {bulkProgress && (
+              <div className="space-y-4">
+                {/* Progress bar */}
+                <div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>{bulkProgress.currentName ? `Generating: ${bulkProgress.currentName}` : (bulkStopped ? '⏹ Dihentikan' : '✅ Selesai')}</span>
+                    <span className="font-medium">{bulkProgress.current}/{bulkProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500"
+                      style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="macos-label">Filter Semester (Opsional)</label>
-                <input
-                  type="number"
-                  className="macos-input"
-                  value={bulkConfig.semester}
-                  onChange={(e) => setBulkConfig({ ...bulkConfig, semester: e.target.value })}
-                  placeholder="Semua Semester"
-                  min={1}
-                  max={14}
-                />
-                <p className="text-[10px] text-gray-400 mt-1">Kosongkan untuk meng-generate semua semester sekaligus.</p>
-              </div>
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-green-50 rounded-apple p-2">
+                    <p className="text-lg font-bold text-green-600">{bulkProgress.done.length}</p>
+                    <p className="text-[10px] text-green-500">Berhasil</p>
+                  </div>
+                  <div className="bg-yellow-50 rounded-apple p-2">
+                    <p className="text-lg font-bold text-yellow-600">{bulkProgress.skipped.length}</p>
+                    <p className="text-[10px] text-yellow-500">Dilewati</p>
+                  </div>
+                  <div className="bg-red-50 rounded-apple p-2">
+                    <p className="text-lg font-bold text-red-600">{bulkProgress.errors.length}</p>
+                    <p className="text-[10px] text-red-500">Gagal</p>
+                  </div>
+                </div>
 
-              <div>
-                <label className="macos-label">Konteks Tambahan (Opsional)</label>
-                <textarea
-                  className="macos-input min-h-[80px] resize-none"
-                  value={bulkConfig.additional_context}
-                  onChange={(e) => setBulkConfig({ ...bulkConfig, additional_context: e.target.value })}
-                  placeholder="Informasi tambahan untuk membimbing AI..."
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setShowBulkModal(false)}
-                disabled={bulkGenerating}
-                className="macos-button-ghost px-4 py-2 text-xs"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleBulkGenerate}
-                disabled={bulkGenerating}
-                className="macos-button py-2.5 px-4 flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs rounded-apple-lg disabled:from-gray-300 disabled:to-gray-400"
-              >
-                {bulkGenerating ? (
-                  <>Mengenerate semua...</>
-                ) : (
-                  <><Sparkles className="w-4 h-4" /> Mulai Generate</>
+                {/* Error detail */}
+                {bulkProgress.errors.length > 0 && (
+                  <div className="bg-red-50 border border-red-100 rounded-apple p-3 max-h-32 overflow-y-auto">
+                    {bulkProgress.errors.map((e, i) => (
+                      <p key={i} className="text-xs text-red-600 mb-1">
+                        <span className="font-mono font-medium">{e.kode}</span> {e.nama}: {e.error}
+                      </p>
+                    ))}
+                  </div>
                 )}
-              </button>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              {!bulkGenerating && (
+                <button
+                  onClick={() => { setShowBulkModal(false); setBulkProgress(null); setBulkStopped(false) }}
+                  className="macos-button-ghost px-4 py-2 text-xs"
+                >
+                  {bulkProgress ? 'Tutup' : 'Batal'}
+                </button>
+              )}
+              {bulkGenerating ? (
+                <button
+                  onClick={() => { bulkStopRef.current = true }}
+                  className="macos-button py-2.5 px-4 flex items-center gap-2 bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-medium text-xs rounded-apple-lg"
+                >
+                  ⏹ Stop
+                </button>
+              ) : !bulkProgress ? (
+                <button
+                  onClick={handleBulkGenerate}
+                  disabled={!bulkConfig.prodi_id}
+                  className="macos-button py-2.5 px-4 flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs rounded-apple-lg disabled:from-gray-300 disabled:to-gray-400"
+                >
+                  <Sparkles className="w-4 h-4" /> Mulai Generate
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setBulkProgress(null); setBulkStopped(false) }}
+                  className="macos-button py-2.5 px-4 flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs rounded-apple-lg"
+                >
+                  <Sparkles className="w-4 h-4" /> Generate Lagi
+                </button>
+              )}
             </div>
           </div>
         </div>
