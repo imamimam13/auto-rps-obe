@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.models import User, UserRole
 from app.schemas.auth import (
     LoginRequest, TokenResponse, UserCreate, UserUpdate, UserResponse,
-    ChangePasswordRequest,
+    ChangePasswordRequest, BulkUserCreate, BulkUserResult,
 )
 from app.core.auth import (
     create_access_token, verify_password, hash_password,
@@ -85,6 +85,56 @@ async def list_users(
 ):
     result = await db.execute(select(User))
     return result.scalars().all()
+
+
+@router.post("/users/bulk", response_model=BulkUserResult, status_code=201)
+async def bulk_create_users(
+    items: list[BulkUserCreate],
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+):
+    """Bulk create multiple users. Skips rows that fail (duplicate username/NIDN/email)."""
+    created = 0
+    errors = 0
+    error_detail: list[str] = []
+
+    for item in items:
+        try:
+            async with db.begin_nested():
+                # Check username uniqueness
+                exists = await db.execute(select(User).where(User.username == item.username))
+                if exists.scalar_one_or_none():
+                    raise ValueError(f"Username '{item.username}' sudah digunakan")
+
+                email_val = item.email.strip() if (item.email and item.email.strip()) else None
+                nidn_val = item.nidn.strip() if (item.nidn and item.nidn.strip()) else None
+
+                if email_val:
+                    r = await db.execute(select(User).where(User.email == email_val))
+                    if r.scalar_one_or_none():
+                        raise ValueError(f"Email '{email_val}' sudah digunakan")
+                if nidn_val:
+                    r = await db.execute(select(User).where(User.nidn == nidn_val))
+                    if r.scalar_one_or_none():
+                        raise ValueError(f"NIDN '{nidn_val}' sudah digunakan")
+
+                new_user = User(
+                    username=item.username,
+                    password_hash=hash_password(item.password),
+                    email=email_val,
+                    nama=item.nama,
+                    nidn=nidn_val,
+                    role=item.role,
+                    prodi_id=item.prodi_id,
+                )
+                db.add(new_user)
+                created += 1
+        except Exception as exc:
+            errors += 1
+            error_detail.append(f"{item.username}: {str(exc)}")
+
+    await db.commit()
+    return BulkUserResult(created=created, errors=errors, total=len(items), error_detail=error_detail)
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)

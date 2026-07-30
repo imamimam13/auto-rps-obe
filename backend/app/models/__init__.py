@@ -133,7 +133,10 @@ class OBEValidationLog(Base):
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
-    PRODI = "prodi"
+    KETUA_PRODI = "ketua_prodi"
+    GMK = "gmk"
+    DOSEN = "dosen"
+    PRODI = "prodi"  # legacy alias, kept for backward compat
 
 
 class User(Base):

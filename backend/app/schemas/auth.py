@@ -6,7 +6,10 @@ from enum import Enum
 
 class UserRole(str, Enum):
     ADMIN = "admin"
-    PRODI = "prodi"
+    KETUA_PRODI = "ketua_prodi"
+    GMK = "gmk"
+    DOSEN = "dosen"
+    PRODI = "prodi"  # legacy
 
 
 class LoginRequest(BaseModel):
@@ -59,6 +62,24 @@ class UserResponse(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=4)
+
+
+class BulkUserCreate(BaseModel):
+    """Schema for a single row in a bulk user import."""
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=4)
+    nama: str
+    nidn: Optional[str] = None
+    email: Optional[str] = None
+    role: UserRole = UserRole.DOSEN
+    prodi_id: Optional[int] = None
+
+
+class BulkUserResult(BaseModel):
+    created: int
+    errors: int
+    total: int
+    error_detail: List[str] = []
 
 
 TokenResponse.model_rebuild()
