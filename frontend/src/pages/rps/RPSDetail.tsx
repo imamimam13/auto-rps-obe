@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2, Globe, Loader2 } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -37,6 +37,7 @@ export default function RPSDetail() {
     koordinator_pengembang_rps: '',
     koordinator_rmk: '',
     ka_prodi: '',
+    gugus_kendali_mutu: '',
     nama_mata_kuliah: '',
     kode_mata_kuliah: '',
     sks: 3,
@@ -51,6 +52,7 @@ export default function RPSDetail() {
   const [formPenilaian, setFormPenilaian] = useState<any[]>([])
   const [formSDGs, setFormSDGs] = useState<number[]>([])
   const [fixing, setFixing] = useState(false)
+  const [analyzingSDGs, setAnalyzingSDGs] = useState(false)
 
   useEffect(() => {
     if (id) loadData()
@@ -64,6 +66,28 @@ export default function RPSDetail() {
       toast.error('Gagal memuat RPS')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleAnalyzeSDGs() {
+    setAnalyzingSDGs(true)
+    const toastId = toast.loading('Menganalisis keterkaitan SDGs dengan AI...')
+    try {
+      const res = await api.post(`/api/v1/rps/${id}/analyze-sdgs`)
+      toast.success(res.data.message || 'Analisis SDGs selesai!', { id: toastId })
+      if (res.data.reasoning) {
+        toast((t) => (
+          <div className="text-xs max-w-sm">
+            <p className="font-semibold mb-1 text-macos-blue">Analisis AI (SDGs):</p>
+            <p className="text-gray-600 leading-normal">{res.data.reasoning}</p>
+          </div>
+        ), { duration: 8000 })
+      }
+      loadData()
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Gagal menganalisis SDGs dengan AI'), { id: toastId })
+    } finally {
+      setAnalyzingSDGs(false)
     }
   }
 
@@ -116,6 +140,7 @@ export default function RPSDetail() {
       koordinator_pengembang_rps: rps.identitas?.koordinator_pengembang_rps || '',
       koordinator_rmk: rps.identitas?.koordinator_rmk || '',
       ka_prodi: rps.identitas?.ka_prodi || '',
+      gugus_kendali_mutu: rps.identitas?.gugus_kendali_mutu || '',
       nama_mata_kuliah: rps.identitas?.nama_mata_kuliah || '',
       kode_mata_kuliah: rps.identitas?.kode_mata_kuliah || '',
       sks: rps.identitas?.sks || 3,
@@ -165,6 +190,7 @@ export default function RPSDetail() {
           koordinator_pengembang_rps: formIdentitas.koordinator_pengembang_rps,
           koordinator_rmk: formIdentitas.koordinator_rmk,
           ka_prodi: formIdentitas.ka_prodi,
+          gugus_kendali_mutu: formIdentitas.gugus_kendali_mutu,
           nama_mata_kuliah: formIdentitas.nama_mata_kuliah,
           kode_mata_kuliah: formIdentitas.kode_mata_kuliah,
           sks: Number(formIdentitas.sks),
@@ -371,9 +397,27 @@ export default function RPSDetail() {
       </div>
 
       {/* SDGs connection */}
-      {rps.sdgs && rps.sdgs.length > 0 && (
-        <div className="macos-card p-5 animate-fade-in">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Sustainable Development Goals (SDGs) Terkait</h3>
+      <div className="macos-card p-5 animate-fade-in">
+        <div className="flex items-center justify-between mb-3 border-b border-gray-100/50 pb-2.5">
+          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+            <Globe className="w-4 h-4 text-macos-blue" />
+            Sustainable Development Goals (SDGs) Terkait
+          </h3>
+          <button
+            onClick={handleAnalyzeSDGs}
+            disabled={analyzingSDGs}
+            className="macos-button py-1 px-2.5 text-[10px] flex items-center gap-1 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {analyzingSDGs ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Sparkles className="w-3 h-3 text-purple-500" />
+            )}
+            {rps.sdgs && rps.sdgs.length > 0 ? 'Analisis Ulang AI' : 'Analisis dengan AI'}
+          </button>
+        </div>
+        
+        {rps.sdgs && rps.sdgs.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {rps.sdgs.map((sdgId: number) => {
               const sdg = getSDGById(sdgId)
@@ -393,8 +437,10 @@ export default function RPSDetail() {
               )
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-xs text-gray-400 italic">Mata kuliah/RPS ini belum dikaitkan dengan SDGs. Klik tombol di atas untuk menganalisis keterkaitan SDGs secara otomatis menggunakan AI.</p>
+        )}
+      </div>
 
       {/* OBE Validation Result Card */}
       {rps.obe_validated && rps.obe_validation_result && (
@@ -698,6 +744,14 @@ export default function RPSDetail() {
                           className="macos-input"
                           value={formIdentitas.koordinator_rmk}
                           onChange={(e) => setFormIdentitas({ ...formIdentitas, koordinator_rmk: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="macos-label">Nama Gugus Kendali Mutu (GKM/GMK)</label>
+                        <input
+                          className="macos-input"
+                          value={formIdentitas.gugus_kendali_mutu}
+                          onChange={(e) => setFormIdentitas({ ...formIdentitas, gugus_kendali_mutu: e.target.value })}
                         />
                       </div>
                       <div>

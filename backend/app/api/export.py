@@ -111,19 +111,23 @@ RPS_HTML_TEMPLATE = Template("""
       </td>
     </tr>
     <tr>
-      <td colspan="2" style="font-weight: bold; text-align: center; padding: 4px;">Koordinator Pengembang RPS</td>
-      <td style="font-weight: bold; text-align: center; padding: 4px;">Koordinator Rumpun MK</td>
-      <td style="font-weight: bold; text-align: center; padding: 4px;">Ka PRODI</td>
+      <td style="font-weight: bold; text-align: center; padding: 4px; width: 25%;">Koordinator Pengembang RPS</td>
+      <td style="font-weight: bold; text-align: center; padding: 4px; width: 25%;">Koordinator Rumpun MK</td>
+      <td style="font-weight: bold; text-align: center; padding: 4px; width: 25%;">Gugus Kendali Mutu (GKM)</td>
+      <td style="font-weight: bold; text-align: center; padding: 4px; width: 25%;">Ka. PRODI</td>
     </tr>
     <tr style="height: 50px;">
-      <td colspan="2" style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
-        Tanda tangan<br/><strong>{{ data.identitas.koordinator_pengembang_rps if data.identitas else '-' }}</strong>
+      <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
+        Tanda tangan<br/><strong>{{ data.identitas.koordinator_pengembang_rps if data.identitas and data.identitas.koordinator_pengembang_rps else '-' }}</strong>
       </td>
       <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
-        Tanda tangan<br/><strong>{{ data.identitas.koordinator_rmk if data.identitas else '-' }}</strong>
+        Tanda tangan<br/><strong>{{ data.identitas.koordinator_rmk if data.identitas and data.identitas.koordinator_rmk else '-' }}</strong>
       </td>
       <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
-        Tanda tangan<br/><strong>{{ data.identitas.ka_prodi if data.identitas else '-' }}</strong>
+        Tanda tangan<br/><strong>{{ data.identitas.gugus_kendali_mutu if data.identitas and data.identitas.gugus_kendali_mutu else '-' }}</strong>
+      </td>
+      <td style="text-align: center; vertical-align: bottom; padding-bottom: 5px;">
+        Tanda tangan<br/><strong>{{ data.identitas.ka_prodi if data.identitas and data.identitas.ka_prodi else '-' }}</strong>
       </td>
     </tr>
     <tr>
@@ -451,14 +455,13 @@ def generate_docx(rps_data: dict, output_path: str, course_cpls: list, brand_nam
         cell_oto.merge(table.rows[3].cells[col])
         
     table.rows[4].cells[0].text = 'Koordinator Pengembang RPS'
-    table.rows[4].cells[2].text = 'Koordinator Rumpun MK'
-    table.rows[4].cells[3].text = 'Ka PRODI'
-    
-    table.rows[4].cells[0].merge(table.rows[4].cells[1])
-    table.rows[5].cells[0].merge(table.rows[5].cells[1])
+    table.rows[4].cells[1].text = 'Koordinator Rumpun MK'
+    table.rows[4].cells[2].text = 'Gugus Kendali Mutu (GKM)'
+    table.rows[4].cells[3].text = 'Ka. PRODI'
     
     table.rows[5].cells[0].text = f"Tanda tangan\n\n\n{identitas.get('koordinator_pengembang_rps', '') or '-'}"
-    table.rows[5].cells[2].text = f"Tanda tangan\n\n\n{identitas.get('koordinator_rmk', '') or '-'}"
+    table.rows[5].cells[1].text = f"Tanda tangan\n\n\n{identitas.get('koordinator_rmk', '') or '-'}"
+    table.rows[5].cells[2].text = f"Tanda tangan\n\n\n{identitas.get('gugus_kendali_mutu', '') or '-'}"
     table.rows[5].cells[3].text = f"Tanda tangan\n\n\n{identitas.get('ka_prodi', '') or '-'}"
 
     # Dosen Pengampu (Row 6)

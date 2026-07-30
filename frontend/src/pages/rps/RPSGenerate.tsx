@@ -64,6 +64,9 @@ export default function RPSGenerate() {
     tahun_akademik: '2025/2026',
     dosen_pengampu: [] as { nama: string; nidn: string }[],
     additional_context: '',
+    koordinator_rmk: '',
+    gugus_kendali_mutu: '',
+    ka_prodi: '',
   })
   const [dosenInput, setDosenInput] = useState({ nama: '', nidn: '' })
 
@@ -80,6 +83,11 @@ export default function RPSGenerate() {
       if (res.data.prodi_id) {
         const pRes = await api.get(`/api/v1/prodi/${res.data.prodi_id}`)
         setProdi(pRes.data)
+        setFormData(f => ({
+          ...f,
+          koordinator_rmk: pRes.data.koordinator_rmk || '',
+          ka_prodi: pRes.data.ka_prodi || '',
+        }))
       }
     } catch (e: any) {
       toast.error(e.response?.data?.detail || e.message || 'Gagal memuat data mata kuliah')
@@ -121,13 +129,19 @@ export default function RPSGenerate() {
   async function handleSave() {
     if (!rpsData || !mk || !prodi) return
     try {
+      const identitas = {
+        ...(rpsData.identitas || {}),
+        koordinator_rmk: formData.koordinator_rmk,
+        gugus_kendali_mutu: formData.gugus_kendali_mutu,
+        ka_prodi: formData.ka_prodi,
+      }
       const res = await api.post('/api/v1/rps/', {
         mata_kuliah_id: mk.id,
         prodi_id: prodi.id,
         semester: formData.semester,
         tahun_akademik: formData.tahun_akademik,
         dosen_pengampu: formData.dosen_pengampu.length > 0 ? formData.dosen_pengampu : [],
-        identitas: rpsData.identitas || null,
+        identitas: identitas,
         cpmk: rpsData.cpmk || [],
         sub_cpmk: rpsData.sub_cpmk || [],
         rencana_pembelajaran: rpsData.rencana_pembelajaran || [],
@@ -192,6 +206,25 @@ export default function RPSGenerate() {
         <div className="macos-card p-5">
           <label className="macos-label">Tahun Akademik</label>
           <input className="macos-input" value={formData.tahun_akademik} onChange={(e) => setFormData({ ...formData, tahun_akademik: e.target.value })} placeholder="2025/2026" />
+        </div>
+      </div>
+
+      {/* Otorisasi */}
+      <div className="macos-card p-5 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2">Otorisasi & Tanda Tangan</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="macos-label">Koordinator Rumpun MK (RMK)</label>
+            <input className="macos-input" value={formData.koordinator_rmk} onChange={(e) => setFormData({ ...formData, koordinator_rmk: e.target.value })} placeholder="Nama Koordinator RMK" />
+          </div>
+          <div>
+            <label className="macos-label">Gugus Kendali Mutu (GKM/GMK)</label>
+            <input className="macos-input" value={formData.gugus_kendali_mutu} onChange={(e) => setFormData({ ...formData, gugus_kendali_mutu: e.target.value })} placeholder="Nama Gugus Kendali Mutu" />
+          </div>
+          <div>
+            <label className="macos-label">Ketua Program Studi (Ka. Prodi)</label>
+            <input className="macos-input" value={formData.ka_prodi} onChange={(e) => setFormData({ ...formData, ka_prodi: e.target.value })} placeholder="Nama Ka. Prodi" />
+          </div>
         </div>
       </div>
 

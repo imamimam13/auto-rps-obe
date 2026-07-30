@@ -155,3 +155,79 @@ async def approve_rps(
     await db.commit()
     await db.refresh(rps)
     return rps
+
+
+@router.post("/{rps_id}/analyze-sdgs")
+async def analyze_rps_sdgs(rps_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(RPS).where(RPS.id == rps_id))
+    rps = result.scalar_one_or_none()
+    if not rps:
+        raise HTTPException(status_code=404, detail="RPS not found")
+        
+    # Get course details
+    mk_result = await db.execute(select(MataKuliah).where(MataKuliah.id == rps.mata_kuliah_id))
+    mk = mk_result.scalar_one_or_none()
+    
+    nama_mk = mk.nama if mk else (rps.identitas.get("nama_mata_kuliah") if rps.identitas else "Mata Kuliah")
+    deskripsi = rps.deskripsi_mata_kuliah or (mk.deskripsi if mk else "")
+    
+    # Format CPMK & CPL
+    cpmk_list = rps.cpmk or []
+    cpmk_str = ""
+    for idx, c in enumerate(cpmk_list):
+        cpmk_str += f"- CPMK {c.get('kode', f'0{idx+1}')}: {c.get('deskripsi', '')}\n"
+        if c.get("cpl_prodi"):
+            cpmk_str += f"  CPL: {', '.join(c.get('cpl_prodi'))}\n"
+            
+    from app.services.ollama_service import ai_service
+    from app.prompts.rps_prompts import SDGS_ANALYSIS_SYSTEM_PROMPT, SDGS_ANALYSIS_PROMPT
+    import json
+    
+    prompt = SDGS_ANALYSIS_PROMPT.format(
+        nama_mata_kuliah=nama_mk,
+        deskripsi_mata_kuliah=deskripsi or "Tidak ada deskripsi",
+        capaian_pembelajaran=cpmk_str or "Tidak ada capaian pembelajaran khusus"
+    )
+    
+    try:
+        response_text = await ai_service.generate(
+            prompt=prompt,
+            system_prompt=SDGS_ANALYSIS_SYSTEM_PROMPT,
+            temperature=0.3,
+            format="json"
+        )
+        
+        # Parse result
+        # Clean potential markdown wrappers
+        cleaned = response_text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+        
+        data = json.loads(cleaned)
+        sdgs = data.get("sdgs", [])
+        # Ensure it's list of unique integers
+        sdgs = list(set([int(x) for x in sdgs if str(x).isdigit() and 1 <= int(x) <= 17]))
+        
+        # Save to database
+        rps.sdgs = sdgs
+        # Also update the Mata Kuliah if it has no SDGs yet
+        if mk and not mk.sdgs:
+            mk.sdgs = sdgs
+            
+        await db.commit()
+        await db.refresh(rps)
+        
+        return {
+            "status": "success",
+            "sdgs": sdgs,
+            "reasoning": data.get("reasoning", ""),
+            "message": "Analisis SDGs selesai"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal melakukan analisis SDGs dengan AI: {str(e)}"
+        )

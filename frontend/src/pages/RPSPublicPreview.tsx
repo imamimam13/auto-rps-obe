@@ -24,6 +24,7 @@ interface RPS {
     koordinator_pengembang_rps?: string
     koordinator_rmk?: string
     ka_prodi?: string
+    gugus_kendali_mutu?: string
   }
   deskripsi_mata_kuliah?: string
   bahan_kajian?: string[] | string
@@ -258,6 +259,10 @@ export default function RPSPublicPreview() {
               <div className="flex justify-between border-b border-gray-50 pb-1">
                 <span>Koordinator RMK</span>
                 <span className="font-semibold text-gray-900">{rps.identitas?.koordinator_rmk || '-'}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-50 pb-1">
+                <span>Gugus Kendali Mutu</span>
+                <span className="font-semibold text-gray-900">{rps.identitas?.gugus_kendali_mutu || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span>Ka. Program Studi</span>

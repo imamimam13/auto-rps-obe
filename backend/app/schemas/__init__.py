@@ -130,6 +130,7 @@ class RPSIdentitas(BaseModel):
     koordinator_pengembang_rps: Optional[str] = ""
     koordinator_rmk: Optional[str] = ""
     ka_prodi: Optional[str] = ""
+    gugus_kendali_mutu: Optional[str] = ""
 
 
 class RPSCPMK(BaseModel):

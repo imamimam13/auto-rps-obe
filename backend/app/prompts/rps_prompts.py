@@ -298,3 +298,31 @@ Output format JSON:
 }}
 
 Skor 0-100. Issues minimal 3 jika ada masalah. Berikan saran yang actionable."""  # noqa: E501
+
+
+SDGS_ANALYSIS_SYSTEM_PROMPT = """Anda adalah pakar kurikulum perguruan tinggi dan pakar Sustainable Development Goals (SDGs) PBB. 
+Tugas Anda adalah menganalisis keselarasan (alignment) antara data mata kuliah, CPMK, dan CPL dengan 17 poin SDGs PBB.
+
+Anda harus mengembalikan hasil analisis dalam format JSON murni sebagai berikut:
+{
+  "sdgs": [angka_id_sdg_1, angka_id_sdg_2],
+  "reasoning": "Penjelasan singkat mengapa mata kuliah ini cocok dengan poin SDGs tersebut berdasarkan nama, deskripsi, CPMK, dan CPL yang diberikan."
+}
+
+PENTING:
+- Poin SDGs dalam array harus berupa angka integer antara 1 sampai 17.
+- Pilih maksimal 4 poin SDGs yang paling kuat dan relevan. Jika tidak ada yang relevan, kembalikan array kosong [].
+- Jangan memberikan kata pengantar, penjelasan di luar JSON, atau tanda ```json. Kembalikan JSON murni.
+"""
+
+SDGS_ANALYSIS_PROMPT = """Analisis keterkaitan SDGs untuk data mata kuliah berikut:
+
+MATA KULIAH:
+- Nama: {nama_mata_kuliah}
+- Deskripsi: {deskripsi_mata_kuliah}
+
+CAPAIAN PEMBELAJARAN (CPMK & CPL):
+{capaian_pembelajaran}
+
+Berdasarkan data di atas, tentukan poin SDGs (1-17) mana saja yang selaras/cocok dengan konten tersebut beserta alasannya!
+"""
