@@ -45,9 +45,9 @@ Buat RPS lengkap dengan format JSON berikut. Pastikan konten relevan dengan visi
     "fakultas": "nama fakultas",
     "tanggal_penyusunan": "Tanggal hari ini",
     "no_dokumen": "No dokumen/RPS",
-    "koordinator_pengembang_rps": "Nama Dosen/Koordinator Pengembang",
-    "koordinator_rmk": "Nama Koordinator Rumpun MK",
-    "ka_prodi": "Nama Ketua Program Studi"
+    "koordinator_pengembang_rps": "-",
+    "koordinator_rmk": "-",
+    "ka_prodi": "-"
   }},
   "deskripsi_mata_kuliah": "deskripsi lengkap sesuai CPL",
   "bahan_kajian": [

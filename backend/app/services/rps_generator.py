@@ -107,6 +107,19 @@ def extract_json(text: str) -> Any:
     except json.JSONDecodeError:
         pass
         
+    cleaned = text
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:].strip()
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[3:].strip()
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3].strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
     # 1. Coba cari di dalam markdown code block: ```json ... ``` atau ``` ... ```
     code_block_match = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
     if code_block_match:
@@ -120,15 +133,15 @@ def extract_json(text: str) -> Any:
             except Exception:
                 pass
             
-    # 2. Coba cari dengan mendeteksi posisi kurung kurawal/siku pertama dan terakhir
+    # 2. Coba cari dengan mendeteksi posisi kurung kurawal/siku pertama
     start_idx = -1
-    for i, char in enumerate(text):
+    for i, char in enumerate(cleaned):
         if char in ('{', '['):
             start_idx = i
             break
             
     if start_idx != -1:
-        candidate = text[start_idx:]
+        candidate = cleaned[start_idx:]
         try:
             repaired = repair_truncated_json(candidate)
             return json.loads(repaired)
@@ -195,7 +208,7 @@ class RPSGeneratorService:
             identitas.setdefault("fakultas", "")
             identitas["tahun_akademik"] = tahun_akademik
 
-            # Automatically map dosen_pengampu as Koordinator Pengembang RPS
+            # Enforce actual lecturer names or default/hyphen — clear AI hallucinations
             dosen_names = ""
             if dosen_pengampu:
                 dosen_names = ", ".join([str(d.get("nama", "")).strip() for d in dosen_pengampu if d.get("nama")])
@@ -205,21 +218,21 @@ class RPSGeneratorService:
             elif settings.DEFAULT_KOORDINATOR_PENGEMBANG:
                 identitas["koordinator_pengembang_rps"] = settings.DEFAULT_KOORDINATOR_PENGEMBANG
             else:
-                identitas["koordinator_pengembang_rps"] = ""
+                identitas["koordinator_pengembang_rps"] = "-"
 
-            if koordinator_rmk:
-                identitas["koordinator_rmk"] = koordinator_rmk
+            if koordinator_rmk and str(koordinator_rmk).strip():
+                identitas["koordinator_rmk"] = str(koordinator_rmk).strip()
             elif settings.DEFAULT_KOORDINATOR_RMK:
                 identitas["koordinator_rmk"] = settings.DEFAULT_KOORDINATOR_RMK
             else:
-                identitas["koordinator_rmk"] = ""
+                identitas["koordinator_rmk"] = "-"
 
-            if ka_prodi:
-                identitas["ka_prodi"] = ka_prodi
+            if ka_prodi and str(ka_prodi).strip():
+                identitas["ka_prodi"] = str(ka_prodi).strip()
             elif settings.DEFAULT_KA_PRODI:
                 identitas["ka_prodi"] = settings.DEFAULT_KA_PRODI
             else:
-                identitas["ka_prodi"] = ""
+                identitas["ka_prodi"] = "-"
                     
             return rps_data
         except Exception as e:
