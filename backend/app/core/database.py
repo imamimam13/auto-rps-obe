@@ -141,6 +141,67 @@ async def init_db():
                 if "sdgs" not in cols_mk:
                     await session.execute(text("ALTER TABLE mata_kuliah ADD COLUMN sdgs JSON"))
                     await session.commit()
+                
+                # ── Auto-recovery: restore MataKuliah from _mata_kuliah_old or RPS records ──
+                res_mk_count = await session.execute(text("SELECT COUNT(*) FROM mata_kuliah"))
+                mk_count = res_mk_count.scalar() or 0
+                
+                # Check if _mata_kuliah_old table exists in SQLite
+                tables_res = await session.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='_mata_kuliah_old'"))
+                if tables_res.scalar_one_or_none():
+                    print("[DATABASE RECOVERY] _mata_kuliah_old table found! Recovering courses...")
+                    try:
+                        await session.execute(text("""
+                            INSERT OR IGNORE INTO mata_kuliah (id, kode, nama, sks, sks_teori, sks_praktik, semester, prodi_id, status)
+                            SELECT id, kode, nama, COALESCE(sks, 3), COALESCE(sks_teori, 2), COALESCE(sks_praktik, 1), COALESCE(semester, 1), prodi_id, COALESCE(status, 'aktif')
+                            FROM _mata_kuliah_old
+                        """))
+                        await session.commit()
+                        res_mk_count = await session.execute(text("SELECT COUNT(*) FROM mata_kuliah"))
+                        mk_count = res_mk_count.scalar() or 0
+                    except Exception as ex_rec:
+                        print(f"[DATABASE RECOVERY] Error copying from _mata_kuliah_old: {ex_rec}")
+
+                if mk_count == 0:
+                    res_rps = await session.execute(text("SELECT id, mata_kuliah_id, prodi_id, semester, kode, identitas FROM rps"))
+                    rps_rows = res_rps.fetchall()
+                    if rps_rows:
+                        print(f"[DATABASE RECOVERY] mata_kuliah table is empty, but {len(rps_rows)} RPS entries found. Auto-recreating MataKuliah entries...")
+                        recovered_count = 0
+                        for r_row in rps_rows:
+                            r_id, r_mk_id, r_prodi_id, r_sem, r_kode, r_ident = r_row
+                            mk_kode = f"MK-{r_mk_id}"
+                            mk_nama = f"Mata Kuliah {r_mk_id}"
+                            mk_sks = 3
+                            
+                            if r_ident:
+                                if isinstance(r_ident, str):
+                                    try: r_ident = json.loads(r_ident)
+                                    except: r_ident = {}
+                                if isinstance(r_ident, dict):
+                                    mk_kode = r_ident.get("kode_mata_kuliah") or r_ident.get("kode") or mk_kode
+                                    mk_nama = r_ident.get("nama_mata_kuliah") or r_ident.get("nama") or mk_nama
+                                    mk_sks = r_ident.get("sks") or 3
+                            
+                            try:
+                                await session.execute(text("""
+                                    INSERT OR IGNORE INTO mata_kuliah (id, kode, nama, sks, sks_teori, sks_praktik, semester, prodi_id, status)
+                                    VALUES (:id, :kode, :nama, :sks, 2, 1, :semester, :prodi_id, 'aktif')
+                                """), {
+                                    "id": r_mk_id,
+                                    "kode": mk_kode,
+                                    "nama": mk_nama,
+                                    "sks": mk_sks,
+                                    "semester": r_sem or 1,
+                                    "prodi_id": r_prodi_id,
+                                })
+                                recovered_count += 1
+                            except Exception as ex_inst:
+                                print(f"[DATABASE RECOVERY] Could not recover MK id {r_mk_id}: {ex_inst}")
+                        
+                        await session.commit()
+                        print(f"[DATABASE RECOVERY] Successfully recovered {recovered_count} MataKuliah entries from RPS table!")
+                
                 # Add composite unique index for SQLite
                 await session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_mata_kuliah_kode_prodi ON mata_kuliah (kode, prodi_id)"))
                 await session.commit()
