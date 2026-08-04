@@ -41,7 +41,8 @@ export default function RPSDetail() {
     nama_mata_kuliah: '',
     kode_mata_kuliah: '',
     sks: 3,
-    semester: 3
+    semester: 3,
+    dosen_pengampu: ''
   })
   const [formBahanKajian, setFormBahanKajian] = useState<string[]>([])
   const [formCPMK, setFormCPMK] = useState<any[]>([])
@@ -157,6 +158,15 @@ export default function RPSDetail() {
       referensi: rps.referensi || {},
     }
     setEditJson(JSON.stringify(editableData, null, 2))
+    let dosenStr = ''
+    const dp = rps.dosen_pengampu || rps.identitas?.dosen_pengampu
+    if (Array.isArray(dp)) {
+      const names = dp.map((d: any) => typeof d === 'string' ? d : (d?.nama || '')).filter(Boolean)
+      dosenStr = names.join(', ')
+    } else if (typeof dp === 'string') {
+      dosenStr = dp
+    }
+
     setFormIdentitas({
       tanggal_penyusunan: rps.identitas?.tanggal_penyusunan || '',
       no_dokumen: rps.identitas?.no_dokumen || '',
@@ -167,7 +177,8 @@ export default function RPSDetail() {
       nama_mata_kuliah: rps.identitas?.nama_mata_kuliah || '',
       kode_mata_kuliah: rps.identitas?.kode_mata_kuliah || '',
       sks: rps.identitas?.sks || 3,
-      semester: rps.identitas?.semester || 3
+      semester: rps.identitas?.semester || 3,
+      dosen_pengampu: dosenStr
     })
     
     setFormBahanKajian(rps.bahan_kajian || [])
@@ -205,9 +216,15 @@ export default function RPSDetail() {
 
   async function handleSaveJson() {
     try {
+      const dosenArray = formIdentitas.dosen_pengampu
+        ? formIdentitas.dosen_pengampu.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : []
+
       const parsed = {
+        dosen_pengampu: dosenArray,
         identitas: {
           ...rps?.identitas,
+          dosen_pengampu: dosenArray,
           tanggal_penyusunan: formIdentitas.tanggal_penyusunan,
           no_dokumen: formIdentitas.no_dokumen,
           koordinator_pengembang_rps: formIdentitas.koordinator_pengembang_rps,
@@ -405,6 +422,19 @@ export default function RPSDetail() {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">{rps.kode}</h1>
             <p className="text-sm text-gray-500">{rps.identitas?.nama_mata_kuliah} · Semester {rps.semester} · {rps.tahun_akademik}</p>
+            {(() => {
+              const dp = rps.dosen_pengampu || rps.identitas?.dosen_pengampu
+              let dosenNames = ''
+              if (Array.isArray(dp)) {
+                const names = dp.map((d: any) => typeof d === 'string' ? d : (d?.nama || '')).filter(Boolean)
+                if (names.length > 0) dosenNames = names.join(', ')
+              } else if (typeof dp === 'string' && dp.trim()) {
+                dosenNames = dp
+              }
+              return dosenNames ? (
+                <p className="text-xs text-gray-600 mt-0.5">Dosen Pengampu: <span className="font-medium text-gray-800">{dosenNames}</span></p>
+              ) : null
+            })()}
           </div>
           <span className={`ml-auto text-xs font-medium px-3 py-1 rounded-full ${
             rps.status === 'approved' ? 'bg-green-50 text-green-600' : 
@@ -768,6 +798,15 @@ export default function RPSDetail() {
                         placeholder="Contoh: Dok-RPS-01"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="macos-label">Dosen Pengampu (pisahkan dengan koma jika lebih dari 1)</label>
+                    <input
+                      className="macos-input"
+                      value={formIdentitas.dosen_pengampu}
+                      onChange={(e) => setFormIdentitas({ ...formIdentitas, dosen_pengampu: e.target.value })}
+                      placeholder="Contoh: Dr. Ahmad, M.Kom, Budi, M.T."
+                    />
                   </div>
                   <div className="border-t border-gray-100 pt-3">
                     <h4 className="text-xs font-semibold text-gray-900 mb-2">Tanda Tangan Otorisasi</h4>
