@@ -47,6 +47,10 @@ async def list_rps(
         count_query = count_query.where(RPS.prodi_id == prodi_id)
     if mata_kuliah_id:
         count_query = count_query.where(RPS.mata_kuliah_id == mata_kuliah_id)
+    if semester:
+        count_query = count_query.where(RPS.semester == semester)
+    if status:
+        count_query = count_query.where(RPS.status == status)
     count_result = await db.execute(count_query)
     total = count_result.scalar()
     

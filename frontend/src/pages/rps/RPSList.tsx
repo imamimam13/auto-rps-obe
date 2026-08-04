@@ -24,6 +24,7 @@ export default function RPSList() {
   const [rpsList, setRpsList] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [prodiFilter, setProdiFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [prodis, setProdis] = useState<any[]>([])
   const [showBulkModal, setShowBulkModal] = useState(false)
@@ -47,17 +48,27 @@ export default function RPSList() {
   })
 
   useEffect(() => {
+    loadProdis()
+  }, [])
+
+  useEffect(() => {
     loadData()
-  }, [statusFilter])
+  }, [statusFilter, prodiFilter])
+
+  async function loadProdis() {
+    try {
+      const res = await api.get('/api/v1/prodi/?size=100')
+      setProdis(res.data.items || [])
+    } catch (e) {
+      console.error('Gagal memuat prodi list', e)
+    }
+  }
 
   async function openBulkModal() {
-    try {
-      const res = await api.get('/api/v1/prodi/?size=50')
-      setProdis(res.data.items || [])
-      setShowBulkModal(true)
-    } catch {
-      toast.error('Gagal memuat daftar Program Studi')
+    if (prodis.length === 0) {
+      await loadProdis()
     }
+    setShowBulkModal(true)
   }
 
   async function handleBulkGenerate() {
@@ -150,8 +161,11 @@ export default function RPSList() {
 
   async function loadData() {
     try {
-      const params = statusFilter ? `?status=${statusFilter}&size=50` : '?size=50'
-      const res = await api.get(`/api/v1/rps/${params}`)
+      const params = new URLSearchParams()
+      if (statusFilter) params.append('status', statusFilter)
+      if (prodiFilter) params.append('prodi_id', prodiFilter)
+      params.append('size', '50')
+      const res = await api.get(`/api/v1/rps/?${params.toString()}`)
       setRpsList(res.data.items || [])
     } catch (e) {
       toast.error('Gagal memuat RPS')
@@ -202,8 +216,11 @@ export default function RPSList() {
     const searchLower = search.toLowerCase()
     const code = r.kode || ''
     const mk = r.identitas?.nama_mata_kuliah || ''
+    const prodiObj = prodis.find((p) => p.id === r.prodi_id)
+    const prodiName = prodiObj?.nama || r.identitas?.prodi || ''
     const matchKode = code.toLowerCase().includes(searchLower)
     const matchMK = mk.toLowerCase().includes(searchLower)
+    const matchProdi = prodiName.toLowerCase().includes(searchLower)
     let matchDosen = false
     if (Array.isArray(r.dosen_pengampu)) {
       matchDosen = r.dosen_pengampu.some((d: any) => {
@@ -213,7 +230,7 @@ export default function RPSList() {
     } else if (typeof r.dosen_pengampu === 'string') {
       matchDosen = r.dosen_pengampu.toLowerCase().includes(searchLower)
     }
-    return matchKode || matchMK || matchDosen
+    return matchKode || matchMK || matchDosen || matchProdi
   })
 
   return (
@@ -233,11 +250,17 @@ export default function RPSList() {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Cari berdasarkan mata kuliah, dosen, atau kode..." value={search} onChange={(e) => setSearch(e.target.value)} className="macos-input pl-10" />
+          <input type="text" placeholder="Cari berdasarkan mata kuliah, dosen, prodi, atau kode..." value={search} onChange={(e) => setSearch(e.target.value)} className="macos-input pl-10" />
         </div>
+        <select value={prodiFilter} onChange={(e) => setProdiFilter(e.target.value)} className="macos-input max-w-[220px]">
+          <option value="">Semua Program Studi</option>
+          {prodis.map((p) => (
+            <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
+          ))}
+        </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="macos-input max-w-[150px]">
           <option value="">Semua Status</option>
           <option value="draft">Draft</option>
@@ -262,6 +285,8 @@ export default function RPSList() {
             } else if (typeof rps.dosen_pengampu === 'string' && rps.dosen_pengampu.trim()) {
               dosenNames = rps.dosen_pengampu
             }
+            const prodiObj = prodis.find((p) => p.id === rps.prodi_id)
+            const prodiName = prodiObj?.nama || rps.identitas?.prodi || ''
             return (
               <div key={rps.id} className="macos-card p-4 flex items-center gap-4 group">
                 <div className="p-3 rounded-apple-lg bg-green-50">
@@ -275,7 +300,7 @@ export default function RPSList() {
                     Dosen: <span className="font-medium text-gray-700">{dosenNames}</span>
                   </p>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    Kode: {rps.kode} · Semester {rps.semester} · {rps.tahun_akademik}
+                    Kode: {rps.kode} {prodiName && `· ${prodiName}`} · Semester {rps.semester} · {rps.tahun_akademik}
                     {rps.obe_validated && ` · OBE: ${rps.obe_score}/100`}
                   </p>
                 </div>
