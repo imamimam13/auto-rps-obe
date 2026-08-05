@@ -26,12 +26,29 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Akun tidak aktif")
 
-    role_val = getattr(user.role, "value", str(user.role))
+    role_val = getattr(user.role, "value", str(user.role)) if user.role else "admin"
     token = create_access_token(
         data={"sub": str(user.id), "role": role_val},
         expires_delta=timedelta(days=7),
     )
-    return TokenResponse(access_token=token, user=user)
+
+    try:
+        user_out = UserResponse.model_validate(user)
+    except Exception as ex:
+        print(f"[login] Fallback serialization for user {user.id}: {ex}")
+        user_out = {
+            "id": user.id,
+            "username": user.username,
+            "nama": user.nama,
+            "email": user.email,
+            "nidn": user.nidn,
+            "role": role_val,
+            "prodi_id": user.prodi_id,
+            "is_active": user.is_active,
+            "created_at": user.created_at,
+        }
+
+    return TokenResponse(access_token=token, user=user_out)
 
 
 @router.get("/me", response_model=UserResponse)

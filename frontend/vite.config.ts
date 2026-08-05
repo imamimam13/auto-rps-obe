@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    allowedHosts: ["rps.uwb.ac.id", "localhost", "127.0.0.1"],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:9810',
@@ -21,7 +21,7 @@ export default defineConfig({
   },
   preview: {
     port: 9811,
-    allowedHosts: ["rps.uwb.ac.id", "localhost", "127.0.0.1"],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:9810',
