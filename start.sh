@@ -30,9 +30,7 @@ BACKEND_PID=$!
 
 echo "Building Frontend for production..."
 cd "$ROOT_DIR/frontend"
-if [ ! -d "$ROOT_DIR/frontend/dist" ]; then
-    npx vite build 2>&1 || echo "⚠️  Build gagal, memakai dist lama jika ada"
-fi
+npx vite build 2>&1 || echo "⚠️  Build gagal, memakai dist lama jika ada"
 
 echo "Starting Frontend on port $FRONTEND_PORT..."
 nohup npx vite preview --host 0.0.0.0 --port $FRONTEND_PORT > /tmp/auto-rps-frontend.log 2>&1 &
