@@ -77,7 +77,8 @@ BACKEND_PID=$!
 cd ..
 
 cd frontend
-nohup npx vite --host 0.0.0.0 --port $FRONTEND_PORT > /tmp/auto-rps-frontend.log 2>&1 &
+npx vite build 2>&1 | tail -2
+nohup npx vite preview --host 0.0.0.0 --port $FRONTEND_PORT > /tmp/auto-rps-frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 

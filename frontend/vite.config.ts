@@ -19,4 +19,14 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    port: 9811,
+    allowedHosts: ["rps.uwb.ac.id", "localhost", "127.0.0.1"],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:9810',
+        changeOrigin: true,
+      },
+    },
+  },
 })
