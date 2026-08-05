@@ -60,15 +60,14 @@ export default function LandingPage() {
       }
 
       const [prodiRes, rpsRes] = await Promise.all([
-        api.get('/api/v1/prodi/'),
-        api.get('/api/v1/rps/?limit=1000')
+        api.get('/api/v1/prodi/?size=100'),
+        api.get('/api/v1/rps/?size=1000&limit=1000')
       ])
 
       const items = prodiRes.data?.items || []
       setProdis(items)
-      if (items.length > 0) {
-        setSelectedProdiId(items[0].id)
-      }
+      // Default to null so all published RPS from all Prodi are visible by default
+      setSelectedProdiId(null)
       setRpsList(rpsRes.data?.items || [])
     } catch (e) {
       console.error('Failed to load public directory data', e)
@@ -181,32 +180,53 @@ export default function LandingPage() {
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {loading ? (
                 <div className="text-center py-8 text-xs text-gray-400">Memuat prodi...</div>
-              ) : filteredProdis.length === 0 ? (
-                <div className="text-center py-8 text-xs text-gray-400 italic">Prodi tidak ditemukan</div>
               ) : (
-                filteredProdis.map(prodi => {
-                  const isActive = selectedProdiId === prodi.id
-                  return (
-                    <button
-                      key={prodi.id}
-                      onClick={() => {
-                        setSelectedProdiId(prodi.id)
-                        setShowProdiSidebar(false)
-                      }}
-                      className={`w-full text-left px-3.5 py-2.5 rounded-apple transition-all flex items-center gap-2.5 ${
-                        isActive
-                          ? 'bg-white text-gray-900 shadow-sm font-semibold border-l-4 border-macos-blue'
-                          : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
-                      }`}
-                    >
-                      <GraduationCap className={`w-4 h-4 shrink-0 ${isActive ? 'text-macos-blue' : 'text-gray-400'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs truncate leading-snug">{prodi.nama}</p>
-                        <p className="text-[9px] text-gray-400 font-mono mt-0.5">{prodi.kode}</p>
-                      </div>
-                    </button>
-                  )
-                })
+                <>
+                  <button
+                    onClick={() => {
+                      setSelectedProdiId(null)
+                      setShowProdiSidebar(false)
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-apple transition-all flex items-center gap-2.5 ${
+                      selectedProdiId === null
+                        ? 'bg-white text-gray-900 shadow-sm font-semibold border-l-4 border-macos-blue'
+                        : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                    }`}
+                  >
+                    <GraduationCap className={`w-4 h-4 shrink-0 ${selectedProdiId === null ? 'text-macos-blue' : 'text-gray-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs truncate leading-snug">Semua Program Studi</p>
+                      <p className="text-[9px] text-gray-400 font-mono mt-0.5">Semua Berkas Terbit</p>
+                    </div>
+                  </button>
+                  {filteredProdis.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-gray-400 italic">Prodi tidak ditemukan</div>
+                  ) : (
+                    filteredProdis.map(prodi => {
+                      const isActive = selectedProdiId === prodi.id
+                      return (
+                        <button
+                          key={prodi.id}
+                          onClick={() => {
+                            setSelectedProdiId(prodi.id)
+                            setShowProdiSidebar(false)
+                          }}
+                          className={`w-full text-left px-3.5 py-2.5 rounded-apple transition-all flex items-center gap-2.5 ${
+                            isActive
+                              ? 'bg-white text-gray-900 shadow-sm font-semibold border-l-4 border-macos-blue'
+                              : 'text-gray-600 hover:bg-black/5 hover:text-gray-900'
+                          }`}
+                        >
+                          <GraduationCap className={`w-4 h-4 shrink-0 ${isActive ? 'text-macos-blue' : 'text-gray-400'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs truncate leading-snug">{prodi.nama}</p>
+                            <p className="text-[9px] text-gray-400 font-mono mt-0.5">{prodi.kode}</p>
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </>
               )}
             </div>
           </aside>
@@ -218,7 +238,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-between w-full md:w-auto">
                 <div className="flex-1 min-w-0 pr-2">
                   <h3 className="text-sm font-bold text-gray-900 truncate">
-                    {prodis.find(p => p.id === selectedProdiId)?.nama || 'Pilih Program Studi'}
+                    {selectedProdiId === null ? 'Semua Program Studi' : (prodis.find(p => p.id === selectedProdiId)?.nama || 'Pilih Program Studi')}
                   </h3>
                   <p className="text-[11px] text-gray-400 mt-0.5 truncate">
                     Daftar Rencana Pembelajaran Semester (RPS) Kurikulum OBE

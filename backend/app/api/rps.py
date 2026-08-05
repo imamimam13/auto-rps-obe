@@ -26,8 +26,10 @@ async def list_rps(
     status: str = None,
     page: int = 1,
     size: int = 10,
+    limit: int = None,
     db: AsyncSession = Depends(get_db),
 ):
+    actual_size = limit if limit is not None else size
     query = select(RPS)
     if prodi_id:
         query = query.where(RPS.prodi_id == prodi_id)
@@ -38,7 +40,8 @@ async def list_rps(
     if status:
         query = query.where(RPS.status == status)
     
-    query = query.offset((page - 1) * size).limit(size)
+    query = query.order_by(RPS.updated_at.desc(), RPS.id.desc())
+    query = query.offset((page - 1) * actual_size).limit(actual_size)
     result = await db.execute(query)
     items = result.scalars().all()
     
@@ -83,8 +86,8 @@ async def list_rps(
         items=items_out,
         total=total,
         page=page,
-        size=size,
-        pages=(total + size - 1) // size,
+        size=actual_size,
+        pages=(total + actual_size - 1) // actual_size if actual_size > 0 else 1,
     )
 
 
