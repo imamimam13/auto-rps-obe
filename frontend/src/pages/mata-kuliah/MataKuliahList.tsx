@@ -13,6 +13,7 @@ interface MK {
   sks_teori: number
   sks_praktik: number
   semester: number
+  periode?: string
   prodi_id: number
   deskripsi: string
   sdgs?: number[]
@@ -23,11 +24,21 @@ interface Prodi {
   nama: string
 }
 
+interface PeriodeItem {
+  id: number
+  kode: string
+  nama: string
+  tahun_akademik: string
+  is_active: boolean
+}
+
 export default function MataKuliahList() {
   const [mkList, setMkList] = useState<MK[]>([])
   const [prodiList, setProdiList] = useState<Prodi[]>([])
+  const [periodeList, setPeriodeList] = useState<PeriodeItem[]>([])
   const [search, setSearch] = useState('')
   const [filterProdi, setFilterProdi] = useState('')
+  const [filterPeriode, setFilterPeriode] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -43,23 +54,30 @@ export default function MataKuliahList() {
     sks_teori: 2,
     sks_praktik: 1,
     semester: 1,
+    periode: '',
     prodi_id: '',
     deskripsi: '',
   })
 
   useEffect(() => {
     loadData()
-  }, [filterProdi])
+  }, [filterProdi, filterPeriode])
 
   async function loadData() {
     try {
-      const params = filterProdi ? `?prodi_id=${filterProdi}&size=100` : '?size=100'
-      const [mkRes, pRes] = await Promise.all([
-        api.get(`/api/v1/mata-kuliah/${params}`),
+      const params = new URLSearchParams()
+      params.append('size', '100')
+      if (filterProdi) params.append('prodi_id', filterProdi)
+      if (filterPeriode) params.append('periode', filterPeriode)
+      const [mkRes, pRes, perRes] = await Promise.all([
+        api.get(`/api/v1/mata-kuliah/?${params.toString()}`),
         api.get('/api/v1/prodi/?size=50'),
+        api.get('/api/v1/periode/'),
       ])
       setMkList(mkRes.data.items || [])
       setProdiList(pRes.data.items || [])
+      const periodes = perRes.data.items || []
+      setPeriodeList(periodes)
     } catch (e) {
       toast.error('Gagal memuat data')
     } finally {
@@ -95,6 +113,7 @@ export default function MataKuliahList() {
 
   function openCreateForm() {
     setEditingId(null)
+    const activePeriode = periodeList.find(p => p.is_active)?.nama || ''
     setFormData({
       kode: '',
       nama: '',
@@ -102,6 +121,7 @@ export default function MataKuliahList() {
       sks_teori: 2,
       sks_praktik: 1,
       semester: 1,
+      periode: activePeriode,
       prodi_id: '',
       deskripsi: '',
     })
@@ -118,6 +138,7 @@ export default function MataKuliahList() {
       sks_teori: mk.sks_teori,
       sks_praktik: mk.sks_praktik,
       semester: mk.semester,
+      periode: mk.periode || '',
       prodi_id: mk.prodi_id.toString(),
       deskripsi: mk.deskripsi || '',
     })
@@ -220,14 +241,22 @@ export default function MataKuliahList() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input type="text" placeholder="Cari mata kuliah..." value={search} onChange={(e) => setSearch(e.target.value)} className="macos-input pl-10" />
         </div>
         <select value={filterProdi} onChange={(e) => setFilterProdi(e.target.value)} className="macos-input max-w-[200px]">
           <option value="">Semua Prodi</option>
           {prodiList.map((p) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+        </select>
+        <select value={filterPeriode} onChange={(e) => setFilterPeriode(e.target.value)} className="macos-input max-w-[200px]">
+          <option value="">Semua Periode</option>
+          {periodeList.map((p) => (
+            <option key={p.id} value={p.nama}>
+              {p.nama} {p.is_active ? '(Aktif)' : ''}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -256,6 +285,17 @@ export default function MataKuliahList() {
               <div>
                 <label className="macos-label">Nama Mata Kuliah</label>
                 <input className="macos-input" value={formData.nama} onChange={(e) => setFormData({ ...formData, nama: e.target.value })} required placeholder="Algoritma dan Pemrograman" />
+              </div>
+              <div>
+                <label className="macos-label">Periode Akademik</label>
+                <select className="macos-input" value={formData.periode} onChange={(e) => setFormData({ ...formData, periode: e.target.value })}>
+                  <option value="">-- Pilih Periode --</option>
+                  {periodeList.map((p) => (
+                    <option key={p.id} value={p.nama}>
+                      {p.nama} {p.is_active ? '(Aktif Saat Ini)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -355,7 +395,14 @@ export default function MataKuliahList() {
                     <BookOpen className="w-5 h-5 text-orange-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900">{mk.nama}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-900">{mk.nama}</h3>
+                      {mk.periode && (
+                        <span className="text-[10px] font-medium bg-blue-50 text-macos-blue px-2 py-0.5 rounded-full border border-blue-100/50">
+                          {mk.periode}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5">{mk.kode} · {mk.sks} SKS · Semester {mk.semester}</p>
                   </div>
                 </button>
@@ -365,7 +412,14 @@ export default function MataKuliahList() {
                     <BookOpen className="w-5 h-5 text-orange-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 group-hover:text-macos-blue transition-colors">{mk.nama}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-900 group-hover:text-macos-blue transition-colors">{mk.nama}</h3>
+                      {mk.periode && (
+                        <span className="text-[10px] font-medium bg-blue-50 text-macos-blue px-2 py-0.5 rounded-full border border-blue-100/50">
+                          {mk.periode}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5">{mk.kode} · {mk.sks} SKS · Semester {mk.semester}</p>
                   </div>
                   <Link to={`/rps/generate/${mk.id}`} className="macos-button-ghost text-xs flex items-center gap-1.5 px-3 py-1.5">

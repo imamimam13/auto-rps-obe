@@ -16,6 +16,7 @@ router = APIRouter(prefix="/mata-kuliah", tags=["Mata Kuliah"])
 async def list_mata_kuliah(
     prodi_id: int = None,
     semester: int = None,
+    periode: str = None,
     page: int = 1,
     size: int = 20,
     db: AsyncSession = Depends(get_db),
@@ -25,6 +26,8 @@ async def list_mata_kuliah(
         query = query.where(MataKuliah.prodi_id == prodi_id)
     if semester:
         query = query.where(MataKuliah.semester == semester)
+    if periode:
+        query = query.where(MataKuliah.periode == periode)
     
     query = query.offset((page - 1) * size).limit(size)
     result = await db.execute(query)
@@ -35,6 +38,8 @@ async def list_mata_kuliah(
         count_query = count_query.where(MataKuliah.prodi_id == prodi_id)
     if semester:
         count_query = count_query.where(MataKuliah.semester == semester)
+    if periode:
+        count_query = count_query.where(MataKuliah.periode == periode)
     count_result = await db.execute(count_query)
     total = count_result.scalar()
     
@@ -53,6 +58,7 @@ async def list_mata_kuliah(
                 "sks_teori": m.sks_teori or 2,
                 "sks_praktik": m.sks_praktik or 1,
                 "semester": m.semester or 1,
+                "periode": m.periode or "",
                 "prodi_id": m.prodi_id,
                 "deskripsi": m.deskripsi or "",
                 "status": str(m.status).lower() if m.status else "aktif",

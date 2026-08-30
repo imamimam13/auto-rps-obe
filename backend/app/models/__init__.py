@@ -45,6 +45,20 @@ class Prodi(Base):
     rps = relationship("RPS", back_populates="prodi")
 
 
+class Periode(Base):
+    __tablename__ = "periode"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    kode = Column(String(50), unique=True, index=True, nullable=False)
+    nama = Column(String(100), nullable=False)  # e.g., "2024/2025 Ganjil"
+    tahun_akademik = Column(String(50), nullable=False)  # e.g., "2024/2025"
+    semester_tipe = Column(String(20), default="ganjil")  # ganjil, genap, pendek
+    is_active = Column(Boolean, default=False, index=True)
+    status = Column(String(20), default="aktif")  # aktif, selesai, arsip
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
 class MataKuliah(Base):
     __tablename__ = "mata_kuliah"
     
@@ -56,6 +70,7 @@ class MataKuliah(Base):
     sks_teori = Column(Integer, default=2)
     sks_praktik = Column(Integer, default=1)
     semester = Column(Integer, index=True, nullable=False)
+    periode = Column(String(50), nullable=True, index=True)
     prodi_id = Column(Integer, ForeignKey("prodi.id"), index=True, nullable=False)
     prasyarat = Column(JSON)  # List of mata kuliah kode
     cpl_prodi = Column(JSON)  # CPL yang berkontribusi

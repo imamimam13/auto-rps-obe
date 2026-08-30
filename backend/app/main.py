@@ -32,6 +32,13 @@ async def lifespan(app: FastAPI):
                 print("✅ Migration: added koordinator_rmk to prodi table")
             except Exception:
                 pass
+            try:
+                from sqlalchemy import text
+                await db.execute(text("ALTER TABLE mata_kuliah ADD COLUMN periode VARCHAR(50) DEFAULT ''"))
+                await db.commit()
+                print("✅ Migration: added periode to mata_kuliah table")
+            except Exception:
+                pass
 
         # Seed default admin
         async with AsyncSessionLocal() as db:

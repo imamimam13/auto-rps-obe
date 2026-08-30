@@ -23,9 +23,11 @@ else
     PY_BIN="$(command -v python3)"
 fi
 
+mkdir -p "$ROOT_DIR/logs"
+
 echo "Starting Backend on port $BACKEND_PORT using $PY_BIN..."
 cd "$ROOT_DIR/backend"
-nohup "$PY_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > /tmp/auto-rps-backend.log 2>&1 &
+nohup "$PY_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port $BACKEND_PORT > "$ROOT_DIR/logs/backend.log" 2>&1 &
 BACKEND_PID=$!
 
 echo "Building Frontend for production..."
@@ -33,16 +35,16 @@ cd "$ROOT_DIR/frontend"
 npx vite build 2>&1 || echo "⚠️  Build gagal, memakai dist lama jika ada"
 
 echo "Starting Frontend on port $FRONTEND_PORT..."
-nohup npx vite preview --host 0.0.0.0 --port $FRONTEND_PORT > /tmp/auto-rps-frontend.log 2>&1 &
+nohup npx vite preview --host 0.0.0.0 --port $FRONTEND_PORT > "$ROOT_DIR/logs/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 
 sleep 3
 
 if kill -0 $BACKEND_PID 2>/dev/null && kill -0 $FRONTEND_PID 2>/dev/null; then
     echo "✅ Aplikasi berhasil dinyalakan!"
-    echo "Backend:  http://localhost:$BACKEND_PORT"
-    echo "Frontend: http://localhost:$FRONTEND_PORT"
+    echo "Backend:  http://0.0.0.0:$BACKEND_PORT"
+    echo "Frontend: http://0.0.0.0:$FRONTEND_PORT"
 else
     echo "❌ Gagal menyalakan aplikasi. Log backend:"
-    tail -n 15 /tmp/auto-rps-backend.log 2>/dev/null || true
+    tail -n 15 "$ROOT_DIR/logs/backend.log" 2>/dev/null || true
 fi

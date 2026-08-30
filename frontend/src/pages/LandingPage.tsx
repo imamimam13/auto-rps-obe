@@ -25,12 +25,24 @@ interface RPSItem {
     sks: number
     semester: number
     ka_prodi?: string
+    tahun_akademik?: string
   }
+}
+
+interface PeriodeItem {
+  id: number
+  kode: string
+  nama: string
+  tahun_akademik: string
+  is_active: boolean
 }
 
 export default function LandingPage() {
   const [prodis, setProdis] = useState<Prodi[]>([])
   const [rpsList, setRpsList] = useState<RPSItem[]>([])
+  const [periodes, setPeriodes] = useState<PeriodeItem[]>([])
+  const [selectedPeriode, setSelectedPeriode] = useState<string>('')
+  const [activePeriodeName, setActivePeriodeName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [prodiSearchQuery, setProdiSearchQuery] = useState('')
@@ -59,9 +71,10 @@ export default function LandingPage() {
         // use fallback
       }
 
-      const [prodiRes, rpsRes] = await Promise.all([
+      const [prodiRes, rpsRes, perRes] = await Promise.all([
         api.get('/api/v1/prodi/?size=100'),
-        api.get('/api/v1/rps/?size=1000&limit=1000')
+        api.get('/api/v1/rps/?size=1000&limit=1000'),
+        api.get('/api/v1/periode/'),
       ])
 
       const items = prodiRes.data?.items || []
@@ -69,6 +82,13 @@ export default function LandingPage() {
       // Default to null so all published RPS from all Prodi are visible by default
       setSelectedProdiId(null)
       setRpsList(rpsRes.data?.items || [])
+      
+      const pList = perRes.data?.items || []
+      setPeriodes(pList)
+      const act = pList.find((p: PeriodeItem) => p.is_active)
+      if (act) {
+        setActivePeriodeName(act.nama)
+      }
     } catch (e) {
       console.error('Failed to load public directory data', e)
     } finally {
@@ -86,6 +106,12 @@ export default function LandingPage() {
   const filteredRPS = rpsList.filter(rps => {
     if (rps.status !== 'published') return false
     if (selectedProdiId !== null && rps.prodi_id !== selectedProdiId) return false
+    if (selectedPeriode) {
+      const rpsTa = rps.tahun_akademik || rps.identitas?.tahun_akademik || ''
+      const matchTa = rpsTa.toLowerCase().includes(selectedPeriode.toLowerCase()) ||
+                      selectedPeriode.toLowerCase().includes(rpsTa.toLowerCase())
+      if (!matchTa) return false
+    }
     
     if (!searchQuery) return true
     const searchLower = searchQuery.toLowerCase()
@@ -237,9 +263,17 @@ export default function LandingPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200/50 pb-4 shrink-0">
               <div className="flex items-center justify-between w-full md:w-auto">
                 <div className="flex-1 min-w-0 pr-2">
-                  <h3 className="text-sm font-bold text-gray-900 truncate">
-                    {selectedProdiId === null ? 'Semua Program Studi' : (prodis.find(p => p.id === selectedProdiId)?.nama || 'Pilih Program Studi')}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-gray-900 truncate">
+                      {selectedProdiId === null ? 'Semua Program Studi' : (prodis.find(p => p.id === selectedProdiId)?.nama || 'Pilih Program Studi')}
+                    </h3>
+                    {activePeriodeName && (
+                      <span className="text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        Periode Aktif: {activePeriodeName}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-gray-400 mt-0.5 truncate">
                     Daftar Rencana Pembelajaran Semester (RPS) Kurikulum OBE
                   </p>
@@ -253,16 +287,32 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* RPS Search */}
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  type="text"
-                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200/80 rounded-apple text-xs placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-macos-blue/30 focus:border-macos-blue"
-                  placeholder="Cari mata kuliah..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                {/* Periode Filter */}
+                <select
+                  value={selectedPeriode}
+                  onChange={(e) => setSelectedPeriode(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-gray-200/80 rounded-apple text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-macos-blue/30 focus:border-macos-blue min-w-[130px]"
+                >
+                  <option value="">Semua Periode</option>
+                  {periodes.map((p) => (
+                    <option key={p.id} value={p.nama}>
+                      {p.nama} {p.is_active ? '(Aktif)' : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {/* RPS Search */}
+                <div className="relative flex-1 md:w-56">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200/80 rounded-apple text-xs placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-macos-blue/30 focus:border-macos-blue"
+                    placeholder="Cari mata kuliah..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 

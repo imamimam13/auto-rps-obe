@@ -63,6 +63,38 @@ class ProdiResponse(ProdiBase):
         from_attributes = True
 
 
+# Periode Schemas
+class PeriodeBase(BaseModel):
+    kode: str
+    nama: str
+    tahun_akademik: str
+    semester_tipe: Optional[str] = "ganjil"
+    is_active: Optional[bool] = False
+    status: Optional[str] = "aktif"
+
+
+class PeriodeCreate(PeriodeBase):
+    pass
+
+
+class PeriodeUpdate(BaseModel):
+    kode: Optional[str] = None
+    nama: Optional[str] = None
+    tahun_akademik: Optional[str] = None
+    semester_tipe: Optional[str] = None
+    is_active: Optional[bool] = None
+    status: Optional[str] = None
+
+
+class PeriodeResponse(PeriodeBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 # Mata Kuliah Schemas
 class MataKuliahBase(BaseModel):
     kode: str = Field(..., max_length=20)
@@ -72,6 +104,7 @@ class MataKuliahBase(BaseModel):
     sks_teori: Optional[Any] = 2
     sks_praktik: Optional[Any] = 1
     semester: Optional[Any] = 1
+    periode: Optional[Any] = None
     prasyarat: Optional[Any] = []
     cpl_prodi: Optional[Any] = []
     cpmk: Optional[Any] = []
@@ -93,6 +126,7 @@ class MataKuliahUpdate(BaseModel):
     sks_teori: Optional[int] = None
     sks_praktik: Optional[int] = None
     semester: Optional[int] = None
+    periode: Optional[str] = None
     prasyarat: Optional[Any] = None
     cpl_prodi: Optional[Any] = None
     cpmk: Optional[Any] = None
@@ -107,6 +141,7 @@ class MataKuliahUpdate(BaseModel):
 class MataKuliahResponse(MataKuliahBase):
     id: int
     prodi_id: int
+    periode: Optional[str] = None
     status: Any = "aktif"
     created_at: Optional[Any] = None
     updated_at: Optional[Any] = None
