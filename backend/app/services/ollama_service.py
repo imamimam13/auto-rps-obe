@@ -9,16 +9,27 @@ class AIService:
         self.base_url = settings.AI_BASE_URL.rstrip("/")
         self.model = settings.AI_MODEL
         self.api_key = settings.AI_API_KEY
-        self.timeout = settings.AI_TIMEOUT
+        self.timeout = max(300, getattr(settings, "AI_TIMEOUT", 300))
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
         )
 
+    def _get_client(self) -> httpx.AsyncClient:
+        current_base_url = settings.AI_BASE_URL.rstrip("/")
+        current_timeout = max(300, getattr(settings, "AI_TIMEOUT", 300))
+        if self.client.is_closed or str(self.client.base_url).rstrip("/") != current_base_url:
+            self.client = httpx.AsyncClient(
+                base_url=current_base_url,
+                timeout=current_timeout,
+            )
+        return self.client
+
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+        api_key = settings.AI_API_KEY or self.api_key
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
     async def generate(
@@ -29,7 +40,8 @@ class AIService:
         max_tokens: int = 4096,
         format: str = "json",
     ) -> str:
-        if self.provider in ("ollama", "9router"):
+        provider = settings.AI_PROVIDER or self.provider
+        if provider in ("ollama", "9router"):
             return await self._generate_ollama(prompt, system_prompt, temperature, max_tokens, format)
         else:
             return await self._generate_openai_compat(prompt, system_prompt, temperature, max_tokens, format)
@@ -42,21 +54,24 @@ class AIService:
         max_tokens: int = 4096,
         format: str = "json",
     ) -> str:
+        model = settings.AI_MODEL or self.model
         payload = {
-            "model": self.model,
+            "model": model,
             "prompt": prompt,
             "stream": False,
             "format": format if format == "json" else None,
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,
+                "num_ctx": 8192,
             },
         }
         if system_prompt:
             payload["system"] = system_prompt
 
         try:
-            resp = await self.client.post("/api/generate", json=payload)
+            client = self._get_client()
+            resp = await client.post("/api/generate", json=payload)
             resp.raise_for_status()
             data = resp.json()
             return data.get("response", "")
@@ -82,8 +97,9 @@ class AIService:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        model = settings.AI_MODEL or self.model
         payload = {
-            "model": self.model,
+            "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -91,8 +107,9 @@ class AIService:
         if format == "json":
             payload["response_format"] = {"type": "json_object"}
 
+        client = self._get_client()
         try:
-            resp = await self.client.post(
+            resp = await client.post(
                 "/v1/chat/completions",
                 json=payload,
                 headers=self._get_headers(),
@@ -102,12 +119,11 @@ class AIService:
             content = data["choices"][0]["message"]["content"]
             return content
         except httpx.HTTPStatusError as e:
-            # Fallback: if json_object format is not supported by llama.cpp/model, retry without it
             if format == "json" and "response_format" in payload:
                 print(f"[AI WARNING] OpenAI-compat JSON mode failed ({e.response.status_code}), retrying without response_format...")
                 del payload["response_format"]
                 try:
-                    resp = await self.client.post(
+                    resp = await client.post(
                         "/v1/chat/completions",
                         json=payload,
                         headers=self._get_headers(),
@@ -134,17 +150,20 @@ class AIService:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
-        if self.provider in ("ollama", "9router"):
+        provider = settings.AI_PROVIDER or self.provider
+        model = settings.AI_MODEL or self.model
+        client = self._get_client()
+        if provider in ("ollama", "9router"):
             payload = {
-                "model": self.model,
+                "model": model,
                 "prompt": prompt,
                 "stream": True,
-                "options": {"temperature": temperature},
+                "options": {"temperature": temperature, "num_ctx": 8192, "num_predict": 4096},
             }
             if system_prompt:
                 payload["system"] = system_prompt
             try:
-                async with self.client.stream("POST", "/api/generate", json=payload) as resp:
+                async with client.stream("POST", "/api/generate", json=payload) as resp:
                     resp.raise_for_status()
                     async for line in resp.aiter_lines():
                         if line:
@@ -161,10 +180,10 @@ class AIService:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
             try:
-                async with self.client.stream(
+                async with client.stream(
                     "POST",
                     "/v1/chat/completions",
-                    json={"model": self.model, "messages": messages, "temperature": temperature, "stream": True},
+                    json={"model": model, "messages": messages, "temperature": temperature, "stream": True},
                     headers=self._get_headers(),
                 ) as resp:
                     resp.raise_for_status()
@@ -181,23 +200,27 @@ class AIService:
                 yield f"Error: {str(e)}"
 
     async def check_available(self) -> bool:
-        if self.provider in ("ollama", "9router"):
+        provider = settings.AI_PROVIDER or self.provider
+        client = self._get_client()
+        if provider in ("ollama", "9router"):
             try:
-                resp = await self.client.get("/api/tags")
+                resp = await client.get("/api/tags")
                 return resp.status_code == 200
             except Exception:
                 return False
         else:
             try:
-                resp = await self.client.get("/v1/models", headers=self._get_headers())
+                resp = await client.get("/v1/models", headers=self._get_headers())
                 return resp.status_code == 200
             except Exception:
                 return False
 
     async def list_models(self) -> list:
-        if self.provider in ("ollama", "9router"):
+        provider = settings.AI_PROVIDER or self.provider
+        client = self._get_client()
+        if provider in ("ollama", "9router"):
             try:
-                resp = await self.client.get("/api/tags")
+                resp = await client.get("/api/tags")
                 resp.raise_for_status()
                 data = resp.json()
                 return [m["name"] for m in data.get("models", [])]
@@ -205,7 +228,7 @@ class AIService:
                 raise Exception(f"Failed: {str(e)}")
         else:
             try:
-                resp = await self.client.get("/v1/models", headers=self._get_headers())
+                resp = await client.get("/v1/models", headers=self._get_headers())
                 resp.raise_for_status()
                 data = resp.json()
                 return [m["id"] for m in data.get("data", [])]

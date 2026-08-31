@@ -20,13 +20,21 @@ def repair_truncated_json(json_str: str) -> str:
     """Balance open brackets, braces, and quotes in truncated JSON strings to make them parsable."""
     json_str = json_str.strip()
     if not json_str:
-        return json_str
+        return "{}"
         
     try:
         json.loads(json_str)
         return json_str
     except ValueError:
         pass
+
+    # Strip markdown code blocks if any
+    if json_str.startswith("```json"):
+        json_str = json_str[7:].strip()
+    elif json_str.startswith("```"):
+        json_str = json_str[3:].strip()
+    if json_str.endswith("```"):
+        json_str = json_str[:-3].strip()
 
     in_string = False
     escape = False
@@ -73,21 +81,21 @@ def repair_truncated_json(json_str: str) -> str:
         repaired_str += '"'
         
     repaired_str = repaired_str.rstrip()
-    if repaired_str.endswith(','):
+    if repaired_str.endswith(':'):
+        repaired_str += ' null'
+    elif repaired_str.endswith(','):
         repaired_str = repaired_str[:-1].rstrip()
         
     while stack:
         top = stack.pop()
         repaired_str = repaired_str.rstrip()
+        if repaired_str.endswith(':'):
+            repaired_str += ' null'
+        elif repaired_str.endswith(','):
+            repaired_str = repaired_str[:-1].rstrip()
         if top == '{':
-            if repaired_str.endswith(':'):
-                repaired_str += ' null'
-            elif repaired_str.endswith(','):
-                repaired_str = repaired_str[:-1].rstrip()
             repaired_str += '}'
         elif top == '[':
-            if repaired_str.endswith(','):
-                repaired_str = repaired_str[:-1].rstrip()
             repaired_str += ']'
             
     try:
@@ -96,7 +104,7 @@ def repair_truncated_json(json_str: str) -> str:
     except ValueError:
         pass
         
-    return json_str
+    return repaired_str
 
 
 def extract_json(text: str) -> Any:
@@ -166,7 +174,7 @@ class RPSGeneratorService:
         ka_prodi: Optional[str] = None,
         koordinator_rmk: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generate complete RPS from prodi vision, mission, and course info"""
+        """Generate complete RPS from prodi vision, mission, and course info with auto-retry"""
         
         prompt = RPS_GENERATION_PROMPT.format(
             visi_prodi=visi_prodi,
@@ -183,19 +191,50 @@ class RPSGeneratorService:
             additional_context=additional_context or "",
         )
         
-        response = await ollama_service.generate(
-            prompt=prompt,
-            system_prompt=RPS_GENERATION_SYSTEM_PROMPT,
-            temperature=0.3,
-            max_tokens=8192,
-        )
-        
+        last_error = None
+        last_response = ""
+        rps_data = None
+
+        for attempt in range(2):
+            try:
+                response = await ollama_service.generate(
+                    prompt=prompt,
+                    system_prompt=RPS_GENERATION_SYSTEM_PROMPT,
+                    temperature=0.3 if attempt == 0 else 0.2,
+                    max_tokens=8192,
+                )
+                last_response = response
+                rps_data = extract_json(response)
+                break
+            except Exception as e:
+                last_error = e
+                if attempt == 0:
+                    print(f"[RPS GENERATOR] Attempt 1 for {mata_kuliah.get('nama')} failed ({e}), retrying once...")
+                    import asyncio
+                    await asyncio.sleep(1)
+                    continue
+
+        if not rps_data or not isinstance(rps_data, dict):
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(last_error)}. Output: {last_response[:400] if last_response else ''}")
+
         try:
-            rps_data = extract_json(response)
-            
             # Post-process defaults if configured
             from app.core.config import settings
             rps_data.setdefault("sdgs", [])
+            rps_data.setdefault("bahan_kajian", [])
+            rps_data.setdefault("cpmk", [])
+            rps_data.setdefault("sub_cpmk", [])
+            rps_data.setdefault("rencana_pembelajaran", [])
+            rps_data.setdefault("metode_pembelajaran", [])
+            rps_data.setdefault("penilaian", [])
+            if "media_pembelajaran" not in rps_data or not isinstance(rps_data["media_pembelajaran"], dict):
+                rps_data["media_pembelajaran"] = {
+                    "perangkat_lunak": ["PowerPoint", "Google Classroom", "Zoom"],
+                    "perangkat_keras": ["LCD Projector", "Whiteboard", "Notebook"]
+                }
+            if "referensi" not in rps_data or not isinstance(rps_data["referensi"], dict):
+                rps_data["referensi"] = {"utama": [], "pendukung": []}
+
             if "identitas" not in rps_data or not isinstance(rps_data["identitas"], dict):
                 rps_data["identitas"] = {}
                 
@@ -236,7 +275,7 @@ class RPSGeneratorService:
                     
             return rps_data
         except Exception as e:
-            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {response[:400]}")
+            raise ValueError(f"Respon AI bukan JSON yang valid. Detail: {str(e)}. Output: {last_response[:400]}")
 
     async def generate_cpmk(
         self,
