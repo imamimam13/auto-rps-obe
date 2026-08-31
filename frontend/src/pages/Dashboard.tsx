@@ -41,7 +41,8 @@ export default function Dashboard() {
     rps: 0,
     obe_validated: 0,
   })
-  const [ollamaStatus, setOllamaStatus] = useState(false)
+  const [aiStatus, setAiStatus] = useState(false)
+  const [aiProvider, setAiProvider] = useState('AI')
   const [periodes, setPeriodes] = useState<PeriodeItem[]>([])
   const [activePeriode, setActivePeriode] = useState<PeriodeItem | null>(null)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
@@ -53,7 +54,7 @@ export default function Dashboard() {
 
   async function loadData() {
     try {
-      const [prodiRes, mkRes, rpsRes, ollamaRes, perRes] = await Promise.all([
+      const [prodiRes, mkRes, rpsRes, aiRes, perRes] = await Promise.all([
         api.get('/api/v1/prodi/?size=1'),
         api.get('/api/v1/mata-kuliah/?size=1'),
         api.get('/api/v1/rps/?size=1'),
@@ -66,7 +67,10 @@ export default function Dashboard() {
         rps: rpsRes.data.total || 0,
         obe_validated: 0,
       })
-      setOllamaStatus(ollamaRes.data.available)
+      setAiStatus(aiRes.data.available)
+      const p = aiRes.data.provider || 'AI'
+      const label = p === 'lmstudio' ? 'LM Studio' : p === 'openai' ? 'OpenAI' : p === '9router' ? '9Router' : p === 'ollama' ? 'Ollama' : 'AI Engine'
+      setAiProvider(label)
       const pList = perRes.data.items || []
       setPeriodes(pList)
       const act = pList.find((p: PeriodeItem) => p.is_active)
@@ -106,15 +110,15 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500 mt-1">Selamat datang di Auto RPS & OBE AI</p>
         </div>
         <div className="flex items-center gap-2">
-          {ollamaStatus ? (
+          {aiStatus ? (
             <span className="macos-tag flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              Ollama Online
+              {aiProvider} Online
             </span>
           ) : (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-500">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5" />
-              Ollama Offline
+              {aiProvider} Offline
             </span>
           )}
         </div>

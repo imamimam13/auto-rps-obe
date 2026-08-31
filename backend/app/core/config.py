@@ -92,61 +92,61 @@ def save_settings_to_env(updates: dict):
     if "BRAND_RENTANG_PENILAIAN" in updates:
         settings.BRAND_RENTANG_PENILAIAN = updates["BRAND_RENTANG_PENILAIAN"]
 
-    env_path = ".env"
     possible_paths = [
         ".env",
         "backend/.env",
-        "/Users/imamimam/Documents/auto RPS obe/backend/.env"
+        "/Users/imamimam/Documents/auto RPS obe/backend/.env",
+        "/Users/imamimam/Documents/auto RPS obe/.env"
     ]
-    for p in possible_paths:
-        if os.path.exists(p):
-            env_path = p
-            break
+    target_paths = list(set([p for p in possible_paths if os.path.exists(p)]))
+    if not target_paths:
+        target_paths = [".env"]
 
-    # Read existing content
-    lines = []
-    if os.path.exists(env_path):
+    for env_path in target_paths:
+        # Read existing content
+        lines = []
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+            except Exception as e:
+                print(f"[SAVE ENV ERROR] Reading failed for {env_path}: {e}")
+
+        updated_keys = set()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if "=" in line and not stripped.startswith("#"):
+                key, val = line.split("=", 1)
+                key = key.strip()
+                if key in updates:
+                    new_lines.append(f"{key}={updates[key]}\n")
+                    updated_keys.add(key)
+                    continue
+                # Also sync legacy keys if they are in the updates
+                if key == "OLLAMA_BASE_URL" and "AI_BASE_URL" in updates:
+                    new_lines.append(f"OLLAMA_BASE_URL={updates['AI_BASE_URL']}\n")
+                    updated_keys.add(key)
+                    continue
+                if key == "OLLAMA_MODEL" and "AI_MODEL" in updates:
+                    new_lines.append(f"OLLAMA_MODEL={updates['AI_MODEL']}\n")
+                    updated_keys.add(key)
+                    continue
+            new_lines.append(line)
+
+        for key, val in updates.items():
+            if key not in updated_keys:
+                new_lines.append(f"{key}={val}\n")
+                
+        # Also add legacy keys if they weren't in the file and we updated their new equivalents
+        if "OLLAMA_BASE_URL" not in updated_keys and "AI_BASE_URL" in updates:
+            new_lines.append(f"OLLAMA_BASE_URL={updates['AI_BASE_URL']}\n")
+        if "OLLAMA_MODEL" not in updated_keys and "AI_MODEL" in updates:
+            new_lines.append(f"OLLAMA_MODEL={updates['AI_MODEL']}\n")
+
         try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
         except Exception as e:
-            print(f"[SAVE ENV ERROR] Reading failed: {e}")
-
-    updated_keys = set()
-    new_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if "=" in line and not stripped.startswith("#"):
-            key, val = line.split("=", 1)
-            key = key.strip()
-            if key in updates:
-                new_lines.append(f"{key}={updates[key]}\n")
-                updated_keys.add(key)
-                continue
-            # Also sync legacy keys if they are in the updates
-            if key == "OLLAMA_BASE_URL" and "AI_BASE_URL" in updates:
-                new_lines.append(f"OLLAMA_BASE_URL={updates['AI_BASE_URL']}\n")
-                updated_keys.add(key)
-                continue
-            if key == "OLLAMA_MODEL" and "AI_MODEL" in updates:
-                new_lines.append(f"OLLAMA_MODEL={updates['AI_MODEL']}\n")
-                updated_keys.add(key)
-                continue
-        new_lines.append(line)
-
-    for key, val in updates.items():
-        if key not in updated_keys:
-            new_lines.append(f"{key}={val}\n")
-            
-    # Also add legacy keys if they weren't in the file and we updated their new equivalents
-    if "OLLAMA_BASE_URL" not in updated_keys and "AI_BASE_URL" in updates:
-        new_lines.append(f"OLLAMA_BASE_URL={updates['AI_BASE_URL']}\n")
-    if "OLLAMA_MODEL" not in updated_keys and "AI_MODEL" in updates:
-        new_lines.append(f"OLLAMA_MODEL={updates['AI_MODEL']}\n")
-
-    try:
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-    except Exception as e:
-        print(f"[SAVE ENV ERROR] Writing failed: {e}")
+            print(f"[SAVE ENV ERROR] Writing failed for {env_path}: {e}")
 
