@@ -7,6 +7,7 @@ from app.schemas import RPSGenerateRequest, BulkGenerateRequest, OBEValidationRe
 from app.services.rps_generator import rps_generator_service
 from sqlalchemy import select
 import json
+import uuid
 
 router = APIRouter(prefix="/generate", tags=["AI Generation"])
 
@@ -257,27 +258,72 @@ async def generate_and_save_one_rps(
             koordinator_rmk=prodi.koordinator_rmk,
         )
 
-        rps = RPS(
-            kode=f"RPS-{mk.kode}-{mk.semester}",
-            mata_kuliah_id=mk.id,
-            prodi_id=prodi.id,
-            semester=data.semester,
-            tahun_akademik=data.tahun_akademik,
-            dosen_pengampu=data.dosen_pengampu or [],
-            identitas=rps_data.get("identitas"),
-            deskripsi_mata_kuliah=rps_data.get("deskripsi_mata_kuliah") or "",
-            bahan_kajian=rps_data.get("bahan_kajian") or [],
-            cpmk=rps_data.get("cpmk", []),
-            sub_cpmk=rps_data.get("sub_cpmk", []),
-            rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
-            metode_pembelajaran=rps_data.get("metode_pembelajaran", []),
-            media_pembelajaran=rps_data.get("media_pembelajaran", []),
-            penilaian=rps_data.get("penilaian", []),
-            referensi=rps_data.get("referensi", []),
-            sdgs=rps_data.get("sdgs") or mk.sdgs or [],
-            status="draft",
+        # ── Check if an existing RPS exists for this mata kuliah or kode ──
+        existing_res = await db.execute(
+            select(RPS).where(
+                (RPS.mata_kuliah_id == mk.id) | (RPS.kode == f"RPS-{mk.kode}-{data.semester}")
+            )
         )
-        db.add(rps)
+        rps = existing_res.scalars().first()
+
+        if rps:
+            # Update existing RPS in place
+            rps.prodi_id = prodi.id
+            rps.semester = data.semester
+            rps.tahun_akademik = data.tahun_akademik
+            if data.dosen_pengampu:
+                rps.dosen_pengampu = data.dosen_pengampu
+            rps.identitas = rps_data.get("identitas")
+            rps.deskripsi_mata_kuliah = rps_data.get("deskripsi_mata_kuliah") or ""
+            rps.bahan_kajian = rps_data.get("bahan_kajian") or []
+            rps.cpmk = rps_data.get("cpmk", [])
+            rps.sub_cpmk = rps_data.get("sub_cpmk", [])
+            rps.rencana_pembelajaran = rps_data.get("rencana_pembelajaran", [])
+            rps.metode_pembelajaran = rps_data.get("metode_pembelajaran", [])
+            rps.media_pembelajaran = rps_data.get("media_pembelajaran", [])
+            rps.penilaian = rps_data.get("penilaian", [])
+            rps.referensi = rps_data.get("referensi", [])
+            rps.sdgs = rps_data.get("sdgs") or mk.sdgs or []
+            flag_modified(rps, "identitas")
+            flag_modified(rps, "bahan_kajian")
+            flag_modified(rps, "cpmk")
+            flag_modified(rps, "sub_cpmk")
+            flag_modified(rps, "rencana_pembelajaran")
+            flag_modified(rps, "metode_pembelajaran")
+            flag_modified(rps, "media_pembelajaran")
+            flag_modified(rps, "penilaian")
+            flag_modified(rps, "referensi")
+            flag_modified(rps, "sdgs")
+        else:
+            base_kode = f"RPS-{mk.kode}-{data.semester}"
+            chk_kode = await db.execute(select(RPS).where(RPS.kode == base_kode))
+            if chk_kode.scalar_one_or_none():
+                final_kode = f"RPS-{mk.kode}-{data.semester}-{uuid.uuid4().hex[:4].upper()}"
+            else:
+                final_kode = base_kode
+
+            rps = RPS(
+                kode=final_kode,
+                mata_kuliah_id=mk.id,
+                prodi_id=prodi.id,
+                semester=data.semester,
+                tahun_akademik=data.tahun_akademik,
+                dosen_pengampu=data.dosen_pengampu or [],
+                identitas=rps_data.get("identitas"),
+                deskripsi_mata_kuliah=rps_data.get("deskripsi_mata_kuliah") or "",
+                bahan_kajian=rps_data.get("bahan_kajian") or [],
+                cpmk=rps_data.get("cpmk", []),
+                sub_cpmk=rps_data.get("sub_cpmk", []),
+                rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
+                metode_pembelajaran=rps_data.get("metode_pembelajaran", []),
+                media_pembelajaran=rps_data.get("media_pembelajaran", []),
+                penilaian=rps_data.get("penilaian", []),
+                referensi=rps_data.get("referensi", []),
+                sdgs=rps_data.get("sdgs") or mk.sdgs or [],
+                status="draft",
+            )
+            db.add(rps)
+
         await db.commit()
         await db.refresh(rps)
 
@@ -359,28 +405,72 @@ async def bulk_generate_rps(
                 koordinator_rmk=prodi.koordinator_rmk,
             )
             
-            # Save to database
-            rps = RPS(
-                kode=f"RPS-{mk.kode}-{mk.semester}",
-                mata_kuliah_id=mk.id,
-                prodi_id=prodi.id,
-                semester=mk.semester,
-                tahun_akademik=data.tahun_akademik,
-                dosen_pengampu=data.dosen_pengampu or [],
-                identitas=rps_data.get("identitas"),
-                deskripsi_mata_kuliah=rps_data.get("deskripsi_mata_kuliah") or "",
-                bahan_kajian=rps_data.get("bahan_kajian") or [],
-                cpmk=rps_data.get("cpmk", []),
-                sub_cpmk=rps_data.get("sub_cpmk", []),
-                rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
-                metode_pembelajaran=rps_data.get("metode_pembelajaran", []),
-                media_pembelajaran=rps_data.get("media_pembelajaran", []),
-                penilaian=rps_data.get("penilaian", []),
-                referensi=rps_data.get("referensi", []),
-                sdgs=rps_data.get("sdgs") or mk.sdgs or [],
-                status="draft",
+            # ── Check if an existing RPS exists for this mata kuliah or kode ──
+            existing_res = await db.execute(
+                select(RPS).where(
+                    (RPS.mata_kuliah_id == mk.id) | (RPS.kode == f"RPS-{mk.kode}-{mk.semester}")
+                )
             )
-            db.add(rps)
+            rps = existing_res.scalars().first()
+
+            if rps:
+                # Update existing RPS in place
+                rps.prodi_id = prodi.id
+                rps.semester = mk.semester
+                rps.tahun_akademik = data.tahun_akademik
+                if data.dosen_pengampu:
+                    rps.dosen_pengampu = data.dosen_pengampu
+                rps.identitas = rps_data.get("identitas")
+                rps.deskripsi_mata_kuliah = rps_data.get("deskripsi_mata_kuliah") or ""
+                rps.bahan_kajian = rps_data.get("bahan_kajian") or []
+                rps.cpmk = rps_data.get("cpmk", [])
+                rps.sub_cpmk = rps_data.get("sub_cpmk", [])
+                rps.rencana_pembelajaran = rps_data.get("rencana_pembelajaran", [])
+                rps.metode_pembelajaran = rps_data.get("metode_pembelajaran", [])
+                rps.media_pembelajaran = rps_data.get("media_pembelajaran", [])
+                rps.penilaian = rps_data.get("penilaian", [])
+                rps.referensi = rps_data.get("referensi", [])
+                rps.sdgs = rps_data.get("sdgs") or mk.sdgs or []
+                flag_modified(rps, "identitas")
+                flag_modified(rps, "bahan_kajian")
+                flag_modified(rps, "cpmk")
+                flag_modified(rps, "sub_cpmk")
+                flag_modified(rps, "rencana_pembelajaran")
+                flag_modified(rps, "metode_pembelajaran")
+                flag_modified(rps, "media_pembelajaran")
+                flag_modified(rps, "penilaian")
+                flag_modified(rps, "referensi")
+                flag_modified(rps, "sdgs")
+            else:
+                base_kode = f"RPS-{mk.kode}-{mk.semester}"
+                chk_kode = await db.execute(select(RPS).where(RPS.kode == base_kode))
+                if chk_kode.scalar_one_or_none():
+                    final_kode = f"RPS-{mk.kode}-{mk.semester}-{uuid.uuid4().hex[:4].upper()}"
+                else:
+                    final_kode = base_kode
+
+                rps = RPS(
+                    kode=final_kode,
+                    mata_kuliah_id=mk.id,
+                    prodi_id=prodi.id,
+                    semester=mk.semester,
+                    tahun_akademik=data.tahun_akademik,
+                    dosen_pengampu=data.dosen_pengampu or [],
+                    identitas=rps_data.get("identitas"),
+                    deskripsi_mata_kuliah=rps_data.get("deskripsi_mata_kuliah") or "",
+                    bahan_kajian=rps_data.get("bahan_kajian") or [],
+                    cpmk=rps_data.get("cpmk", []),
+                    sub_cpmk=rps_data.get("sub_cpmk", []),
+                    rencana_pembelajaran=rps_data.get("rencana_pembelajaran", []),
+                    metode_pembelajaran=rps_data.get("metode_pembelajaran", []),
+                    media_pembelajaran=rps_data.get("media_pembelajaran", []),
+                    penilaian=rps_data.get("penilaian", []),
+                    referensi=rps_data.get("referensi", []),
+                    sdgs=rps_data.get("sdgs") or mk.sdgs or [],
+                    status="draft",
+                )
+                db.add(rps)
+
             await db.commit()
             results.append({"mk": mk.nama, "kode": mk.kode, "rps_id": rps.id})
         except Exception as e:
