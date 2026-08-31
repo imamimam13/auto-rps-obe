@@ -18,7 +18,7 @@ export default function OBEAnalyzer() {
 
   async function loadRPS() {
     try {
-      const res = await api.get('/api/v1/rps/?size=50')
+      const res = await api.get('/api/v1/rps/?size=1000&limit=1000')
       setRpsList(res.data.items || [])
     } catch (e) {
       toast.error('Gagal memuat data')

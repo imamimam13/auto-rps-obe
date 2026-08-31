@@ -24,8 +24,9 @@ async def list_rps(
     mata_kuliah_id: int = None,
     semester: int = None,
     status: str = None,
+    tahun_akademik: str = None,
     page: int = 1,
-    size: int = 10,
+    size: int = 100,
     limit: int = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -39,6 +40,8 @@ async def list_rps(
         query = query.where(RPS.semester == semester)
     if status:
         query = query.where(RPS.status == status)
+    if tahun_akademik:
+        query = query.where(RPS.tahun_akademik == tahun_akademik)
     
     query = query.order_by(RPS.updated_at.desc(), RPS.id.desc())
     query = query.offset((page - 1) * actual_size).limit(actual_size)
@@ -54,6 +57,8 @@ async def list_rps(
         count_query = count_query.where(RPS.semester == semester)
     if status:
         count_query = count_query.where(RPS.status == status)
+    if tahun_akademik:
+        count_query = count_query.where(RPS.tahun_akademik == tahun_akademik)
     count_result = await db.execute(count_query)
     total = count_result.scalar()
     

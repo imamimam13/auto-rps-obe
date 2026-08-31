@@ -55,6 +55,15 @@ export default function RPSList() {
     max_retries: 3,
   })
 
+  useEffect(() => {
+    loadProdis()
+    loadPeriodes()
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [statusFilter, prodiFilter])
+
   async function loadProdis() {
     try {
       const res = await api.get('/api/v1/prodi/?size=100')
@@ -267,10 +276,12 @@ export default function RPSList() {
 
   async function loadData() {
     try {
+      setLoading(true)
       const params = new URLSearchParams()
       if (statusFilter) params.append('status', statusFilter)
       if (prodiFilter) params.append('prodi_id', prodiFilter)
-      params.append('size', '50')
+      params.append('size', '1000')
+      params.append('limit', '1000')
       const res = await api.get(`/api/v1/rps/?${params.toString()}`)
       setRpsList(res.data.items || [])
     } catch (e) {
