@@ -54,6 +54,7 @@ export default function RPSGenerate() {
   const navigate = useNavigate()
   const [mk, setMk] = useState<any>(null)
   const [prodi, setProdi] = useState<any>(null)
+  const [periodes, setPeriodes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -61,7 +62,7 @@ export default function RPSGenerate() {
   const [rpsData, setRpsData] = useState<RPSData | null>(null)
   const [formData, setFormData] = useState({
     semester: 1,
-    tahun_akademik: '2025/2026',
+    tahun_akademik: '',
     dosen_pengampu: [] as { nama: string; nidn: string }[],
     additional_context: '',
     koordinator_rmk: '',
@@ -71,15 +72,36 @@ export default function RPSGenerate() {
   const [dosenInput, setDosenInput] = useState({ nama: '', nidn: '' })
 
   useEffect(() => {
+    loadPeriodes()
     if (mkId && mkId !== 'new') loadMk()
     else setLoading(false)
   }, [mkId])
+
+  async function loadPeriodes() {
+    try {
+      const res = await api.get('/api/v1/periode/')
+      const items = res.data.items || []
+      setPeriodes(items)
+      const active = items.find((p: any) => p.is_active)
+      if (active) {
+        setFormData(f => ({ ...f, tahun_akademik: f.tahun_akademik || active.tahun_akademik || active.nama }))
+      } else if (items.length > 0) {
+        setFormData(f => ({ ...f, tahun_akademik: f.tahun_akademik || items[0].tahun_akademik || items[0].nama }))
+      }
+    } catch (e) {
+      console.error('Gagal memuat daftar periode', e)
+    }
+  }
 
   async function loadMk() {
     try {
       const res = await api.get(`/api/v1/mata-kuliah/${mkId}`)
       setMk(res.data)
-      setFormData(f => ({ ...f, semester: res.data.semester || 1 }))
+      setFormData(f => ({
+        ...f,
+        semester: res.data.semester || 1,
+        tahun_akademik: res.data.periode || f.tahun_akademik,
+      }))
       if (res.data.prodi_id) {
         const pRes = await api.get(`/api/v1/prodi/${res.data.prodi_id}`)
         setProdi(pRes.data)
@@ -204,8 +226,27 @@ export default function RPSGenerate() {
           <input type="number" className="macos-input" value={formData.semester} onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })} min={1} max={14} />
         </div>
         <div className="macos-card p-5">
-          <label className="macos-label">Tahun Akademik</label>
-          <input className="macos-input" value={formData.tahun_akademik} onChange={(e) => setFormData({ ...formData, tahun_akademik: e.target.value })} placeholder="2025/2026" />
+          <label className="macos-label">Tahun Akademik / Periode</label>
+          <div className="space-y-1.5">
+            <select
+              className="macos-input"
+              value={formData.tahun_akademik}
+              onChange={(e) => setFormData({ ...formData, tahun_akademik: e.target.value })}
+            >
+              <option value="">-- Pilih Periode Master --</option>
+              {periodes.map((p) => (
+                <option key={p.id} value={p.tahun_akademik || p.nama}>
+                  {p.nama} {p.is_active ? '(Aktif)' : ''}
+                </option>
+              ))}
+            </select>
+            <input
+              className="macos-input text-xs"
+              value={formData.tahun_akademik}
+              onChange={(e) => setFormData({ ...formData, tahun_akademik: e.target.value })}
+              placeholder="Atau ketik kustom, misal: 2025/2026"
+            />
+          </div>
         </div>
       </div>
 

@@ -22,7 +22,7 @@ function formatApiError(e: any, fallback: string): string {
 
 export default function RPSDetail() {
   const { id } = useParams()
-  const { isAdmin } = useAuth()
+  const { isAdmin, canEditRPS } = useAuth()
   const navigate = useNavigate()
   const [rps, setRps] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -359,7 +359,7 @@ export default function RPSDetail() {
             <ArrowLeft className="w-4 h-4" /> Kembali
           </Link>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {rps.status === 'draft' && isAdmin && (
+            {rps.status === 'draft' && canEditRPS && (
               <button
                 onClick={() => handleUpdateStatus('review')}
                 disabled={updatingStatus}
@@ -368,7 +368,7 @@ export default function RPSDetail() {
                 Ajukan Review
               </button>
             )}
-            {(rps.status === 'draft' || rps.status === 'review') && isAdmin && (
+            {(rps.status === 'draft' || rps.status === 'review') && canEditRPS && (
               <button
                 onClick={() => handleUpdateStatus('approved')}
                 disabled={updatingStatus}
@@ -377,7 +377,7 @@ export default function RPSDetail() {
                 Setujui (Approve)
               </button>
             )}
-            {rps.status === 'approved' && isAdmin && (
+            {rps.status === 'approved' && canEditRPS && (
               <button
                 onClick={() => handleUpdateStatus('published')}
                 disabled={updatingStatus}
@@ -386,7 +386,7 @@ export default function RPSDetail() {
                 Publikasikan
               </button>
             )}
-            {rps.status === 'draft' && isAdmin && (
+            {rps.status === 'draft' && canEditRPS && (
               <button onClick={openEditModal} className="macos-button flex items-center gap-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-apple-md font-medium">
                 <Sparkles className="w-4 h-4" /> Edit RPS
               </button>
@@ -404,7 +404,7 @@ export default function RPSDetail() {
           <button onClick={() => handleExport('docx')} className="macos-button-ghost flex items-center gap-1.5 text-sm">
             <FileText className="w-4 h-4" /> DOCX
           </button>
-          {isAdmin && (
+          {canEditRPS && (
             <button onClick={handleDelete} className="macos-button-ghost flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 hover:bg-red-50">
               <Trash2 className="w-4 h-4" /> Hapus
             </button>
@@ -512,7 +512,7 @@ export default function RPSDetail() {
               }`}>
                 Skor: {rps.obe_score}/100
               </span>
-              {rps.status === 'draft' && isAdmin && (
+              {rps.status === 'draft' && canEditRPS && (
                 <button
                   onClick={handleAutoFix}
                   disabled={fixing}

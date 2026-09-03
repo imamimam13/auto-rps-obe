@@ -20,7 +20,7 @@ const statusIcons: Record<string, any> = {
 }
 
 export default function RPSList() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, canEditRPS } = useAuth()
   const [rpsList, setRpsList] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -365,7 +365,7 @@ export default function RPSList() {
           <h1 className="text-2xl font-semibold text-gray-900">RPS</h1>
           <p className="text-sm text-gray-500 mt-1">Rencana Pembelajaran Semester</p>
         </div>
-        {isAdmin && (
+        {canEditRPS && (
           <button
             onClick={openBulkModal}
             className="macos-button flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
@@ -448,7 +448,7 @@ export default function RPSList() {
                   <button onClick={() => handleExport(rps.id, 'docx')} className="macos-button-ghost px-2.5 py-1.5 text-xs" title="Export DOCX">
                     <FileText className="w-3.5 h-3.5" />
                   </button>
-                  {isAdmin && (
+                  {canEditRPS && (
                     <button onClick={() => handleDelete(rps.id)} className="macos-button-ghost px-2.5 py-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50" title="Hapus RPS">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

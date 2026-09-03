@@ -7,7 +7,7 @@ interface User {
   nama: string
   email?: string
   nidn?: string
-  role: 'admin' | 'prodi'
+  role: 'admin' | 'ketua_prodi' | 'gmk' | 'dosen' | 'prodi' | string
   prodi_id?: number
 }
 
@@ -17,6 +17,8 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>
   logout: () => void
   isAdmin: boolean
+  isKetuaProdi: boolean
+  canEditRPS: boolean
   loading: boolean
 }
 
@@ -55,10 +57,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  const roleLower = (user?.role || '').toLowerCase()
+  const isAdmin = roleLower === 'admin'
+  const isKetuaProdi = roleLower === 'ketua_prodi' || roleLower === 'prodi'
+  const canEditRPS = isAdmin || isKetuaProdi
+
   return (
     <AuthContext.Provider value={{
       user, token, login, logout,
-      isAdmin: user?.role === 'admin',
+      isAdmin,
+      isKetuaProdi,
+      canEditRPS,
       loading,
     }}>
       {children}

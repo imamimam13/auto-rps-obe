@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Server, Cpu, RefreshCw, Link, Key } from 'lucide-react'
+import { Settings as SettingsIcon, Server, Cpu, RefreshCw, Link, Key, Calendar, Plus, Trash2, Edit2, Check, CheckCircle2, X } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
+
+interface Periode {
+  id: number
+  kode: string
+  nama: string
+  tahun_akademik: string
+  semester_tipe: string
+  is_active: boolean
+  status: string
+}
 
 const providers = [
   { value: 'ollama', label: 'Ollama (Local)' },
@@ -26,10 +36,136 @@ export default function Settings() {
   const [rentangPenilaian, setRentangPenilaian] = useState('')
   const [savingBranding, setSavingBranding] = useState(false)
 
+  // Periode state
+  const [periodes, setPeriodes] = useState<Periode[]>([])
+  const [loadingPeriodes, setLoadingPeriodes] = useState(false)
+  const [showAddPeriodeModal, setShowAddPeriodeModal] = useState(false)
+  const [editingPeriode, setEditingPeriode] = useState<Periode | null>(null)
+  const [savingPeriode, setSavingPeriode] = useState(false)
+  const [periodeForm, setPeriodeForm] = useState({
+    kode: '',
+    nama: '',
+    tahun_akademik: '2025/2026',
+    semester_tipe: 'ganjil',
+    is_active: false,
+    status: 'aktif',
+  })
+
   useEffect(() => { 
     checkAI()
     loadBranding()
+    loadPeriodes()
   }, [])
+
+  async function loadPeriodes() {
+    setLoadingPeriodes(true)
+    try {
+      const res = await api.get('/api/v1/periode/')
+      setPeriodes(res.data.items || [])
+    } catch {
+      toast.error('Gagal memuat daftar periode')
+    } finally {
+      setLoadingPeriodes(false)
+    }
+  }
+
+  function openAddPeriodeModal() {
+    const currentYear = new Date().getFullYear()
+    const defaultTahun = `${currentYear}/${currentYear + 1}`
+    const defaultKode = `${currentYear}-1`
+    const defaultNama = `${defaultTahun} Ganjil`
+    setPeriodeForm({
+      kode: defaultKode,
+      nama: defaultNama,
+      tahun_akademik: defaultTahun,
+      semester_tipe: 'ganjil',
+      is_active: false,
+      status: 'aktif',
+    })
+    setShowAddPeriodeModal(true)
+  }
+
+  function handleTahunOrSemesterChange(tahun: string, tipe: string) {
+    const startYear = tahun.split('/')[0] || tahun.substring(0, 4)
+    const suffix = tipe === 'ganjil' ? '1' : tipe === 'genap' ? '2' : '3'
+    const tipeLabel = tipe.charAt(0).toUpperCase() + tipe.slice(1)
+    const newKode = startYear ? `${startYear}-${suffix}` : ''
+    const newNama = tahun ? `${tahun} ${tipeLabel}` : ''
+    
+    setPeriodeForm(prev => ({
+      ...prev,
+      tahun_akademik: tahun,
+      semester_tipe: tipe,
+      kode: newKode || prev.kode,
+      nama: newNama || prev.nama,
+    }))
+  }
+
+  async function handleCreatePeriode() {
+    if (!periodeForm.kode.trim() || !periodeForm.nama.trim() || !periodeForm.tahun_akademik.trim()) {
+      toast.error('Kode, Nama, dan Tahun Akademik wajib diisi')
+      return
+    }
+    setSavingPeriode(true)
+    try {
+      await api.post('/api/v1/periode/', periodeForm)
+      toast.success('Periode akademik berhasil ditambahkan!')
+      setShowAddPeriodeModal(false)
+      loadPeriodes()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal menambahkan periode')
+    } finally {
+      setSavingPeriode(false)
+    }
+  }
+
+  function openEditPeriodeModal(p: Periode) {
+    setEditingPeriode(p)
+  }
+
+  async function handleUpdatePeriode() {
+    if (!editingPeriode) return
+    setSavingPeriode(true)
+    try {
+      await api.put(`/api/v1/periode/${editingPeriode.id}`, {
+        kode: editingPeriode.kode,
+        nama: editingPeriode.nama,
+        tahun_akademik: editingPeriode.tahun_akademik,
+        semester_tipe: editingPeriode.semester_tipe,
+        status: editingPeriode.status,
+        is_active: editingPeriode.is_active,
+      })
+      toast.success('Periode akademik berhasil diperbarui!')
+      setEditingPeriode(null)
+      loadPeriodes()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal memperbarui periode')
+    } finally {
+      setSavingPeriode(false)
+    }
+  }
+
+  async function handleSetActivePeriode(p: Periode) {
+    if (p.is_active) return
+    try {
+      await api.put(`/api/v1/periode/${p.id}/set-active`)
+      toast.success(`Periode '${p.nama}' sekarang aktif!`)
+      loadPeriodes()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal mengaktifkan periode')
+    }
+  }
+
+  async function handleDeletePeriode(p: Periode) {
+    if (!confirm(`Apakah Anda yakin ingin menghapus periode '${p.nama}'?`)) return
+    try {
+      await api.delete(`/api/v1/periode/${p.id}`)
+      toast.success('Periode berhasil dihapus')
+      loadPeriodes()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Gagal menghapus periode')
+    }
+  }
 
   async function loadBranding() {
     try {
@@ -255,6 +391,109 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Manajemen Periode Akademik */}
+      <div className="macos-card p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-apple-lg bg-indigo-50">
+              <Calendar className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Periode Akademik</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Kelola master periode semester & tahun akademik untuk RPS & Mata Kuliah.</p>
+            </div>
+          </div>
+          <button
+            onClick={openAddPeriodeModal}
+            className="macos-button flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-apple-md font-medium"
+          >
+            <Plus className="w-4 h-4" /> Tambah Periode
+          </button>
+        </div>
+
+        {loadingPeriodes ? (
+          <div className="text-center py-6 text-gray-400 text-xs">Memuat periode...</div>
+        ) : periodes.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-xs">Belum ada periode. Klik "Tambah Periode" untuk membuat.</div>
+        ) : (
+          <div className="space-y-2.5">
+            {periodes.map((p) => (
+              <div
+                key={p.id}
+                className={`p-3.5 rounded-apple-lg border transition-all flex items-center justify-between gap-4 ${
+                  p.is_active
+                    ? 'bg-indigo-50/50 border-indigo-200 shadow-xs'
+                    : 'bg-white border-gray-100 hover:border-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      p.is_active ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm text-gray-900">{p.nama}</span>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                        {p.kode}
+                      </span>
+                      <span
+                        className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${
+                          p.semester_tipe === 'ganjil'
+                            ? 'bg-amber-50 text-amber-700'
+                            : p.semester_tipe === 'genap'
+                            ? 'bg-teal-50 text-teal-700'
+                            : 'bg-purple-50 text-purple-700'
+                        }`}
+                      >
+                        {p.semester_tipe}
+                      </span>
+                      {p.is_active && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white shadow-xs">
+                          <CheckCircle2 className="w-3 h-3" /> Periode Aktif
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Tahun Akademik: <span className="font-medium text-gray-700">{p.tahun_akademik}</span> · Status:{' '}
+                      <span className="capitalize">{p.status || 'aktif'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {!p.is_active && (
+                    <button
+                      onClick={() => handleSetActivePeriode(p)}
+                      className="macos-button-ghost text-xs text-indigo-600 hover:bg-indigo-50 px-2.5 py-1 rounded-apple font-medium"
+                    >
+                      Jadikan Aktif
+                    </button>
+                  )}
+                  <button
+                    onClick={() => openEditPeriodeModal(p)}
+                    className="macos-button-ghost p-1.5 text-gray-500 hover:text-gray-900"
+                    title="Edit Periode"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeletePeriode(p)}
+                    className="macos-button-ghost p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    title="Hapus Periode"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="macos-card p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2.5 rounded-apple-lg bg-blue-50">
@@ -274,6 +513,219 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Modal Tambah Periode */}
+      {showAddPeriodeModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="macos-card p-6 w-full max-w-md bg-white shadow-2xl rounded-apple-xl space-y-4 border border-gray-100 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-semibold text-gray-900 text-sm">Tambah Periode Baru</h3>
+              </div>
+              <button
+                onClick={() => setShowAddPeriodeModal(false)}
+                className="macos-button-ghost p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="macos-label">Tahun Akademik *</label>
+                  <input
+                    className="macos-input"
+                    value={periodeForm.tahun_akademik}
+                    onChange={(e) => handleTahunOrSemesterChange(e.target.value, periodeForm.semester_tipe)}
+                    placeholder="2025/2026"
+                  />
+                </div>
+                <div>
+                  <label className="macos-label">Tipe Semester *</label>
+                  <select
+                    className="macos-input"
+                    value={periodeForm.semester_tipe}
+                    onChange={(e) => handleTahunOrSemesterChange(periodeForm.tahun_akademik, e.target.value)}
+                  >
+                    <option value="ganjil">Ganjil</option>
+                    <option value="genap">Genap</option>
+                    <option value="pendek">Pendek</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="macos-label">Nama Periode *</label>
+                <input
+                  className="macos-input"
+                  value={periodeForm.nama}
+                  onChange={(e) => setPeriodeForm({ ...periodeForm, nama: e.target.value })}
+                  placeholder="2025/2026 Ganjil"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="macos-label">Kode Periode *</label>
+                  <input
+                    className="macos-input font-mono"
+                    value={periodeForm.kode}
+                    onChange={(e) => setPeriodeForm({ ...periodeForm, kode: e.target.value })}
+                    placeholder="2025-1"
+                  />
+                </div>
+                <div>
+                  <label className="macos-label">Status</label>
+                  <select
+                    className="macos-input"
+                    value={periodeForm.status}
+                    onChange={(e) => setPeriodeForm({ ...periodeForm, status: e.target.value })}
+                  >
+                    <option value="aktif">Aktif</option>
+                    <option value="selesai">Selesai</option>
+                    <option value="arsip">Arsip</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={periodeForm.is_active}
+                  onChange={(e) => setPeriodeForm({ ...periodeForm, is_active: e.target.checked })}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-gray-700 text-xs font-medium">Jadikan sebagai Periode Aktif saat ini</span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowAddPeriodeModal(false)}
+                className="macos-button-ghost px-3 py-1.5 text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleCreatePeriode}
+                disabled={savingPeriode}
+                className="macos-button bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 text-xs font-medium"
+              >
+                {savingPeriode ? 'Menyimpan...' : 'Simpan Periode'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Periode */}
+      {editingPeriode && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in p-4">
+          <div className="macos-card p-6 w-full max-w-md bg-white shadow-2xl rounded-apple-xl space-y-4 border border-gray-100 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-semibold text-gray-900 text-sm">Edit Periode Akademik</h3>
+              </div>
+              <button
+                onClick={() => setEditingPeriode(null)}
+                className="macos-button-ghost p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="macos-label">Tahun Akademik *</label>
+                  <input
+                    className="macos-input"
+                    value={editingPeriode.tahun_akademik}
+                    onChange={(e) => setEditingPeriode({ ...editingPeriode, tahun_akademik: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="macos-label">Tipe Semester *</label>
+                  <select
+                    className="macos-input"
+                    value={editingPeriode.semester_tipe}
+                    onChange={(e) => setEditingPeriode({ ...editingPeriode, semester_tipe: e.target.value })}
+                  >
+                    <option value="ganjil">Ganjil</option>
+                    <option value="genap">Genap</option>
+                    <option value="pendek">Pendek</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="macos-label">Nama Periode *</label>
+                <input
+                  className="macos-input"
+                  value={editingPeriode.nama}
+                  onChange={(e) => setEditingPeriode({ ...editingPeriode, nama: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="macos-label">Kode Periode *</label>
+                  <input
+                    className="macos-input font-mono"
+                    value={editingPeriode.kode}
+                    onChange={(e) => setEditingPeriode({ ...editingPeriode, kode: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="macos-label">Status</label>
+                  <select
+                    className="macos-input"
+                    value={editingPeriode.status}
+                    onChange={(e) => setEditingPeriode({ ...editingPeriode, status: e.target.value })}
+                  >
+                    <option value="aktif">Aktif</option>
+                    <option value="selesai">Selesai</option>
+                    <option value="arsip">Arsip</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={editingPeriode.is_active}
+                  onChange={(e) => setEditingPeriode({ ...editingPeriode, is_active: e.target.checked })}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-gray-700 text-xs font-medium">Periode Aktif</span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setEditingPeriode(null)}
+                className="macos-button-ghost px-3 py-1.5 text-xs"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdatePeriode}
+                disabled={savingPeriode}
+                className="macos-button bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 text-xs font-medium"
+              >
+                {savingPeriode ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
