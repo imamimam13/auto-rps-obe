@@ -258,16 +258,17 @@ async def generate_and_save_one_rps(
             koordinator_rmk=prodi.koordinator_rmk,
         )
 
-        # ── Check if an existing RPS exists for this mata kuliah or kode ──
+        # ── Check if an existing RPS exists specifically for this mata kuliah AND this exact tahun_akademik ──
         existing_res = await db.execute(
             select(RPS).where(
-                (RPS.mata_kuliah_id == mk.id) | (RPS.kode == f"RPS-{mk.kode}-{data.semester}")
+                RPS.mata_kuliah_id == mk.id,
+                RPS.tahun_akademik == data.tahun_akademik,
             )
         )
         rps = existing_res.scalars().first()
 
         if rps:
-            # Update existing RPS in place
+            # Update existing RPS in place for this specific period
             rps.prodi_id = prodi.id
             rps.semester = data.semester
             rps.tahun_akademik = data.tahun_akademik
@@ -295,10 +296,11 @@ async def generate_and_save_one_rps(
             flag_modified(rps, "referensi")
             flag_modified(rps, "sdgs")
         else:
-            base_kode = f"RPS-{mk.kode}-{data.semester}"
+            clean_ta = "".join(c for c in (data.tahun_akademik or "") if c.isalnum() or c in "-_")
+            base_kode = f"RPS-{mk.kode}-{data.semester}-{clean_ta}" if clean_ta else f"RPS-{mk.kode}-{data.semester}"
             chk_kode = await db.execute(select(RPS).where(RPS.kode == base_kode))
             if chk_kode.scalar_one_or_none():
-                final_kode = f"RPS-{mk.kode}-{data.semester}-{uuid.uuid4().hex[:4].upper()}"
+                final_kode = f"{base_kode}-{uuid.uuid4().hex[:4].upper()}"
             else:
                 final_kode = base_kode
 

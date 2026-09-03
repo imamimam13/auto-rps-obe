@@ -49,11 +49,17 @@ export default function RPSList() {
     prodi_id: 'all',
     tahun_akademik: '2025/2026',
     semester: '',
+    filter_mk_periode: 'all',
     additional_context: '',
     skip_existing: true,
     auto_retry: true,
     max_retries: 3,
   })
+
+  function normalizePeriodStr(s?: string): string {
+    if (!s) return ''
+    return s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  }
 
   useEffect(() => {
     loadProdis()
@@ -80,7 +86,7 @@ export default function RPSList() {
       setPeriodes(pList)
       const act = pList.find((p: any) => p.is_active)
       if (act) {
-        setBulkConfig(prev => ({ ...prev, tahun_akademik: act.tahun_akademik || act.nama }))
+        setBulkConfig(prev => ({ ...prev, tahun_akademik: act.nama || act.tahun_akademik }))
       }
     } catch (e) {
       console.error('Gagal memuat periode list', e)
@@ -102,12 +108,15 @@ export default function RPSList() {
 
     try {
       // 1. Fetch target mata kuliah (Selected Prodi or ALL Prodis)
-      let url = `/api/v1/mata-kuliah/?size=500`
+      let url = `/api/v1/mata-kuliah/?size=1000&limit=1000`
       if (bulkConfig.prodi_id && bulkConfig.prodi_id !== 'all') {
         url += `&prodi_id=${bulkConfig.prodi_id}`
       }
       if (bulkConfig.semester) {
         url += `&semester=${bulkConfig.semester}`
+      }
+      if (bulkConfig.filter_mk_periode && bulkConfig.filter_mk_periode !== 'all') {
+        url += `&periode=${encodeURIComponent(bulkConfig.filter_mk_periode)}`
       }
       const mkRes = await api.get(url)
       const allMkList: any[] = mkRes.data.items || []
@@ -118,9 +127,8 @@ export default function RPSList() {
         return
       }
 
-      // 2. Check existing RPS records to skip if enabled
-      let existingKeys = new Set<string>()
-      let existingMkIds = new Set<number>()
+      // 2. Check existing RPS records per mata kuliah specifically by period
+      const existingMap = new Map<number, Set<string>>()
       if (bulkConfig.skip_existing) {
         let rpsUrl = `/api/v1/rps/?size=1000&limit=1000`
         if (bulkConfig.prodi_id && bulkConfig.prodi_id !== 'all') {
@@ -129,13 +137,17 @@ export default function RPSList() {
         const rpsRes = await api.get(rpsUrl)
         const existingRps: any[] = rpsRes.data.items || []
         for (const r of existingRps) {
-          existingMkIds.add(r.mata_kuliah_id)
-          const rTa = (r.tahun_akademik || r.identitas?.tahun_akademik || '').toLowerCase().trim()
-          existingKeys.add(`${r.mata_kuliah_id}_${rTa}`)
+          if (r.mata_kuliah_id) {
+            if (!existingMap.has(r.mata_kuliah_id)) {
+              existingMap.set(r.mata_kuliah_id, new Set())
+            }
+            const rTaNorm = normalizePeriodStr(r.tahun_akademik || r.identitas?.tahun_akademik)
+            existingMap.get(r.mata_kuliah_id)!.add(rTaNorm)
+          }
         }
       }
 
-      const targetPeriodLower = (bulkConfig.tahun_akademik || '').toLowerCase().trim()
+      const targetPeriodNorm = normalizePeriodStr(bulkConfig.tahun_akademik)
 
       const done: any[] = []
       const skipped: any[] = []
@@ -145,17 +157,13 @@ export default function RPSList() {
       const toProcess: any[] = []
       for (const mk of allMkList) {
         let isAlreadyExists = false
-        if (bulkConfig.skip_existing) {
-          if (targetPeriodLower) {
-            // Check if RPS exists for this MK and matching target period
-            isAlreadyExists = Array.from(existingKeys).some(k => {
-              const [mkIdStr, taStr] = k.split('_')
-              if (Number(mkIdStr) !== mk.id) return false
-              if (!taStr) return true
-              return taStr.includes(targetPeriodLower) || targetPeriodLower.includes(taStr)
-            })
+        if (bulkConfig.skip_existing && existingMap.has(mk.id)) {
+          const periodsForMk = existingMap.get(mk.id)!
+          if (targetPeriodNorm) {
+            // ONLY skip if an RPS exists for THIS mata kuliah with the SAME target period
+            isAlreadyExists = periodsForMk.has(targetPeriodNorm)
           } else {
-            isAlreadyExists = existingMkIds.has(mk.id)
+            isAlreadyExists = periodsForMk.size > 0
           }
         }
 
@@ -164,6 +172,23 @@ export default function RPSList() {
         } else {
           toProcess.push(mk)
         }
+      }
+
+      if (toProcess.length === 0) {
+        toast.success(`Semua ${allMkList.length} mata kuliah sudah memiliki RPS untuk periode '${bulkConfig.tahun_akademik}'. Tidak ada yang perlu di-generate.`)
+        setBulkProgress({
+          currentPass: 1,
+          maxPasses: 1,
+          current: allMkList.length,
+          total: allMkList.length,
+          currentName: '',
+          statusMessage: `Semua ${allMkList.length} mata kuliah sudah memiliki RPS untuk periode '${bulkConfig.tahun_akademik}'.`,
+          done: [],
+          errors: [],
+          skipped: [...skipped],
+        })
+        setBulkGenerating(false)
+        return
       }
 
       const maxPasses = bulkConfig.auto_retry ? Math.max(1, bulkConfig.max_retries || 3) : 1
@@ -193,7 +218,7 @@ export default function RPSList() {
             current: done.length + skipped.length + i + 1,
             total: allMkList.length,
             currentName: mk.nama,
-            statusMessage: `${passTitle} — ${mk.nama}`,
+            statusMessage: `${passTitle} [${i + 1}/${currentBatch.length}] — ${mk.nama}`,
             done: [...done],
             errors: [...passErrors],
             skipped: [...skipped],
@@ -228,7 +253,7 @@ export default function RPSList() {
             current: done.length + skipped.length + (i + 1),
             total: allMkList.length,
             currentName: mk.nama,
-            statusMessage: `${passTitle} — ${mk.nama}`,
+            statusMessage: `${passTitle} [${i + 1}/${currentBatch.length}] — ${mk.nama}`,
             done: [...done],
             errors: [...passErrors],
             skipped: [...skipped],
@@ -264,7 +289,7 @@ export default function RPSList() {
       if (failedQueue.length === 0) {
         toast.success(`Selesai! ${done.length} RPS berhasil dibuat, ${skipped.length} dilewati.`)
       } else {
-        toast.error(`Selesai dengan ${failedQueue.length} item gagal setelah ${maxPasses} pass retry.`)
+        toast.error(`Selesai: ${done.length} berhasil, ${failedQueue.length} item gagal setelah ${maxPasses} pass retry.`)
       }
       loadData()
     } catch (e: any) {
@@ -492,32 +517,57 @@ export default function RPSList() {
                   </select>
                 </div>
                 <div>
-                  <label className="macos-label">Tahun Akademik / Periode</label>
-                  <select
-                    className="macos-input"
-                    value={bulkConfig.tahun_akademik}
-                    onChange={(e) => setBulkConfig({ ...bulkConfig, tahun_akademik: e.target.value })}
-                  >
-                    <option value="">-- Pilih dari Periode Master --</option>
-                    {periodes.map((p) => (
-                      <option key={p.id} value={p.tahun_akademik || p.nama}>
-                        {p.nama} {p.is_active ? '(Aktif)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="macos-label">Target Tahun Akademik / Periode RPS *</label>
+                  <div className="space-y-1.5">
+                    <select
+                      className="macos-input"
+                      value={bulkConfig.tahun_akademik}
+                      onChange={(e) => setBulkConfig({ ...bulkConfig, tahun_akademik: e.target.value })}
+                    >
+                      <option value="">-- Pilih dari Master Periode --</option>
+                      {periodes.map((p) => (
+                        <option key={p.id} value={p.nama}>
+                          {p.nama} {p.is_active ? '(Aktif)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className="macos-input text-xs"
+                      value={bulkConfig.tahun_akademik}
+                      onChange={(e) => setBulkConfig({ ...bulkConfig, tahun_akademik: e.target.value })}
+                      placeholder="Atau masukkan tahun akademik manual (misal: 2025/2026 Ganjil)"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="macos-label">Filter Semester (Opsional)</label>
-                  <input
-                    type="number"
-                    className="macos-input"
-                    value={bulkConfig.semester}
-                    onChange={(e) => setBulkConfig({ ...bulkConfig, semester: e.target.value })}
-                    placeholder="Semua Semester"
-                    min={1}
-                    max={14}
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1">Kosongkan untuk semua semester.</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="macos-label">Filter Semester (Opsional)</label>
+                    <input
+                      type="number"
+                      className="macos-input"
+                      value={bulkConfig.semester}
+                      onChange={(e) => setBulkConfig({ ...bulkConfig, semester: e.target.value })}
+                      placeholder="Semua Semester"
+                      min={1}
+                      max={14}
+                    />
+                  </div>
+                  <div>
+                    <label className="macos-label">Filter Periode MK (Opsional)</label>
+                    <select
+                      className="macos-input"
+                      value={bulkConfig.filter_mk_periode}
+                      onChange={(e) => setBulkConfig({ ...bulkConfig, filter_mk_periode: e.target.value })}
+                    >
+                      <option value="all">Semua Periode MK</option>
+                      {periodes.map((p) => (
+                        <option key={p.id} value={p.nama}>
+                          {p.nama}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="macos-label">Konteks Tambahan (Opsional)</label>

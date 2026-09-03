@@ -90,6 +90,23 @@ async def create_mata_kuliah(data: MataKuliahCreate, db: AsyncSession = Depends(
     if not prodi_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Prodi not found")
     
+    # Check if duplicate in same prodi and same periode
+    dup_query = select(MataKuliah).where(
+        MataKuliah.kode == data.kode,
+        MataKuliah.prodi_id == data.prodi_id,
+    )
+    if data.periode:
+        dup_query = dup_query.where(MataKuliah.periode == data.periode)
+    else:
+        dup_query = dup_query.where((MataKuliah.periode == None) | (MataKuliah.periode == ""))
+    
+    dup_res = await db.execute(dup_query)
+    if dup_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Mata kuliah dengan kode '{data.kode}' sudah terdaftar di program studi ini untuk periode '{data.periode or 'Default'}'"
+        )
+    
     mk = MataKuliah(**data.model_dump())
     db.add(mk)
     await db.commit()
@@ -129,12 +146,23 @@ async def bulk_create_mata_kuliah(
     errors = []
     for item in data:
         try:
-            # Check if kode already exists in the same prodi to avoid aborting the database transaction
-            existing_result = await db.execute(
-                select(MataKuliah).where(MataKuliah.kode == item.kode, MataKuliah.prodi_id == prodi_id)
+            # Check if kode already exists in the same prodi AND same periode
+            dup_query = select(MataKuliah).where(
+                MataKuliah.kode == item.kode,
+                MataKuliah.prodi_id == prodi_id,
             )
+            if item.periode:
+                dup_query = dup_query.where(MataKuliah.periode == item.periode)
+            else:
+                dup_query = dup_query.where((MataKuliah.periode == None) | (MataKuliah.periode == ""))
+
+            existing_result = await db.execute(dup_query)
             if existing_result.scalar_one_or_none():
-                errors.append({"kode": item.kode, "nama": item.nama, "error": f"Mata kuliah dengan kode '{item.kode}' sudah terdaftar di program studi ini"})
+                errors.append({
+                    "kode": item.kode,
+                    "nama": item.nama,
+                    "error": f"Mata kuliah dengan kode '{item.kode}' sudah terdaftar di prodi ini pada periode '{item.periode or 'Default'}'"
+                })
                 continue
                 
             async with db.begin_nested():

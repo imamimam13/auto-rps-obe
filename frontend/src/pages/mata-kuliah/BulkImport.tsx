@@ -14,6 +14,8 @@ export default function BulkImport() {
   const navigate = useNavigate()
   const [prodiList, setProdiList] = useState<ProdiOption[]>([])
   const [prodiId, setProdiId] = useState('')
+  const [periodeList, setPeriodeList] = useState<any[]>([])
+  const [periode, setPeriode] = useState('')
   const [textData, setTextData] = useState('')
   const [preview, setPreview] = useState<any[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -21,6 +23,12 @@ export default function BulkImport() {
 
   useEffect(() => {
     api.get('/api/v1/prodi/?size=50').then(r => setProdiList(r.data.items || []))
+    api.get('/api/v1/periode/').then(r => {
+      const list = r.data.items || []
+      setPeriodeList(list)
+      const act = list.find((p: any) => p.is_active)
+      if (act) setPeriode(act.nama)
+    })
   }, [])
 
   const TEMPLATE = `KODE | NAMA | SKS | SKS_TEORI | SKS_PRAKTIK | SEMESTER | DESKRIPSI
@@ -169,7 +177,11 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
     if (!prodiId || preview.length === 0) return
     setSubmitting(true)
     try {
-      const payload = preview.map(({ _line, ...item }) => ({ ...item, prodi_id: parseInt(prodiId) }))
+      const payload = preview.map(({ _line, ...item }) => ({
+        ...item,
+        prodi_id: parseInt(prodiId),
+        periode: item.periode || periode || undefined,
+      }))
       const res = await api.post('/api/v1/mata-kuliah/bulk', payload)
       setResult(res.data)
       if (res.data.errors === 0) {
@@ -202,19 +214,38 @@ TI104 | Jaringan Komputer | 3 | 2 | 1 | 3 | Dasar jaringan dan komunikasi data`
         </div>
       </div>
 
-      {/* Pilih Prodi */}
+      {/* Pilih Prodi & Periode */}
       <div className="macos-card p-5">
-        <label className="macos-label">Program Studi</label>
-        <select
-          className="macos-input"
-          value={prodiId}
-          onChange={(e) => setProdiId(e.target.value)}
-        >
-          <option value="">Pilih prodi...</option>
-          {prodiList.map(p => (
-            <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
-          ))}
-        </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="macos-label">Program Studi *</label>
+            <select
+              className="macos-input"
+              value={prodiId}
+              onChange={(e) => setProdiId(e.target.value)}
+            >
+              <option value="">Pilih prodi...</option>
+              {prodiList.map(p => (
+                <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="macos-label">Periode Akademik (Opsional)</label>
+            <select
+              className="macos-input"
+              value={periode}
+              onChange={(e) => setPeriode(e.target.value)}
+            >
+              <option value="">-- Tanpa Periode Tertentu --</option>
+              {periodeList.map(p => (
+                <option key={p.id} value={p.nama}>
+                  {p.nama} {p.is_active ? '(Aktif)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Format Input */}

@@ -88,7 +88,7 @@ class MataKuliah(Base):
     rps = relationship("RPS", back_populates="mata_kuliah")
 
     __table_args__ = (
-        UniqueConstraint('kode', 'prodi_id', name='uq_mata_kuliah_kode_prodi'),
+        UniqueConstraint('kode', 'prodi_id', 'periode', name='uq_mata_kuliah_kode_prodi_periode'),
     )
 
 
