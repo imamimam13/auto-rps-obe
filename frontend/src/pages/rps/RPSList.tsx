@@ -241,7 +241,10 @@ export default function RPSList() {
               bloom_updated: res.data.bloom_updated,
             })
           } catch (e: any) {
-            const errMsg = e.response?.data?.detail || e.message || 'Gagal generate'
+            let errMsg = e.response?.data?.detail || e.message || 'Gagal generate'
+            if (e.response?.status === 504 || (typeof errMsg === 'string' && errMsg.includes('504'))) {
+              errMsg = 'Gateway Timeout (504): Server proxy Nginx memutus koneksi (>60s). Atur proxy_read_timeout 600s di Nginx.'
+            }
             const errObj = { id: mk.id, kode: mk.kode, nama: mk.nama, prodi_id: mk.prodi_id, semester: mk.semester, error: errMsg }
             passErrors.push(errObj)
             nextFailedQueue.push(mk)

@@ -329,10 +329,26 @@ async def generate_and_save_one_rps(
         await db.commit()
         await db.refresh(rps)
 
-        # ── Auto-run SDGs + Bloom analysis immediately after save ─────────────
-        sdgs = await _analyze_and_save_sdgs(rps, mk, db)
-        bloom_changed = await _analyze_and_save_bloom(rps, db)
-        await db.refresh(rps)
+        # ── Auto-run SDGs + Bloom analysis concurrently with safety timeout ───
+        sdgs = rps.sdgs or []
+        bloom_changed = False
+        try:
+            import asyncio
+            sdgs_task = _analyze_and_save_sdgs(rps, mk, db)
+            bloom_task = _analyze_and_save_bloom(rps, db)
+            results = await asyncio.wait_for(
+                asyncio.gather(sdgs_task, bloom_task, return_exceptions=True),
+                timeout=25.0
+            )
+            if isinstance(results[0], list):
+                sdgs = results[0]
+            if isinstance(results[1], bool):
+                bloom_changed = results[1]
+            await db.refresh(rps)
+        except asyncio.TimeoutError:
+            print(f"[rps-one] Post-analysis timed out for RPS {rps.id}, continuing with generated data")
+        except Exception as e:
+            print(f"[rps-one] Post-analysis warning: {e}")
 
         return {
             "success": True,
