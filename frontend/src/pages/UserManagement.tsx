@@ -24,7 +24,7 @@ interface Prodi {
 const ROLES = [
   { value: 'dosen',       label: 'Dosen',        color: 'bg-blue-100 text-blue-700' },
   { value: 'ketua_prodi', label: 'Ketua Prodi',  color: 'bg-indigo-100 text-indigo-700' },
-  { value: 'gmk',         label: 'GMK / Fakultas', color: 'bg-orange-100 text-orange-700' },
+  { value: 'gmk',         label: 'GMK / GKM Fakultas', color: 'bg-orange-100 text-orange-700' },
   { value: 'prodi',       label: 'Prodi (legacy)', color: 'bg-sky-100 text-sky-700' },
   { value: 'admin',       label: 'Admin',         color: 'bg-purple-100 text-purple-700' },
 ]
@@ -57,6 +57,9 @@ function parseCsvText(raw: string, prodiList: Prodi[], defaultRole: string): { r
 
     // Role matching
     let role = (roleRaw || defaultRole).toLowerCase().replace(/\s+/g, '_')
+    if (role === 'gkm' || role === 'gmk_fakultas' || role === 'gkm_fakultas' || role === 'fakultas' || role === 'gmk') {
+      role = 'gmk'
+    }
     const validRoles = ROLES.map(r => r.value)
     if (!validRoles.includes(role)) role = defaultRole
 

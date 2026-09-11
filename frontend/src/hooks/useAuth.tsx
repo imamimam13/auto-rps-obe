@@ -18,6 +18,7 @@ interface AuthContextType {
   logout: () => void
   isAdmin: boolean
   isKetuaProdi: boolean
+  isGMK: boolean
   canEditRPS: boolean
   loading: boolean
 }
@@ -60,13 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const roleLower = (user?.role || '').toLowerCase()
   const isAdmin = roleLower === 'admin'
   const isKetuaProdi = roleLower === 'ketua_prodi' || roleLower === 'prodi'
-  const canEditRPS = isAdmin || isKetuaProdi
+  const isGMK = roleLower === 'gmk' || roleLower === 'gkm' || roleLower === 'gmk_fakultas' || roleLower === 'gkm_fakultas' || roleLower === 'fakultas'
+  const canEditRPS = isAdmin || isKetuaProdi || isGMK
 
   return (
     <AuthContext.Provider value={{
       user, token, login, logout,
       isAdmin,
       isKetuaProdi,
+      isGMK,
       canEditRPS,
       loading,
     }}>
