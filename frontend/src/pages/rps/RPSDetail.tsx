@@ -377,7 +377,7 @@ export default function RPSDetail() {
                 Setujui (Approve)
               </button>
             )}
-            {rps.status === 'approved' && canEditRPS && (
+            {(rps.status === 'approved' || rps.status === 'draft' || rps.status === 'review') && canEditRPS && (
               <button
                 onClick={() => handleUpdateStatus('published')}
                 disabled={updatingStatus}
@@ -386,7 +386,16 @@ export default function RPSDetail() {
                 Publikasikan
               </button>
             )}
-            {rps.status === 'draft' && canEditRPS && (
+            {(rps.status === 'published' || rps.status === 'approved' || rps.status === 'review') && canEditRPS && (
+              <button
+                onClick={() => handleUpdateStatus('draft')}
+                disabled={updatingStatus}
+                className="macos-button-ghost flex items-center gap-1 text-gray-600 hover:text-gray-900 text-xs px-3 py-1.5 rounded-apple-md font-medium border border-gray-200"
+              >
+                Kembalikan ke Draft
+              </button>
+            )}
+            {canEditRPS && (
               <button onClick={openEditModal} className="macos-button flex items-center gap-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-apple-md font-medium">
                 <Sparkles className="w-4 h-4" /> Edit RPS
               </button>
@@ -512,7 +521,7 @@ export default function RPSDetail() {
               }`}>
                 Skor: {rps.obe_score}/100
               </span>
-              {rps.status === 'draft' && canEditRPS && (
+              {canEditRPS && (
                 <button
                   onClick={handleAutoFix}
                   disabled={fixing}

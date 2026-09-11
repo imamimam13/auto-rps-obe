@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { CheckSquare, Search, AlertCircle, CheckCircle, BarChart3, TrendingUp, Sparkles } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function OBEAnalyzer() {
+  const { canEditRPS } = useAuth()
   const [rpsList, setRpsList] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -161,7 +163,7 @@ export default function OBEAnalyzer() {
                       </p>
                       <p className="text-xs text-gray-400 mt-1">dari 100</p>
                     </div>
-                    {selectedRps.status === 'draft' && (
+                    {canEditRPS && (
                       <button
                         onClick={handleAutoFix}
                         disabled={fixing}
