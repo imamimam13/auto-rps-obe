@@ -336,3 +336,35 @@ class PaginatedResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+# Jadwal Sync Schemas
+class JadwalItemExtracted(BaseModel):
+    kode_mk: str
+    nama_mk: str
+    sks: Optional[int] = 3
+    semester: Optional[int] = 1
+    kurikulum: Optional[str] = ""
+    prodi_nama: Optional[str] = ""
+    prodi_id: Optional[int] = None
+    dosen_pengampu: List[str] = []
+    team_teaching: Optional[List[str]] = []
+    semua_dosen: List[str] = []
+    kelas_list: Optional[List[str]] = []
+
+
+class JadwalSyncRequest(BaseModel):
+    target_tahun_akademik: str
+    prodi_id: Optional[Union[int, str]] = None
+    items: List[JadwalItemExtracted]
+    auto_create_rps_draft: Optional[bool] = False
+
+
+class JadwalSyncResponse(BaseModel):
+    success: bool
+    target_tahun_akademik: str
+    total_items: int
+    updated_rps: int
+    skipped: int
+    not_found_rps: int
+    detail: List[Dict[str, Any]]

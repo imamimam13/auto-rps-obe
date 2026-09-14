@@ -1,16 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from sqlalchemy.orm.attributes import flag_modified
+from typing import List, Optional, Dict, Any, Union
 from app.core.database import get_db
 from app.models import RPS, Prodi, MataKuliah
 from app.schemas import (
     RPSCreate, RPSUpdate, RPSResponse,
     RPSCopyRequest, RPSBulkCopyRequest, RPSCopySelectedRequest,
+    JadwalItemExtracted, JadwalSyncRequest, JadwalSyncResponse,
     PaginatedResponse,
 )
 from sqlalchemy import select, func, update
 import uuid
 import copy
+import zipfile
+import io
+import xml.etree.ElementTree as ET
+import csv
+import re
 from datetime import datetime
 
 router = APIRouter(prefix="/rps", tags=["RPS"])
@@ -702,3 +709,334 @@ async def copy_selected_rps(
         "skipped_detail": skipped,
         "error_detail": errors,
     }
+
+
+def parse_xlsx_to_rows(file_bytes: bytes) -> List[List[str]]:
+    """Parse XLSX worksheet to rows of strings without heavy external dependencies."""
+    with zipfile.ZipFile(io.BytesIO(file_bytes), "r") as z:
+        shared_strings = []
+        if "xl/sharedStrings.xml" in z.namelist():
+            tree = ET.fromstring(z.read("xl/sharedStrings.xml"))
+            for si in tree.findall("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}si"):
+                t = si.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t")
+                if t is not None and t.text:
+                    shared_strings.append(t.text)
+                else:
+                    text_parts = [t_node.text for t_node in si.iter("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t") if t_node.text]
+                    shared_strings.append("".join(text_parts))
+
+        sheet_files = [n for n in z.namelist() if n.startswith("xl/worksheets/sheet") and n.endswith(".xml")]
+        sheet_path = sheet_files[0] if sheet_files else "xl/worksheets/sheet1.xml"
+
+        sheet_tree = ET.fromstring(z.read(sheet_path))
+        rows = []
+        for r in sheet_tree.findall(".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row"):
+            row_cells = []
+            for c in r.findall("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c"):
+                t = c.get("t")
+                v = c.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v")
+                val = ""
+                if v is not None and v.text is not None:
+                    val = v.text
+                    if t == "s":
+                        idx = int(val)
+                        if idx < len(shared_strings):
+                            val = shared_strings[idx]
+                row_cells.append(str(val).strip())
+            if any(row_cells):
+                rows.append(row_cells)
+        return rows
+
+
+def parse_csv_to_rows(text: str) -> List[List[str]]:
+    """Parse CSV / TSV text to rows of strings."""
+    lines = text.strip().splitlines()
+    if not lines:
+        return []
+    first = lines[0]
+    delimiter = "\t" if "\t" in first else (";" if ";" in first else ("," if "," in first else "|"))
+    reader = csv.reader(lines, delimiter=delimiter)
+    return [[col.strip() for col in row] for row in reader if any(col.strip() for col in row)]
+
+
+def extract_and_group_jadwal(rows: List[List[str]]) -> List[Dict[str, Any]]:
+    """Smart parser that extracts MK & Dosen from schedule while ignoring operational columns."""
+    if not rows:
+        return []
+
+    # Find header row
+    header_idx = -1
+    for i, r in enumerate(rows[:15]):
+        row_text = " ".join(r).lower()
+        if ("kode" in row_text or "kode mk" in row_text) and ("mata kuliah" in row_text or "nama" in row_text):
+            header_idx = i
+            break
+
+    if header_idx == -1:
+        # Fallback if no explicit header: treat row 0 as header or positional
+        header_idx = 0
+
+    header = [h.lower().strip() for h in rows[header_idx]]
+    col_map = {}
+    for i, h in enumerate(header):
+        if "kode" in h and "kode" not in col_map:
+            col_map["kode"] = i
+        elif ("nama" in h or "mata kuliah" in h) and "nama" not in col_map:
+            col_map["nama"] = i
+        elif "sks" in h and "sks" not in col_map:
+            col_map["sks"] = i
+        elif ("semester" in h or "smt" in h or "sem" in h) and "semester" not in col_map:
+            col_map["semester"] = i
+        elif ("kurikulum" in h or "prodi" in h or "program studi" in h) and "kurikulum" not in col_map:
+            col_map["kurikulum"] = i
+        elif ("team" in h or "tim" in h) and "team" not in col_map:
+            col_map["team"] = i
+        elif ("dosen" in h or "pengampu" in h) and "dosen" not in col_map:
+            col_map["dosen"] = i
+        elif "kelas" in h and "kelas" not in col_map:
+            col_map["kelas"] = i
+
+    # Fallbacks for missing columns
+    if "kode" not in col_map and len(header) > 0: col_map["kode"] = 0
+    if "nama" not in col_map and len(header) > 1: col_map["nama"] = 1
+    if "dosen" not in col_map and len(header) > 2: col_map["dosen"] = 2
+
+    grouped: Dict[str, Dict[str, Any]] = {}
+    data_rows = rows[header_idx + 1:]
+
+    for r in data_rows:
+        kode = r[col_map["kode"]].strip() if "kode" in col_map and col_map["kode"] < len(r) else ""
+        if not kode or kode.lower() in ["kode", "kode mk", "no", "-"]:
+            continue
+
+        nama = r[col_map["nama"]].strip() if "nama" in col_map and col_map["nama"] < len(r) else ""
+        sks_raw = r[col_map["sks"]].strip() if "sks" in col_map and col_map["sks"] < len(r) else ""
+        sks = int(sks_raw) if sks_raw.isdigit() else 3
+
+        sem_raw = r[col_map["semester"]].strip() if "semester" in col_map and col_map["semester"] < len(r) else ""
+        sem = int(sem_raw) if sem_raw.isdigit() else 1
+
+        kur = r[col_map["kurikulum"]].strip() if "kurikulum" in col_map and col_map["kurikulum"] < len(r) else ""
+        dosen = r[col_map["dosen"]].strip() if "dosen" in col_map and col_map["dosen"] < len(r) else ""
+        team = r[col_map["team"]].strip() if "team" in col_map and col_map["team"] < len(r) else ""
+        kelas = r[col_map["kelas"]].strip() if "kelas" in col_map and col_map["kelas"] < len(r) else ""
+
+        # Derive clean prodi name from Kurikulum string (e.g. "MANAJEMEN GENAP 2025/2026" -> "MANAJEMEN")
+        prodi_name = kur
+        if kur:
+            # Strip year and semester tokens
+            clean_p = re.sub(r"\b(ganjil|genap|pendek|20\d\d/20\d\d|20\d\d)\b", "", kur, flags=re.IGNORECASE).strip()
+            if clean_p:
+                prodi_name = clean_p
+
+        key = f"{kode.upper()}_{kur.upper()}_{sem}"
+        if key not in grouped:
+            grouped[key] = {
+                "kode_mk": kode.upper(),
+                "nama_mk": nama,
+                "sks": sks,
+                "semester": sem,
+                "kurikulum": kur,
+                "prodi_nama": prodi_name,
+                "prodi_id": None,
+                "dosen_pengampu": [],
+                "team_teaching": [],
+                "semua_dosen": [],
+                "kelas_list": [],
+            }
+
+        item = grouped[key]
+        if kelas and kelas not in item["kelas_list"]:
+            item["kelas_list"].append(kelas)
+
+        if dosen and dosen not in ["-", "None", "none", "null", ""]:
+            if dosen not in item["dosen_pengampu"]:
+                item["dosen_pengampu"].append(dosen)
+            if dosen not in item["semua_dosen"]:
+                item["semua_dosen"].append(dosen)
+
+        if team and team not in ["-", "None", "none", "null", ""]:
+            if team not in item["team_teaching"]:
+                item["team_teaching"].append(team)
+            if team not in item["semua_dosen"]:
+                item["semua_dosen"].append(team)
+
+    return list(grouped.values())
+
+
+@router.post("/parse-jadwal", response_model=List[JadwalItemExtracted])
+async def parse_jadwal(
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Parse uploaded XLSX or CSV schedule and extract grouped MK & Lecturers."""
+    rows: List[List[str]] = []
+    if file:
+        content = await file.read()
+        filename = (file.filename or "").lower()
+        if filename.endswith(".xlsx") or filename.endswith(".xlsm") or content.startswith(b"PK"):
+            try:
+                rows = parse_xlsx_to_rows(content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Gagal membaca file Excel (.xlsx): {str(e)}")
+        else:
+            try:
+                text = content.decode("utf-8-sig", errors="replace")
+                rows = parse_csv_to_rows(text)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Gagal membaca file teks/CSV: {str(e)}")
+    elif raw_text and raw_text.strip():
+        rows = parse_csv_to_rows(raw_text)
+    else:
+        raise HTTPException(status_code=400, detail="Harap unggah file (.xlsx / .csv) atau masukkan teks tabel jadwal")
+
+    extracted = extract_and_group_jadwal(rows)
+    if not extracted:
+        raise HTTPException(status_code=400, detail="Tidak ada data mata kuliah dan dosen yang dapat diekstrak dari file jadwal")
+
+    # Match prodi_id from database if available
+    prodis_res = await db.execute(select(Prodi))
+    prodis = prodis_res.scalars().all()
+    for item in extracted:
+        p_name = item.get("prodi_nama", "").lower()
+        kur = item.get("kurikulum", "").lower()
+        for p in prodis:
+            if p.nama.lower() in p_name or p_name in p.nama.lower() or p.nama.lower() in kur or p.kode.lower() in kur:
+                item["prodi_id"] = p.id
+                item["prodi_nama"] = p.nama
+                break
+
+    return extracted
+
+
+@router.post("/sync-jadwal-dosen", response_model=JadwalSyncResponse)
+async def sync_jadwal_dosen(
+    data: JadwalSyncRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Smart-match extracted schedule to RPS records in target academic period and update lecturers."""
+    target_ta = data.target_tahun_akademik.strip()
+    if not target_ta:
+        raise HTTPException(status_code=400, detail="Periode akademik target wajib diisi")
+
+    # Load all Prodi
+    prodis_res = await db.execute(select(Prodi))
+    prodis = {p.id: p for p in prodis_res.scalars().all()}
+    prodi_by_name = {p.nama.lower().strip(): p for p in prodis.values()}
+
+    # Load all MataKuliah
+    mk_query = select(MataKuliah)
+    if data.prodi_id and data.prodi_id != "all":
+        try:
+            pid = int(data.prodi_id)
+            mk_query = mk_query.where(MataKuliah.prodi_id == pid)
+        except Exception:
+            pass
+    mk_res = await db.execute(mk_query)
+    all_mk = mk_res.scalars().all()
+
+    # Index MK by (kode_upper, prodi_id) and also (kode_upper)
+    mk_map_strict: Dict[str, MataKuliah] = {}
+    mk_map_by_kode: Dict[str, List[MataKuliah]] = {}
+    for mk in all_mk:
+        strict_k = f"{mk.kode.upper().strip()}_{mk.prodi_id}"
+        mk_map_strict[strict_k] = mk
+        k_upper = mk.kode.upper().strip()
+        if k_upper not in mk_map_by_kode:
+            mk_map_by_kode[k_upper] = []
+        mk_map_by_kode[k_upper].append(mk)
+
+    # Load all RPS in target period
+    rps_query = select(RPS).where(RPS.tahun_akademik == target_ta)
+    rps_res = await db.execute(rps_query)
+    all_rps = rps_res.scalars().all()
+    rps_by_mk_id: Dict[int, RPS] = {r.mata_kuliah_id: r for r in all_rps}
+
+    updated_count = 0
+    skipped_count = 0
+    not_found_count = 0
+    detail = []
+
+    for item in data.items:
+        kode = item.kode_mk.upper().strip()
+        dosen_list = item.semua_dosen or item.dosen_pengampu or []
+
+        if not dosen_list:
+            skipped_count += 1
+            detail.append({
+                "kode": kode,
+                "nama": item.nama_mk,
+                "status": "skipped",
+                "message": "Tidak ada nama dosen pengampu di jadwal",
+            })
+            continue
+
+        # Find target Prodi
+        target_prodi_id = item.prodi_id
+        if not target_prodi_id and item.prodi_nama:
+            p_match = prodi_by_name.get(item.prodi_nama.lower().strip())
+            if p_match:
+                target_prodi_id = p_match.id
+
+        # Find matching MataKuliah
+        matched_mk: Optional[MataKuliah] = None
+        if target_prodi_id:
+            strict_k = f"{kode}_{target_prodi_id}"
+            matched_mk = mk_map_strict.get(strict_k)
+
+        if not matched_mk and kode in mk_map_by_kode:
+            matched_mk = mk_map_by_kode[kode][0]
+
+        if not matched_mk:
+            not_found_count += 1
+            detail.append({
+                "kode": kode,
+                "nama": item.nama_mk,
+                "status": "mk_not_found",
+                "message": f"Mata kuliah '{kode}' belum terdaftar di database",
+            })
+            continue
+
+        # Check existing RPS in target period
+        rps_record = rps_by_mk_id.get(matched_mk.id)
+
+        if rps_record:
+            # Update dosen_pengampu on existing RPS
+            rps_record.dosen_pengampu = dosen_list
+            identitas = dict(rps_record.identitas or {})
+            identitas["dosen_pengampu"] = dosen_list
+            rps_record.identitas = identitas
+            flag_modified(rps_record, "identitas")
+            flag_modified(rps_record, "dosen_pengampu")
+
+            updated_count += 1
+            detail.append({
+                "kode": kode,
+                "nama": matched_mk.nama,
+                "rps_kode": rps_record.kode,
+                "status": "updated",
+                "dosen": dosen_list,
+                "message": f"Dosen pengampu berhasil disinkronkan: {', '.join(dosen_list)}",
+            })
+        else:
+            not_found_count += 1
+            detail.append({
+                "kode": kode,
+                "nama": matched_mk.nama,
+                "status": "rps_not_found",
+                "message": f"RPS untuk periode '{target_ta}' belum dibuat",
+                "dosen": dosen_list,
+            })
+
+    await db.commit()
+
+    return JadwalSyncResponse(
+        success=True,
+        target_tahun_akademik=target_ta,
+        total_items=len(data.items),
+        updated_rps=updated_count,
+        skipped=skipped_count,
+        not_found_rps=not_found_count,
+        detail=detail,
+    )
