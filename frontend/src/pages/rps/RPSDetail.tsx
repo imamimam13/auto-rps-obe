@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2, Globe, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2, Globe, Loader2, Copy } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -55,9 +55,20 @@ export default function RPSDetail() {
   const [fixing, setFixing] = useState(false)
   const [analyzingSDGs, setAnalyzingSDGs] = useState(false)
   const [analyzingBloom, setAnalyzingBloom] = useState(false)
+  const [showCopyModal, setShowCopyModal] = useState(false)
+  const [copyTargetPeriode, setCopyTargetPeriode] = useState('')
+  const [copyTargetStatus, setCopyTargetStatus] = useState('draft')
+  const [periodes, setPeriodes] = useState<any[]>([])
+  const [copying, setCopying] = useState(false)
 
   useEffect(() => {
     if (id) loadData()
+    api.get('/api/v1/periode/').then(r => {
+      const list = r.data.items || []
+      setPeriodes(list)
+      const act = list.find((p: any) => p.is_active)
+      if (act) setCopyTargetPeriode(act.nama || act.tahun_akademik)
+    }).catch(() => {})
   }, [id])
 
   async function loadData() {
@@ -68,6 +79,27 @@ export default function RPSDetail() {
       toast.error('Gagal memuat RPS')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleCopyRPS() {
+    if (!copyTargetPeriode.trim()) {
+      toast.error('Pilih atau masukkan periode target')
+      return
+    }
+    setCopying(true)
+    try {
+      const res = await api.post(`/api/v1/rps/${id}/copy`, {
+        target_tahun_akademik: copyTargetPeriode.trim(),
+        target_status: copyTargetStatus,
+      })
+      toast.success(`RPS berhasil disalin ke periode '${copyTargetPeriode}'!`)
+      setShowCopyModal(false)
+      navigate(`/rps/${res.data.id}`)
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Gagal menyalin RPS'))
+    } finally {
+      setCopying(false)
     }
   }
 
@@ -404,6 +436,14 @@ export default function RPSDetail() {
         </div>
         {/* Row 2: secondary actions */}
         <div className="flex items-center gap-2 flex-wrap justify-end">
+          {canEditRPS && (
+            <button
+              onClick={() => setShowCopyModal(true)}
+              className="macos-button flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-apple-md"
+            >
+              <Copy className="w-4 h-4" /> Salin ke Periode Lain
+            </button>
+          )}
           <button onClick={handleValidate} disabled={validating} className="macos-button-ghost flex items-center gap-1.5 text-sm">
             <CheckSquare className="w-4 h-4" /> {validating ? 'Memvalidasi...' : 'Validasi OBE'}
           </button>
@@ -1350,6 +1390,87 @@ export default function RPSDetail() {
                 className="macos-button py-2.5 px-4 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-medium text-xs rounded-apple-lg"
               >
                 Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Salin RPS ke Periode Lain */}
+      {showCopyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-apple-xl bg-emerald-50 text-emerald-600">
+                <Copy className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Salin RPS ke Periode Lain</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Duplikasi seluruh silabus & capaian ke tahun akademik berikutnya</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 pt-2">
+              <div className="p-3 bg-gray-50 rounded-apple-lg border border-gray-100 text-xs text-gray-600 space-y-1">
+                <p><strong>Mata Kuliah:</strong> {rps?.identitas?.nama_mata_kuliah || 'RPS'}</p>
+                <p><strong>Periode Saat Ini:</strong> {rps?.tahun_akademik || '-'}</p>
+                <p><strong>Status Saat Ini:</strong> <span className="capitalize font-medium text-gray-800">{rps?.status}</span></p>
+              </div>
+
+              <div>
+                <label className="macos-label">Target Tahun Akademik / Periode *</label>
+                <div className="space-y-1.5">
+                  <select
+                    className="macos-input"
+                    value={copyTargetPeriode}
+                    onChange={(e) => setCopyTargetPeriode(e.target.value)}
+                  >
+                    <option value="">-- Pilih dari Master Periode --</option>
+                    {periodes.map((p) => (
+                      <option key={p.id} value={p.nama}>
+                        {p.nama} {p.is_active ? '(Aktif)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="macos-input text-xs"
+                    value={copyTargetPeriode}
+                    onChange={(e) => setCopyTargetPeriode(e.target.value)}
+                    placeholder="Atau ketik manual (misal: 2025/2026 Ganjil)"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="macos-label">Status Hasil Duplikasi</label>
+                <select
+                  className="macos-input"
+                  value={copyTargetStatus}
+                  onChange={(e) => setCopyTargetStatus(e.target.value)}
+                >
+                  <option value="draft">Draft (Rekomendasi - untuk ditinjau)</option>
+                  <option value="review">Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setShowCopyModal(false)}
+                disabled={copying}
+                className="macos-button-ghost text-xs px-3.5 py-2"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleCopyRPS}
+                disabled={copying || !copyTargetPeriode.trim()}
+                className="macos-button flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-apple-lg"
+              >
+                {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                {copying ? 'Menyalin RPS...' : 'Salin RPS Sekarang'}
               </button>
             </div>
           </div>

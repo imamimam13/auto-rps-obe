@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2 } from 'lucide-react'
+import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2, Copy, Loader2, ArrowRight } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -90,6 +90,104 @@ export default function RPSList() {
       }
     } catch (e) {
       console.error('Gagal memuat periode list', e)
+    }
+  }
+
+  // Single Copy Modal State
+  const [showSingleCopyModal, setShowSingleCopyModal] = useState(false)
+  const [copyTargetRps, setCopyTargetRps] = useState<any>(null)
+  const [singleCopyPeriode, setSingleCopyPeriode] = useState('')
+  const [singleCopyStatus, setSingleCopyStatus] = useState('draft')
+  const [singleCopying, setSingleCopying] = useState(false)
+
+  // Bulk Copy Modal State
+  const [showBulkCopyModal, setShowBulkCopyModal] = useState(false)
+  const [bulkCopyConfig, setBulkCopyConfig] = useState({
+    source_tahun_akademik: '',
+    target_tahun_akademik: '',
+    prodi_id: 'all',
+    statuses: ['draft', 'review', 'approved', 'published'],
+    target_status: 'draft',
+    skip_existing: true,
+  })
+  const [bulkCopying, setBulkCopying] = useState(false)
+  const [bulkCopyResult, setBulkCopyResult] = useState<any>(null)
+
+  function openSingleCopyModal(rpsItem: any) {
+    setCopyTargetRps(rpsItem)
+    const act = periodes.find(p => p.is_active)
+    setSingleCopyPeriode(act?.nama || act?.tahun_akademik || '')
+    setSingleCopyStatus('draft')
+    setShowSingleCopyModal(true)
+  }
+
+  async function handleSingleCopySubmit() {
+    if (!copyTargetRps || !singleCopyPeriode.trim()) {
+      toast.error('Pilih atau masukkan periode target')
+      return
+    }
+    setSingleCopying(true)
+    try {
+      const res = await api.post(`/api/v1/rps/${copyTargetRps.id}/copy`, {
+        target_tahun_akademik: singleCopyPeriode.trim(),
+        target_status: singleCopyStatus,
+      })
+      toast.success(`RPS berhasil disalin ke periode '${singleCopyPeriode}'!`)
+      setShowSingleCopyModal(false)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal menyalin RPS')
+    } finally {
+      setSingleCopying(false)
+    }
+  }
+
+  async function openBulkCopy() {
+    if (prodis.length === 0) await loadProdis()
+    if (periodes.length === 0) await loadPeriodes()
+    const act = periodes.find(p => p.is_active)
+    setBulkCopyConfig({
+      source_tahun_akademik: periodeFilter || (periodes[0]?.nama || ''),
+      target_tahun_akademik: act?.nama || '',
+      prodi_id: prodiFilter || 'all',
+      statuses: ['draft', 'review', 'approved', 'published'],
+      target_status: 'draft',
+      skip_existing: true,
+    })
+    setBulkCopyResult(null)
+    setShowBulkCopyModal(true)
+  }
+
+  async function handleBulkCopySubmit() {
+    if (!bulkCopyConfig.source_tahun_akademik || !bulkCopyConfig.target_tahun_akademik) {
+      toast.error('Pilih periode sumber dan periode target')
+      return
+    }
+    if (bulkCopyConfig.source_tahun_akademik === bulkCopyConfig.target_tahun_akademik) {
+      toast.error('Periode sumber dan target tidak boleh sama')
+      return
+    }
+    setBulkCopying(true)
+    try {
+      const res = await api.post('/api/v1/rps/bulk-copy', {
+        source_tahun_akademik: bulkCopyConfig.source_tahun_akademik,
+        target_tahun_akademik: bulkCopyConfig.target_tahun_akademik,
+        prodi_id: bulkCopyConfig.prodi_id === 'all' ? null : bulkCopyConfig.prodi_id,
+        statuses: bulkCopyConfig.statuses,
+        target_status: bulkCopyConfig.target_status,
+        skip_existing: bulkCopyConfig.skip_existing,
+      })
+      setBulkCopyResult(res.data)
+      if (res.data.copied > 0) {
+        toast.success(`Berhasil menyalin ${res.data.copied} RPS ke periode '${bulkCopyConfig.target_tahun_akademik}'!`)
+      } else {
+        toast.error(`Tidak ada RPS yang disalin (${res.data.skipped} dilewati, ${res.data.errors} error)`)
+      }
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal bulk copy RPS')
+    } finally {
+      setBulkCopying(false)
     }
   }
 
@@ -394,12 +492,20 @@ export default function RPSList() {
           <p className="text-sm text-gray-500 mt-1">Rencana Pembelajaran Semester</p>
         </div>
         {canEditRPS && (
-          <button
-            onClick={openBulkModal}
-            className="macos-button flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
-          >
-            <Sparkles className="w-4 h-4" /> Bulk Generate RPS
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={openBulkCopy}
+              className="macos-button flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
+            >
+              <Copy className="w-4 h-4" /> Salin Massal Periode
+            </button>
+            <button
+              onClick={openBulkModal}
+              className="macos-button flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
+            >
+              <Sparkles className="w-4 h-4" /> Bulk Generate RPS
+            </button>
+          </div>
         )}
       </div>
 
@@ -476,6 +582,11 @@ export default function RPSList() {
                   <button onClick={() => handleExport(rps.id, 'docx')} className="macos-button-ghost px-2.5 py-1.5 text-xs" title="Export DOCX">
                     <FileText className="w-3.5 h-3.5" />
                   </button>
+                  {canEditRPS && (
+                    <button onClick={() => openSingleCopyModal(rps)} className="macos-button-ghost px-2.5 py-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" title="Salin ke Periode Lain">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   {canEditRPS && (
                     <button onClick={() => handleDelete(rps.id)} className="macos-button-ghost px-2.5 py-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50" title="Hapus RPS">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -737,6 +848,264 @@ export default function RPSList() {
                   className="macos-button py-2.5 px-4 flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-medium text-xs rounded-apple-lg"
                 >
                   <Sparkles className="w-4 h-4" /> Generate Lagi
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Salin 1 RPS ke Periode Lain */}
+      {showSingleCopyModal && copyTargetRps && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-apple-xl bg-emerald-50 text-emerald-600">
+                <Copy className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Salin RPS ke Periode Lain</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Duplikasi silabus & capaian ke tahun akademik berikutnya</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 pt-2">
+              <div className="p-3 bg-gray-50 rounded-apple-lg border border-gray-100 text-xs text-gray-600 space-y-1">
+                <p><strong>Mata Kuliah:</strong> {copyTargetRps.identitas?.nama_mata_kuliah || copyTargetRps.kode}</p>
+                <p><strong>Periode Saat Ini:</strong> {copyTargetRps.tahun_akademik || '-'}</p>
+                <p><strong>Status Saat Ini:</strong> <span className="capitalize font-medium text-gray-800">{copyTargetRps.status}</span></p>
+              </div>
+
+              <div>
+                <label className="macos-label">Target Tahun Akademik / Periode *</label>
+                <div className="space-y-1.5">
+                  <select
+                    className="macos-input"
+                    value={singleCopyPeriode}
+                    onChange={(e) => setSingleCopyPeriode(e.target.value)}
+                  >
+                    <option value="">-- Pilih dari Master Periode --</option>
+                    {periodes.map((p) => (
+                      <option key={p.id} value={p.nama}>
+                        {p.nama} {p.is_active ? '(Aktif)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="macos-input text-xs"
+                    value={singleCopyPeriode}
+                    onChange={(e) => setSingleCopyPeriode(e.target.value)}
+                    placeholder="Atau ketik manual (misal: 2025/2026 Ganjil)"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="macos-label">Status Hasil Duplikasi</label>
+                <select
+                  className="macos-input"
+                  value={singleCopyStatus}
+                  onChange={(e) => setSingleCopyStatus(e.target.value)}
+                >
+                  <option value="draft">Draft (Rekomendasi - untuk ditinjau)</option>
+                  <option value="review">Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setShowSingleCopyModal(false)}
+                disabled={singleCopying}
+                className="macos-button-ghost text-xs px-3.5 py-2"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSingleCopySubmit}
+                disabled={singleCopying || !singleCopyPeriode.trim()}
+                className="macos-button flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-apple-lg"
+              >
+                {singleCopying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                {singleCopying ? 'Menyalin...' : 'Salin RPS'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Salin Massal RPS ke Periode Lain */}
+      {showBulkCopyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-lg p-6 space-y-5 border border-gray-100 max-h-[90vh] overflow-y-auto animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-apple-xl bg-emerald-50 text-emerald-600">
+                <Copy className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Salin Massal RPS ke Periode Baru</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Duplikasi seluruh RPS dari satu periode ke periode akademik berikutnya</p>
+              </div>
+            </div>
+
+            {!bulkCopyResult ? (
+              <div className="space-y-4 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="macos-label">Periode Sumber (Asal) *</label>
+                    <select
+                      className="macos-input"
+                      value={bulkCopyConfig.source_tahun_akademik}
+                      onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, source_tahun_akademik: e.target.value })}
+                    >
+                      <option value="">-- Pilih Periode Sumber --</option>
+                      {periodes.map((p) => (
+                        <option key={p.id} value={p.nama}>
+                          {p.nama} {p.is_active ? '(Aktif)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="macos-label">Periode Target (Tujuan) *</label>
+                    <select
+                      className="macos-input"
+                      value={bulkCopyConfig.target_tahun_akademik}
+                      onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, target_tahun_akademik: e.target.value })}
+                    >
+                      <option value="">-- Pilih Periode Target --</option>
+                      {periodes.map((p) => (
+                        <option key={p.id} value={p.nama}>
+                          {p.nama} {p.is_active ? '(Aktif)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="macos-label">Program Studi</label>
+                  <select
+                    className="macos-input"
+                    value={bulkCopyConfig.prodi_id}
+                    onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, prodi_id: e.target.value })}
+                  >
+                    <option value="all">Semua Program Studi</option>
+                    {prodis.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="macos-label">Status RPS yang Ingin Disalin</label>
+                  <div className="grid grid-cols-2 gap-2 mt-1 p-3 bg-gray-50 rounded-apple-lg border border-gray-100">
+                    {['draft', 'review', 'approved', 'published'].map((st) => (
+                      <label key={st} className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700 capitalize">
+                        <input
+                          type="checkbox"
+                          checked={bulkCopyConfig.statuses.includes(st)}
+                          onChange={(e) => {
+                            const cur = bulkCopyConfig.statuses
+                            if (e.target.checked) {
+                              setBulkCopyConfig({ ...bulkCopyConfig, statuses: [...cur, st] })
+                            } else {
+                              setBulkCopyConfig({ ...bulkCopyConfig, statuses: cur.filter(x => x !== st) })
+                            }
+                          }}
+                          className="w-3.5 h-3.5 accent-emerald-600 rounded"
+                        />
+                        {st}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="macos-label">Status Hasil di Periode Target</label>
+                    <select
+                      className="macos-input"
+                      value={bulkCopyConfig.target_status}
+                      onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, target_status: e.target.value })}
+                    >
+                      <option value="draft">Draft (Ditinjau Dosen)</option>
+                      <option value="review">Review</option>
+                      <option value="approved">Approved</option>
+                      <option value="published">Published</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center pt-5">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-800">
+                      <input
+                        type="checkbox"
+                        checked={bulkCopyConfig.skip_existing}
+                        onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, skip_existing: e.target.checked })}
+                        className="w-4 h-4 accent-emerald-600 rounded"
+                      />
+                      Lewati jika sudah ada di periode target
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 pt-1">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-emerald-50 rounded-apple-xl border border-emerald-100">
+                    <p className="text-2xl font-bold text-emerald-600">{bulkCopyResult.copied}</p>
+                    <p className="text-xs font-medium text-emerald-700 mt-0.5">Berhasil Disalin</p>
+                  </div>
+                  <div className="p-3 bg-amber-50 rounded-apple-xl border border-amber-100">
+                    <p className="text-2xl font-bold text-amber-600">{bulkCopyResult.skipped}</p>
+                    <p className="text-xs font-medium text-amber-700 mt-0.5">Dilewati (Sudah Ada)</p>
+                  </div>
+                  <div className="p-3 bg-rose-50 rounded-apple-xl border border-rose-100">
+                    <p className="text-2xl font-bold text-rose-600">{bulkCopyResult.errors}</p>
+                    <p className="text-xs font-medium text-rose-700 mt-0.5">Gagal</p>
+                  </div>
+                </div>
+
+                {bulkCopyResult.detail?.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto p-3 bg-gray-50 rounded-apple-lg border border-gray-100 text-xs space-y-1">
+                    <p className="font-semibold text-gray-700 mb-1">Daftar RPS Berhasil Disalin:</p>
+                    {bulkCopyResult.detail.map((d: any, i: number) => (
+                      <p key={i} className="text-gray-600 flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="font-medium text-gray-800">{d.nama}</span> ({d.target_kode})
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              {!bulkCopyResult ? (
+                <>
+                  <button
+                    onClick={() => setShowBulkCopyModal(false)}
+                    disabled={bulkCopying}
+                    className="macos-button-ghost text-xs px-3.5 py-2"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={handleBulkCopySubmit}
+                    disabled={bulkCopying || !bulkCopyConfig.source_tahun_akademik || !bulkCopyConfig.target_tahun_akademik || bulkCopyConfig.statuses.length === 0}
+                    className="macos-button flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-apple-lg disabled:opacity-50"
+                  >
+                    {bulkCopying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                    {bulkCopying ? 'Menyalin Semua RPS...' : 'Mulai Salin Massal'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setShowBulkCopyModal(false)}
+                  className="macos-button text-xs bg-gray-900 hover:bg-black text-white font-medium px-4 py-2 rounded-apple-lg"
+                >
+                  Selesai
                 </button>
               )}
             </div>

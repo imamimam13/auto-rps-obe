@@ -267,6 +267,25 @@ class RPSResponse(RPSBase):
         from_attributes = True
 
 
+class RPSCopyRequest(BaseModel):
+    target_tahun_akademik: str
+    target_status: Optional[str] = "draft"
+    dosen_pengampu: Optional[List[Any]] = None
+
+
+class RPSBulkCopyRequest(BaseModel):
+    source_tahun_akademik: str
+    target_tahun_akademik: str
+    prodi_id: Optional[Union[int, str]] = None
+    statuses: Optional[List[str]] = None
+    target_status: Optional[str] = "draft"
+    skip_existing: Optional[bool] = True
+    approved_by: Optional[Any] = None
+
+    class Config:
+        from_attributes = True
+
+
 # AI Generation Schemas
 class RPSGenerateRequest(BaseModel):
     mata_kuliah_id: int
