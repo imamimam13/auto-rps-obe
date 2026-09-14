@@ -1468,16 +1468,17 @@ export default function RPSList() {
 
       {/* Modal Sinkronisasi Jadwal Kuliah & Dosen Pengampu */}
       {showJadwalModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-3xl p-6 space-y-4 border border-gray-100 max-h-[92vh] overflow-y-auto animate-scale-up">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-3xl h-[88vh] max-h-[720px] flex flex-col border border-gray-100 overflow-hidden animate-scale-up">
+            {/* 1. Header (Fixed) */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0 bg-white">
               <div className="flex items-center gap-3">
-                <div className="p-3 rounded-apple-xl bg-blue-50 text-blue-600">
-                  <Calendar className="w-6 h-6" />
+                <div className="p-2.5 rounded-apple-xl bg-blue-50 text-blue-600">
+                  <Calendar className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900">Sinkronisasi Jadwal & Dosen Pengampu</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Ekstrak dosen pengampu dari file Excel SIAKAD dan pasangkan ke RPS periode terkait</p>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900">Sinkronisasi Jadwal & Dosen Pengampu</h3>
+                  <p className="text-[11px] text-gray-500">Ekstrak dosen pengampu dari file Excel SIAKAD dan pasangkan ke RPS periode target</p>
                 </div>
               </div>
               <button
@@ -1488,276 +1489,278 @@ export default function RPSList() {
               </button>
             </div>
 
-            {/* Konfigurasi Target Periode & Prodi */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 p-3.5 bg-blue-50/50 rounded-apple-xl border border-blue-100/60">
-              <div>
-                <label className="macos-label text-blue-900 font-semibold">Periode Akademik Tujuan *</label>
-                <div className="space-y-1.5 mt-1">
+            {/* 2. Scrollable Body */}
+            <div className="p-4 space-y-3.5 flex-1 overflow-y-auto min-h-0">
+              {/* Konfigurasi Target Periode & Prodi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50/50 rounded-apple-xl border border-blue-100/60">
+                <div>
+                  <label className="text-[11px] font-semibold text-blue-900 block mb-1">Periode Akademik Tujuan *</label>
                   <select
-                    className="macos-input bg-white text-xs"
+                    className="macos-input bg-white text-xs py-1.5"
                     value={jadwalTargetPeriode}
                     onChange={(e) => setJadwalTargetPeriode(e.target.value)}
                   >
                     <option value="">-- Pilih Periode Tujuan --</option>
-                    {periodes.map((p) => (
-                      <option key={p.id} value={p.nama}>
-                        {p.nama} {p.is_active ? '(Aktif)' : ''}
-                      </option>
+                    {allAvailablePeriodes.map((pName) => {
+                      const pObj = periodes.find(p => p.nama === pName)
+                      return (
+                        <option key={pName} value={pName}>
+                          {pName} {pObj?.is_active ? '(Aktif)' : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-blue-900 block mb-1">Filter Program Studi</label>
+                  <select
+                    className="macos-input bg-white text-xs py-1.5"
+                    value={jadwalProdiId}
+                    onChange={(e) => setJadwalProdiId(e.target.value)}
+                  >
+                    <option value="all">Semua Program Studi</option>
+                    {prodis.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
                     ))}
                   </select>
-                  <input
-                    type="text"
-                    placeholder="Atau ketik periode manual (cth: 2025/2026 Genap)"
-                    value={jadwalTargetPeriode}
-                    onChange={(e) => setJadwalTargetPeriode(e.target.value)}
-                    className="macos-input bg-white text-xs"
-                  />
                 </div>
               </div>
 
-              <div>
-                <label className="macos-label text-blue-900 font-semibold">Filter Program Studi</label>
-                <select
-                  className="macos-input bg-white text-xs mt-1"
-                  value={jadwalProdiId}
-                  onChange={(e) => setJadwalProdiId(e.target.value)}
-                >
-                  <option value="all">Semua Program Studi</option>
-                  {prodis.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-blue-700 mt-1.5">
-                  💡 Jam, ruangan, & kuota otomatis diabaikan. Hanya data Dosen, MK, dan Prodi yang diekstrak.
-                </p>
-              </div>
-            </div>
-
-            {/* Input Metode Upload / Paste */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setJadwalInputMode('upload')}
-                    className={`text-xs font-medium px-3 py-1.5 rounded-apple-lg transition-all ${
-                      jadwalInputMode === 'upload'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    <FileUp className="w-3.5 h-3.5 inline mr-1" /> Upload File Excel (.xlsx / .csv)
-                  </button>
-                  <button
-                    onClick={() => setJadwalInputMode('paste')}
-                    className={`text-xs font-medium px-3 py-1.5 rounded-apple-lg transition-all ${
-                      jadwalInputMode === 'paste'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5 inline mr-1" /> Copy-Paste Tabel
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">Template:</span>
-                  <button
-                    onClick={() => downloadJadwalTemplate('simple')}
-                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium bg-blue-50/60 hover:bg-blue-100/80 px-2.5 py-1 rounded-apple-md transition-colors"
-                    title="Unduh template standar sederhana (Kode MK, Nama MK, Prodi, Dosen)"
-                  >
-                    <Download className="w-3 h-3" /> Template Standar
-                  </button>
-                  <button
-                    onClick={() => downloadJadwalTemplate('siakad')}
-                    className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 font-medium bg-emerald-50/60 hover:bg-emerald-100/80 px-2.5 py-1 rounded-apple-md transition-colors"
-                    title="Unduh template format SIAKAD (16 kolom dengan Kurikulum, Jam, Ruang dll)"
-                  >
-                    <Download className="w-3 h-3" /> Template SIAKAD
-                  </button>
-                </div>
-              </div>
-
-              {jadwalInputMode === 'upload' ? (
-                <div className="p-4 border-2 border-dashed border-gray-200 rounded-apple-xl bg-gray-50/50 text-center hover:border-blue-300 transition-colors">
-                  <FileSpreadsheet className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                  <p className="text-xs font-medium text-gray-700">Pilih file jadwal kuliah SIAKAD (Format .xlsx, .xlsm, .csv)</p>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xlsm,.xls,.csv,.txt"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setJadwalFile(e.target.files[0])
-                        setJadwalExtracted([])
-                      }
-                    }}
-                    className="text-xs mt-2 text-gray-600 file:mr-2 file:py-1 file:px-3 file:rounded-apple-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                  />
-                  {jadwalFile && (
-                    <p className="text-xs text-emerald-600 font-medium mt-2">
-                      ✓ File terpilih: <span className="font-semibold">{jadwalFile.name}</span> ({(jadwalFile.size / 1024).toFixed(1)} KB)
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <textarea
-                    rows={4}
-                    placeholder="Paste tabel data dari Excel di sini (Kode MK | Nama MK | SKS | Semester | Kurikulum/Prodi | Dosen Pengampu | Team Teaching)..."
-                    value={jadwalRawText}
-                    onChange={(e) => {
-                      setJadwalRawText(e.target.value)
-                      setJadwalExtracted([])
-                    }}
-                    className="macos-input text-xs font-mono w-full"
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleParseJadwal}
-                  disabled={jadwalParsing || (jadwalInputMode === 'upload' ? !jadwalFile : !jadwalRawText.trim())}
-                  className="macos-button flex items-center gap-1.5 text-xs bg-gray-900 hover:bg-black text-white font-medium px-4 py-2 rounded-apple-lg disabled:opacity-50"
-                >
-                  {jadwalParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {jadwalParsing ? 'Mengekstrak Jadwal...' : 'Ekstrak & Analisis Dosen'}
-                </button>
-              </div>
-            </div>
-
-            {/* Hasil Ekstraksi & Preview Table */}
-            {jadwalExtracted.length > 0 && (
-              <div className="space-y-2.5 pt-2 border-t border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-semibold text-gray-800">
-                      Hasil Ekstraksi: {jadwalExtracted.length} Mata Kuliah Ditemukan
-                    </span>
+              {/* Input Metode Upload / Paste */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setJadwalInputMode('upload')}
+                      className={`text-xs font-medium px-2.5 py-1.5 rounded-apple-lg transition-all ${
+                        jadwalInputMode === 'upload'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      <FileUp className="w-3.5 h-3.5 inline mr-1" /> Upload Excel (.xlsx / .csv)
+                    </button>
+                    <button
+                      onClick={() => setJadwalInputMode('paste')}
+                      className={`text-xs font-medium px-2.5 py-1.5 rounded-apple-lg transition-all ${
+                        jadwalInputMode === 'paste'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5 inline mr-1" /> Copy-Paste
+                    </button>
                   </div>
-                  <div className="relative w-56">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Cari MK atau Dosen..."
-                      value={jadwalSearch}
-                      onChange={(e) => setJadwalSearch(e.target.value)}
-                      className="macos-input pl-8 py-1 text-xs"
-                    />
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => downloadJadwalTemplate('simple')}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-apple-md transition-colors"
+                      title="Unduh template standar (Kode MK, Nama MK, Prodi, Dosen)"
+                    >
+                      <Download className="w-3 h-3" /> Template Standar
+                    </button>
+                    <button
+                      onClick={() => downloadJadwalTemplate('siakad')}
+                      className="text-[11px] text-emerald-600 hover:text-emerald-800 flex items-center gap-1 font-medium bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-apple-md transition-colors"
+                      title="Unduh template format SIAKAD (16 kolom)"
+                    >
+                      <Download className="w-3 h-3" /> Template SIAKAD
+                    </button>
                   </div>
                 </div>
 
-                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-apple-xl bg-white shadow-xs">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-gray-50 text-gray-600 sticky top-0 border-b border-gray-200">
-                      <tr>
-                        <th className="p-2.5 font-semibold">Kode</th>
-                        <th className="p-2.5 font-semibold">Nama Mata Kuliah</th>
-                        <th className="p-2.5 font-semibold">Prodi / Kurikulum</th>
-                        <th className="p-2.5 font-semibold">Sem</th>
-                        <th className="p-2.5 font-semibold">Dosen Pengampu & Tim</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {jadwalExtracted
-                        .filter((item) => {
-                          if (!jadwalSearch) return true
-                          const s = jadwalSearch.toLowerCase()
-                          const k = item.kode_mk?.toLowerCase() || ''
-                          const n = item.nama_mk?.toLowerCase() || ''
-                          const p = item.prodi_nama?.toLowerCase() || ''
-                          const d = (item.semua_dosen || []).join(' ').toLowerCase()
-                          return k.includes(s) || n.includes(s) || p.includes(s) || d.includes(s)
-                        })
-                        .map((item, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50/70">
-                            <td className="p-2.5 font-mono font-medium text-gray-800">{item.kode_mk}</td>
-                            <td className="p-2.5 font-medium text-gray-900">{item.nama_mk}</td>
-                            <td className="p-2.5 text-gray-600">
-                              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-[11px] font-medium">
-                                {item.prodi_nama || item.kurikulum || '-'}
-                              </span>
-                            </td>
-                            <td className="p-2.5 text-gray-600 text-center">{item.semester}</td>
-                            <td className="p-2.5 text-gray-800">
-                              {item.semua_dosen && item.semua_dosen.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {item.semua_dosen.map((d: string, dIdx: number) => (
-                                    <span
-                                      key={dIdx}
-                                      className="px-2 py-0.5 rounded-apple bg-blue-50 text-blue-700 font-medium text-[11px] border border-blue-100/80"
-                                    >
-                                      {d}
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic">Tidak ada dosen</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Hasil Eksekusi Sinkronisasi */}
-            {jadwalSyncResult && (
-              <div className="space-y-3 pt-3 border-t border-gray-100 animate-fade-in">
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="p-3 bg-emerald-50 rounded-apple-xl border border-emerald-100">
-                    <p className="text-2xl font-bold text-emerald-600">{jadwalSyncResult.updated_rps}</p>
-                    <p className="text-xs font-medium text-emerald-700 mt-0.5">RPS Berhasil Disinkron</p>
-                  </div>
-                  <div className="p-3 bg-amber-50 rounded-apple-xl border border-amber-100">
-                    <p className="text-2xl font-bold text-amber-600">{jadwalSyncResult.not_found_rps}</p>
-                    <p className="text-xs font-medium text-amber-700 mt-0.5">RPS Belum Dibuat</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-apple-xl border border-gray-100">
-                    <p className="text-2xl font-bold text-gray-600">{jadwalSyncResult.skipped}</p>
-                    <p className="text-xs font-medium text-gray-700 mt-0.5">Dilewati (Tanpa Dosen)</p>
-                  </div>
-                </div>
-
-                {jadwalSyncResult.detail?.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto p-2.5 bg-gray-50 rounded-apple-lg border border-gray-100 text-xs space-y-1">
-                    {jadwalSyncResult.detail.slice(0, 50).map((d: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2 py-0.5 text-gray-700">
-                        {d.status === 'updated' ? (
-                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        ) : (
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        )}
-                        <span className="font-mono font-medium">{d.kode}</span> - {d.nama}: <span className="text-gray-500">{d.message}</span>
+                {jadwalInputMode === 'upload' ? (
+                  <div className="p-3 border-2 border-dashed border-gray-200 rounded-apple-xl bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-2.5 hover:border-blue-300 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <FileSpreadsheet className="w-6 h-6 text-blue-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-700">Pilih file jadwal kuliah SIAKAD</p>
+                        <input
+                          type="file"
+                          accept=".xlsx,.xlsm,.xls,.csv,.txt"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setJadwalFile(e.target.files[0])
+                              setJadwalExtracted([])
+                            }
+                          }}
+                          className="text-xs mt-1 text-gray-600 file:mr-2 file:py-0.5 file:px-2.5 file:rounded-apple-md file:border-0 file:text-[11px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                        />
                       </div>
-                    ))}
+                    </div>
+                    <button
+                      onClick={handleParseJadwal}
+                      disabled={jadwalParsing || !jadwalFile}
+                      className="macos-button flex items-center gap-1.5 text-xs bg-gray-900 hover:bg-black text-white font-medium px-3.5 py-1.5 rounded-apple-lg disabled:opacity-50 shrink-0"
+                    >
+                      {jadwalParsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {jadwalParsing ? 'Mengekstrak...' : 'Ekstrak Dosen'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      rows={3}
+                      placeholder="Paste tabel data dari Excel di sini..."
+                      value={jadwalRawText}
+                      onChange={(e) => {
+                        setJadwalRawText(e.target.value)
+                        setJadwalExtracted([])
+                      }}
+                      className="macos-input text-xs font-mono w-full"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleParseJadwal}
+                        disabled={jadwalParsing || !jadwalRawText.trim()}
+                        className="macos-button flex items-center gap-1.5 text-xs bg-gray-900 hover:bg-black text-white font-medium px-3.5 py-1.5 rounded-apple-lg disabled:opacity-50"
+                      >
+                        {jadwalParsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {jadwalParsing ? 'Mengekstrak...' : 'Ekstrak Dosen'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-            )}
 
-            {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
-              <button
-                onClick={() => setShowJadwalModal(false)}
-                disabled={jadwalSyncing}
-                className="macos-button-ghost text-xs px-3.5 py-2"
-              >
-                {jadwalSyncResult ? 'Tutup' : 'Batal'}
-              </button>
-              {jadwalExtracted.length > 0 && !jadwalSyncResult && (
-                <button
-                  onClick={handleSyncJadwalSubmit}
-                  disabled={jadwalSyncing || !jadwalTargetPeriode.trim()}
-                  className="macos-button flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-apple-lg shadow-sm"
-                >
-                  {jadwalSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
-                  {jadwalSyncing ? 'Menyinkronkan...' : `Terapkan Sinkronisasi ke Periode '${jadwalTargetPeriode}'`}
-                </button>
+              {/* Hasil Ekstraksi & Preview Table */}
+              {jadwalExtracted.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      {jadwalExtracted.length} Mata Kuliah Terdeteksi
+                    </span>
+                    <div className="relative w-48">
+                      <Search className="w-3 h-3 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Cari MK/Dosen..."
+                        value={jadwalSearch}
+                        onChange={(e) => setJadwalSearch(e.target.value)}
+                        className="macos-input pl-7 py-0.5 text-[11px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-apple-xl bg-white shadow-xs">
+                    <table className="w-full text-left text-[11px] border-collapse">
+                      <thead className="bg-gray-50 text-gray-600 sticky top-0 border-b border-gray-200">
+                        <tr>
+                          <th className="p-2 font-semibold">Kode</th>
+                          <th className="p-2 font-semibold">Nama Mata Kuliah</th>
+                          <th className="p-2 font-semibold">Prodi</th>
+                          <th className="p-2 font-semibold text-center">Sem</th>
+                          <th className="p-2 font-semibold">Dosen Pengampu & Tim</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {jadwalExtracted
+                          .filter((item) => {
+                            if (!jadwalSearch) return true
+                            const s = jadwalSearch.toLowerCase()
+                            const k = item.kode_mk?.toLowerCase() || ''
+                            const n = item.nama_mk?.toLowerCase() || ''
+                            const p = item.prodi_nama?.toLowerCase() || ''
+                            const d = (item.semua_dosen || []).join(' ').toLowerCase()
+                            return k.includes(s) || n.includes(s) || p.includes(s) || d.includes(s)
+                          })
+                          .map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50/70">
+                              <td className="p-2 font-mono font-medium text-gray-800">{item.kode_mk}</td>
+                              <td className="p-2 font-medium text-gray-900">{item.nama_mk}</td>
+                              <td className="p-2 text-gray-600">{item.prodi_nama || item.kurikulum || '-'}</td>
+                              <td className="p-2 text-gray-600 text-center">{item.semester}</td>
+                              <td className="p-2 text-gray-800">
+                                {item.semua_dosen && item.semua_dosen.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.semua_dosen.map((d: string, dIdx: number) => (
+                                      <span
+                                        key={dIdx}
+                                        className="px-1.5 py-0.5 rounded-apple bg-blue-50 text-blue-700 font-medium text-[10px] border border-blue-100"
+                                      >
+                                        {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">Tidak ada dosen</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
+
+              {/* Hasil Eksekusi Sinkronisasi */}
+              {jadwalSyncResult && (
+                <div className="space-y-2.5 pt-2 border-t border-gray-100 animate-fade-in">
+                  <div className="grid grid-cols-3 gap-2.5 text-center">
+                    <div className="p-2.5 bg-emerald-50 rounded-apple-xl border border-emerald-100">
+                      <p className="text-xl font-bold text-emerald-600">{jadwalSyncResult.updated_rps}</p>
+                      <p className="text-[11px] font-medium text-emerald-700">RPS Berhasil Disinkron</p>
+                    </div>
+                    <div className="p-2.5 bg-amber-50 rounded-apple-xl border border-amber-100">
+                      <p className="text-xl font-bold text-amber-600">{jadwalSyncResult.not_found_rps}</p>
+                      <p className="text-[11px] font-medium text-amber-700">RPS Belum Dibuat</p>
+                    </div>
+                    <div className="p-2.5 bg-gray-50 rounded-apple-xl border border-gray-100">
+                      <p className="text-xl font-bold text-gray-600">{jadwalSyncResult.skipped}</p>
+                      <p className="text-[11px] font-medium text-gray-700">Dilewati</p>
+                    </div>
+                  </div>
+
+                  {jadwalSyncResult.detail?.length > 0 && (
+                    <div className="max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-apple-lg border border-gray-100 text-[11px] space-y-1">
+                      {jadwalSyncResult.detail.slice(0, 50).map((d: any, i: number) => (
+                        <div key={i} className="flex items-center gap-1.5 text-gray-700">
+                          {d.status === 'updated' ? (
+                            <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
+                          )}
+                          <span className="font-mono font-medium">{d.kode}</span> - {d.nama}: <span className="text-gray-500">{d.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Footer Bar (Always Fixed at Bottom) */}
+            <div className="p-3.5 px-5 bg-gray-50 border-t border-gray-200 shrink-0 flex items-center justify-between z-10">
+              <div>
+                {jadwalExtracted.length > 0 && !jadwalSyncResult && (
+                  <span className="text-xs font-semibold text-gray-700">
+                    🎯 Target Periode: <span className="text-blue-700 font-bold">{jadwalTargetPeriode}</span> ({jadwalExtracted.length} MK)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowJadwalModal(false)}
+                  disabled={jadwalSyncing}
+                  className="macos-button-ghost text-xs px-3.5 py-2"
+                >
+                  {jadwalSyncResult ? 'Selesai' : 'Batal'}
+                </button>
+                {jadwalExtracted.length > 0 && !jadwalSyncResult && (
+                  <button
+                    onClick={handleSyncJadwalSubmit}
+                    disabled={jadwalSyncing || !jadwalTargetPeriode.trim()}
+                    className="macos-button flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-apple-lg shadow-md hover:shadow-lg transition-all"
+                  >
+                    {jadwalSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
+                    {jadwalSyncing ? 'Menyinkronkan ke RPS...' : `Terapkan Sinkronisasi Sekarang`}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
