@@ -7,50 +7,20 @@ import { getSDGById } from '@/utils/sdgsData'
 interface RPS {
   id: number
   kode: string
-  mata_kuliah_id: number
-  prodi_id: number
-  semester: number
-  tahun_akademik: string
-  dosen_pengampu?: { nama: string; nidn: string }[]
-  identitas?: {
-    nama_mata_kuliah: string
-    kode_mata_kuliah: string
-    sks: number
-    semester: number
-    prodi: string
-    fakultas: string
-    tanggal_penyusunan?: string
-    no_dokumen?: string
-    koordinator_pengembang_rps?: string
-    koordinator_rmk?: string
-    ka_prodi?: string
-    gugus_kendali_mutu?: string
-  }
+  mata_kuliah_id?: number
+  prodi_id?: number
+  semester?: number
+  tahun_akademik?: string
+  dosen_pengampu?: any
+  identitas?: any
   deskripsi_mata_kuliah?: string
   bahan_kajian?: string[] | string
   cpmk?: { kode: string; deskripsi: string; bobot: number; cpl_prodi: string[] }[]
   sub_cpmk?: { kode: string; cpmk_kode: string; deskripsi: string; indikator: string[] }[]
-  rencana_pembelajaran?: {
-    minggu_ke: number
-    sub_cpmk_kode: string
-    sub_cpmk_deskripsi?: string
-    materi: string
-    metode: string | string[]
-    estimasi_waktu?: string
-    durasi?: string | number
-    pengalaman_belajar?: string
-    kriteria_penilaian?: string
-    bobot?: number
-  }[]
-  media_pembelajaran?: {
-    perangkat_lunak?: string[] | string
-    perangkat_keras?: string[] | string
-  } | string[] | any
-  penilaian?: { komponen: string; bobot: number; jenis: string }[]
-  referensi?: {
-    utama?: string[] | string
-    pendukung?: string[] | string
-  } | string[] | any
+  rencana_pembelajaran?: any[]
+  media_pembelajaran?: any
+  penilaian?: any[]
+  referensi?: any
   sdgs?: number[]
 }
 
@@ -207,19 +177,22 @@ export default function RPSPublicPreview() {
             <div className="text-xs space-y-2 text-gray-600">
               <div className="flex justify-between border-b border-gray-50 pb-1">
                 <span>Kode Mata Kuliah</span>
-                <span className="font-semibold text-gray-900 font-mono">{rps.identitas?.kode_mata_kuliah}</span>
+                <span className="font-semibold text-gray-900 font-mono">{rps.identitas?.kode_mata_kuliah || rps.kode}</span>
               </div>
               <div className="flex justify-between border-b border-gray-50 pb-1">
                 <span>Bobot Kredit (SKS)</span>
-                <span className="font-semibold text-gray-900">{rps.identitas?.sks} SKS</span>
+                <span className="font-semibold text-gray-900">{rps.identitas?.bobot_sks || rps.identitas?.sks || 3} SKS</span>
               </div>
               <div className="flex justify-between border-b border-gray-50 pb-1">
                 <span>Semester / Kelas</span>
-                <span className="font-semibold text-gray-900">Semester {rps.semester}</span>
+                <span className="font-semibold text-gray-900">
+                  Semester {rps.semester || rps.identitas?.semester || 1}
+                  {rps.identitas?.kelas ? ` · ${rps.identitas.kelas}` : ''}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Tahun Akademik</span>
-                <span className="font-semibold text-gray-900 font-mono">{rps.tahun_akademik}</span>
+                <span className="font-semibold text-gray-900 font-mono">{rps.tahun_akademik || rps.identitas?.tahun_akademik}</span>
               </div>
             </div>
           </div>
@@ -227,21 +200,37 @@ export default function RPSPublicPreview() {
           <div className="bg-white rounded-apple-xl border border-gray-100 p-5 shadow-sm space-y-3">
             <h3 className="text-xs font-bold tracking-wider text-gray-400 uppercase">Dosen Pengampu</h3>
             <div className="text-xs space-y-2 text-gray-700">
-              {rps.dosen_pengampu && rps.dosen_pengampu.length > 0 ? (
-                rps.dosen_pengampu.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-gray-50 px-2.5 py-1.5 rounded-apple-md">
-                    <div className="w-5 h-5 rounded-full bg-macos-blue/10 text-macos-blue font-bold flex items-center justify-center text-[10px]">
-                      {(d.nama || 'D').charAt(0)}
+              {(() => {
+                let dList: any[] = []
+                const raw = rps.dosen_pengampu || rps.identitas?.dosen_pengampu
+                if (Array.isArray(raw)) {
+                  dList = raw
+                } else if (typeof raw === 'string' && raw.trim()) {
+                  dList = raw.split(/[\n,;]+/).map((s: string) => s.trim()).filter(Boolean)
+                }
+
+                if (!dList || dList.length === 0) {
+                  return <p className="text-gray-400 italic">Dosen Pengampu belum diisi.</p>
+                }
+
+                return dList.map((d: any, i: number) => {
+                  const name = typeof d === 'string' ? d : (d?.nama || d?.name || 'Dosen Pengampu')
+                  const nidn = typeof d === 'object' ? (d?.nidn || '-') : '-'
+                  const initial = name ? name.trim().charAt(0).toUpperCase() : 'D'
+
+                  return (
+                    <div key={i} className="flex items-center gap-2.5 bg-gray-50/80 border border-gray-100 px-3 py-2 rounded-apple-lg">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[11px] shrink-0">
+                        {initial}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 text-xs truncate">{name}</p>
+                        {nidn !== '-' && <p className="text-[10px] text-gray-400 font-mono">NIDN: {nidn}</p>}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold">{d.nama}</p>
-                      <p className="text-[10px] text-gray-400 font-mono">NIDN: {d.nidn || '-'}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-400 italic">Dosen Pengampu belum diisi.</p>
-              )}
+                  )
+                })
+              })()}
             </div>
           </div>
 
