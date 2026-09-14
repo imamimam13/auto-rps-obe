@@ -217,6 +217,7 @@ export default function RPSList() {
   const [jadwalSyncing, setJadwalSyncing] = useState(false)
   const [jadwalSyncResult, setJadwalSyncResult] = useState<any>(null)
   const [jadwalSearch, setJadwalSearch] = useState('')
+  const [jadwalAutoCreate, setJadwalAutoCreate] = useState(true)
 
   async function openJadwalModal() {
     if (prodis.length === 0) await loadProdis()
@@ -229,6 +230,7 @@ export default function RPSList() {
     setJadwalExtracted([])
     setJadwalSyncResult(null)
     setJadwalSearch('')
+    setJadwalAutoCreate(true)
     setShowJadwalModal(true)
   }
 
@@ -288,6 +290,7 @@ export default function RPSList() {
         target_tahun_akademik: jadwalTargetPeriode.trim(),
         prodi_id: jadwalProdiId === 'all' ? null : jadwalProdiId,
         items: jadwalExtracted,
+        auto_create_rps_draft: jadwalAutoCreate,
       }
       const res = await api.post('/api/v1/rps/sync-jadwal-dosen', payload)
       setJadwalSyncResult(res.data)
@@ -1526,6 +1529,19 @@ export default function RPSList() {
                   </select>
                 </div>
               </div>
+
+              {/* Checkbox Auto-Create MK & Draft RPS */}
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-blue-950 bg-blue-100/60 hover:bg-blue-100/90 p-2.5 rounded-apple-xl border border-blue-200/70 transition-all">
+                <input
+                  type="checkbox"
+                  checked={jadwalAutoCreate}
+                  onChange={(e) => setJadwalAutoCreate(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0"
+                />
+                <span>
+                  <strong className="text-blue-900">Otomatis Daftarkan MK & Buat Draft RPS</strong> jika belum ada di database (menyalin CPL/silabus lama jika ada)
+                </span>
+              </label>
 
               {/* Input Metode Upload / Paste */}
               <div className="space-y-2.5">

@@ -1024,21 +1024,51 @@ async def sync_jadwal_dosen(
         if not matched_mk and kode in mk_map_by_kode:
             matched_mk = mk_map_by_kode[kode][0]
 
+        # Auto-create Mata Kuliah if not found and auto_create is enabled (or default)
         if not matched_mk:
-            not_found_count += 1
-            detail.append({
-                "kode": kode,
-                "nama": item.nama_mk,
-                "status": "mk_not_found",
-                "message": f"Mata kuliah '{kode}' belum terdaftar di database",
-            })
-            continue
+            if data.auto_create_rps_draft is not False:
+                try:
+                    p_id = target_prodi_id or (list(prodis.keys())[0] if prodis else 1)
+                    new_mk = MataKuliah(
+                        kode=kode,
+                        nama=item.nama_mk or kode,
+                        sks=item.sks or 3,
+                        sks_teori=max(1, (item.sks or 3) - 1),
+                        sks_praktik=1 if (item.sks or 3) > 2 else 0,
+                        semester=item.semester or 1,
+                        prodi_id=p_id,
+                        periode="",
+                        status="aktif",
+                    )
+                    db.add(new_mk)
+                    await db.flush()
+                    await db.refresh(new_mk)
+                    matched_mk = new_mk
+                    mk_map_strict[f"{kode}_{p_id}"] = new_mk
+                except Exception as ex:
+                    not_found_count += 1
+                    detail.append({
+                        "kode": kode,
+                        "nama": item.nama_mk,
+                        "status": "mk_error",
+                        "message": f"Gagal mendaftarkan MK baru: {str(ex)}",
+                    })
+                    continue
+            else:
+                not_found_count += 1
+                detail.append({
+                    "kode": kode,
+                    "nama": item.nama_mk,
+                    "status": "mk_not_found",
+                    "message": f"Mata kuliah '{kode}' belum terdaftar di database",
+                })
+                continue
 
         # Check existing RPS in target period
         rps_record = rps_by_mk_id.get(matched_mk.id)
 
         if rps_record:
-            # Update dosen_pengampu on existing RPS
+            # 1. Update dosen_pengampu on existing RPS
             rps_record.dosen_pengampu = dosen_list
             identitas = dict(rps_record.identitas or {})
             identitas["dosen_pengampu"] = dosen_list
@@ -1056,14 +1086,109 @@ async def sync_jadwal_dosen(
                 "message": f"Dosen pengampu berhasil disinkronkan: {', '.join(dosen_list)}",
             })
         else:
-            not_found_count += 1
-            detail.append({
-                "kode": kode,
-                "nama": matched_mk.nama,
-                "status": "rps_not_found",
-                "message": f"RPS untuk periode '{target_ta}' belum dibuat",
-                "dosen": dosen_list,
-            })
+            # 2. RPS not yet created for target period -> Auto-create Draft RPS!
+            if data.auto_create_rps_draft is not False:
+                try:
+                    # Look for previous RPS for this MK to inherit learning outcomes/weekly plans
+                    prev_rps_query = select(RPS).where(RPS.mata_kuliah_id == matched_mk.id).order_by(RPS.id.desc())
+                    prev_res = await db.execute(prev_rps_query)
+                    prev_rps = prev_res.scalars().first()
+
+                    clean_ta = re.sub(r"[^a-zA-Z0-9]", "", target_ta)
+                    base_kode = f"RPS-{matched_mk.kode}-{matched_mk.semester}-{clean_ta}"
+                    final_kode = base_kode
+
+                    # Ensure unique RPS kode
+                    chk = await db.execute(select(RPS).where(RPS.kode == final_kode))
+                    if chk.scalar_one_or_none():
+                        final_kode = f"{base_kode}-{uuid.uuid4().hex[:4].upper()}"
+
+                    p_obj = prodis.get(matched_mk.prodi_id)
+                    prodi_label = p_obj.nama if p_obj else (item.prodi_nama or "")
+
+                    if prev_rps:
+                        # Clone from previous RPS
+                        identitas = copy.deepcopy(prev_rps.identitas or {})
+                        identitas["tahun_akademik"] = target_ta
+                        identitas["dosen_pengampu"] = dosen_list
+                        if prodi_label:
+                            identitas["prodi"] = prodi_label
+
+                        new_rps = RPS(
+                            kode=final_kode,
+                            mata_kuliah_id=matched_mk.id,
+                            prodi_id=matched_mk.prodi_id,
+                            semester=matched_mk.semester,
+                            tahun_akademik=target_ta,
+                            dosen_pengampu=dosen_list,
+                            identitas=identitas,
+                            deskripsi_mata_kuliah=prev_rps.deskripsi_mata_kuliah or "",
+                            bahan_kajian=copy.deepcopy(prev_rps.bahan_kajian) or [],
+                            cpmk=copy.deepcopy(prev_rps.cpmk) or [],
+                            sub_cpmk=copy.deepcopy(prev_rps.sub_cpmk) or [],
+                            rencana_pembelajaran=copy.deepcopy(prev_rps.rencana_pembelajaran) or [],
+                            metode_pembelajaran=copy.deepcopy(prev_rps.metode_pembelajaran) or [],
+                            media_pembelajaran=copy.deepcopy(prev_rps.media_pembelajaran) if prev_rps.media_pembelajaran else None,
+                            penilaian=copy.deepcopy(prev_rps.penilaian) or [],
+                            referensi=copy.deepcopy(prev_rps.referensi) if prev_rps.referensi else None,
+                            sdgs=copy.deepcopy(prev_rps.sdgs) or [],
+                            status="draft",
+                            obe_validated=prev_rps.obe_validated or False,
+                            obe_validation_result=copy.deepcopy(prev_rps.obe_validation_result) if prev_rps.obe_validation_result else None,
+                            obe_score=prev_rps.obe_score,
+                        )
+                    else:
+                        # Create fresh Draft RPS
+                        identitas = {
+                            "kode_mata_kuliah": matched_mk.kode,
+                            "nama_mata_kuliah": matched_mk.nama,
+                            "bobot_sks": matched_mk.sks,
+                            "semester": matched_mk.semester,
+                            "prodi": prodi_label,
+                            "tahun_akademik": target_ta,
+                            "dosen_pengampu": dosen_list,
+                        }
+                        new_rps = RPS(
+                            kode=final_kode,
+                            mata_kuliah_id=matched_mk.id,
+                            prodi_id=matched_mk.prodi_id,
+                            semester=matched_mk.semester,
+                            tahun_akademik=target_ta,
+                            dosen_pengampu=dosen_list,
+                            identitas=identitas,
+                            status="draft",
+                        )
+
+                    db.add(new_rps)
+                    await db.flush()
+                    rps_by_mk_id[matched_mk.id] = new_rps
+                    updated_count += 1
+                    detail.append({
+                        "kode": kode,
+                        "nama": matched_mk.nama,
+                        "rps_kode": new_rps.kode,
+                        "status": "created",
+                        "dosen": dosen_list,
+                        "message": f"Draft RPS baru berhasil dibuat & dosen disinkronkan: {', '.join(dosen_list)}",
+                    })
+                except Exception as ex:
+                    not_found_count += 1
+                    detail.append({
+                        "kode": kode,
+                        "nama": matched_mk.nama,
+                        "status": "rps_create_error",
+                        "message": f"Gagal membuat Draft RPS otomatis: {str(ex)}",
+                        "dosen": dosen_list,
+                    })
+            else:
+                not_found_count += 1
+                detail.append({
+                    "kode": kode,
+                    "nama": matched_mk.nama,
+                    "status": "rps_not_found",
+                    "message": f"RPS untuk periode '{target_ta}' belum dibuat",
+                    "dosen": dosen_list,
+                })
 
     await db.commit()
 
