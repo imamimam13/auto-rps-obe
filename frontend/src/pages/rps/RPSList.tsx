@@ -142,6 +142,69 @@ export default function RPSList() {
     }
   }
 
+  // Checkbox multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [showSelectedCopyModal, setShowSelectedCopyModal] = useState(false)
+  const [selectedCopyPeriode, setSelectedCopyPeriode] = useState('')
+  const [selectedCopyStatus, setSelectedCopyStatus] = useState('draft')
+  const [selectedCopySkip, setSelectedCopySkip] = useState(true)
+  const [selectedCopying, setSelectedCopying] = useState(false)
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(r => r.id)))
+    }
+  }
+
+  function toggleSelectOne(id: number) {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  function openSelectedCopy() {
+    if (selectedIds.size === 0) {
+      toast.error('Pilih minimal 1 RPS terlebih dahulu')
+      return
+    }
+    const act = periodes.find(p => p.is_active)
+    setSelectedCopyPeriode(act?.nama || act?.tahun_akademik || '')
+    setSelectedCopyStatus('draft')
+    setSelectedCopySkip(true)
+    setShowSelectedCopyModal(true)
+  }
+
+  async function handleSelectedCopySubmit() {
+    if (!selectedCopyPeriode.trim()) {
+      toast.error('Pilih atau masukkan periode target')
+      return
+    }
+    setSelectedCopying(true)
+    try {
+      const res = await api.post('/api/v1/rps/copy-selected', {
+        rps_ids: Array.from(selectedIds),
+        target_tahun_akademik: selectedCopyPeriode.trim(),
+        target_status: selectedCopyStatus,
+        skip_existing: selectedCopySkip,
+      })
+      if (res.data.copied > 0) {
+        toast.success(`Berhasil menyalin ${res.data.copied} RPS terpilih ke periode '${selectedCopyPeriode}'!`)
+      } else {
+        toast.error(`0 RPS disalin (${res.data.skipped} dilewati, ${res.data.errors} gagal)`)
+      }
+      setShowSelectedCopyModal(false)
+      setSelectedIds(new Set())
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal menyalin RPS terpilih')
+    } finally {
+      setSelectedCopying(false)
+    }
+  }
+
   async function openBulkCopy() {
     if (prodis.length === 0) await loadProdis()
     if (periodes.length === 0) await loadPeriodes()
@@ -535,7 +598,47 @@ export default function RPSList() {
           <option value="approved">Approved</option>
           <option value="published">Published</option>
         </select>
+
+        {canEditRPS && filtered.length > 0 && (
+          <button
+            onClick={toggleSelectAll}
+            className="macos-button-ghost text-xs px-2.5 py-1.5 flex items-center gap-1.5 text-gray-600 hover:text-gray-900 border border-gray-200"
+          >
+            <input
+              type="checkbox"
+              checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+              onChange={() => {}}
+              className="w-3.5 h-3.5 accent-emerald-600 pointer-events-none rounded"
+            />
+            {selectedIds.size === filtered.length ? 'Batal Pilih Semua' : 'Pilih Semua'}
+          </button>
+        )}
       </div>
+
+      {/* Selected Items Floating/Action Bar */}
+      {canEditRPS && selectedIds.size > 0 && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-apple-xl flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-emerald-900">
+              ✓ {selectedIds.size} dari {filtered.length} RPS Dipilih
+            </span>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-emerald-700 hover:underline ml-2"
+            >
+              Reset Pilihan
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openSelectedCopy}
+              className="macos-button text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3.5 py-1.5 rounded-apple-lg flex items-center gap-1.5 shadow-sm"
+            >
+              <Copy className="w-3.5 h-3.5" /> Salin {selectedIds.size} RPS Terpilih ke Periode Baru
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 text-gray-400">Memuat...</div>
@@ -545,6 +648,7 @@ export default function RPSList() {
         <div className="grid gap-3">
           {filtered.map((rps) => {
             const StatusIcon = statusIcons[rps.status] || Clock
+            const isSelected = selectedIds.has(rps.id)
             let dosenNames = '-'
             if (Array.isArray(rps.dosen_pengampu)) {
               const names = rps.dosen_pengampu.map((d: any) => typeof d === 'string' ? d : (d?.nama || '')).filter(Boolean)
@@ -555,7 +659,15 @@ export default function RPSList() {
             const prodiObj = prodis.find((p) => p.id === rps.prodi_id)
             const prodiName = prodiObj?.nama || rps.identitas?.prodi || ''
             return (
-              <div key={rps.id} className="macos-card p-4 flex items-center gap-4 group">
+              <div key={rps.id} className={`macos-card p-4 flex items-center gap-4 group transition-all ${isSelected ? 'ring-2 ring-emerald-500 bg-emerald-50/20' : ''}`}>
+                {canEditRPS && (
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectOne(rps.id)}
+                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer shrink-0"
+                  />
+                )}
                 <div className="p-3 rounded-apple-lg bg-green-50">
                   <FileText className="w-5 h-5 text-green-500" />
                 </div>
@@ -1108,6 +1220,94 @@ export default function RPSList() {
                   Selesai
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Salin RPS Terpilih (Multi-Select Checkboxes) */}
+      {showSelectedCopyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-apple-xl bg-emerald-50 text-emerald-600">
+                <Copy className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Salin {selectedIds.size} RPS Terpilih</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Duplikasi RPS yang dicentang ke periode akademik baru</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 pt-1">
+              <div>
+                <label className="macos-label">Periode Akademik Tujuan *</label>
+                <div className="space-y-2 mt-1">
+                  <select
+                    className="macos-input"
+                    value={selectedCopyPeriode}
+                    onChange={(e) => setSelectedCopyPeriode(e.target.value)}
+                  >
+                    <option value="">-- Pilih Periode Tujuan --</option>
+                    {periodes.map((p) => (
+                      <option key={p.id} value={p.nama}>
+                        {p.nama} {p.is_active ? '(Aktif)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Atau ketik periode manual (cth: 2025/2026 Ganjil)"
+                    value={selectedCopyPeriode}
+                    onChange={(e) => setSelectedCopyPeriode(e.target.value)}
+                    className="macos-input text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="macos-label">Status Hasil di Periode Baru</label>
+                <select
+                  className="macos-input"
+                  value={selectedCopyStatus}
+                  onChange={(e) => setSelectedCopyStatus(e.target.value)}
+                >
+                  <option value="draft">Draft (Rekomendasi - untuk ditinjau dosen)</option>
+                  <option value="review">Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-800">
+                  <input
+                    type="checkbox"
+                    checked={selectedCopySkip}
+                    onChange={(e) => setSelectedCopySkip(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-600 rounded"
+                  />
+                  Lewati jika RPS mata kuliah sudah ada di periode target
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setShowSelectedCopyModal(false)}
+                disabled={selectedCopying}
+                className="macos-button-ghost text-xs px-3.5 py-2"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSelectedCopySubmit}
+                disabled={selectedCopying || !selectedCopyPeriode.trim()}
+                className="macos-button flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-apple-lg"
+              >
+                {selectedCopying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                {selectedCopying ? 'Menyalin...' : `Salin ${selectedIds.size} RPS`}
+              </button>
             </div>
           </div>
         </div>

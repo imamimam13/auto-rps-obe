@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.models import RPS, Prodi, MataKuliah
 from app.schemas import (
     RPSCreate, RPSUpdate, RPSResponse,
-    RPSCopyRequest, RPSBulkCopyRequest,
+    RPSCopyRequest, RPSBulkCopyRequest, RPSCopySelectedRequest,
     PaginatedResponse,
 )
 from sqlalchemy import select, func, update
@@ -592,6 +592,109 @@ async def bulk_copy_rps(
     return {
         "success": True,
         "total": len(source_items),
+        "copied": len(copied),
+        "skipped": len(skipped),
+        "errors": len(errors),
+        "detail": copied,
+        "skipped_detail": skipped,
+        "error_detail": errors,
+    }
+
+
+@router.post("/copy-selected", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def copy_selected_rps(
+    data: RPSCopySelectedRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    if not data.rps_ids:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 RPS untuk disalin")
+
+    target_ta = (data.target_tahun_akademik or "").strip()
+    if not target_ta:
+        raise HTTPException(status_code=400, detail="Target tahun akademik wajib diisi")
+
+    result = await db.execute(select(RPS).where(RPS.id.in_(data.rps_ids)))
+    items = result.scalars().all()
+    if not items:
+        raise HTTPException(status_code=404, detail="RPS yang dipilih tidak ditemukan")
+
+    existing_res = await db.execute(select(RPS).where(RPS.tahun_akademik == target_ta))
+    existing_mk_ids = set(r.mata_kuliah_id for r in existing_res.scalars().all())
+
+    copied = []
+    skipped = []
+    errors = []
+
+    for orig in items:
+        if orig.mata_kuliah_id in existing_mk_ids and data.skip_existing:
+            skipped.append({
+                "id": orig.id,
+                "kode": orig.kode,
+                "mata_kuliah_id": orig.mata_kuliah_id,
+                "reason": f"RPS untuk MK ini sudah ada di periode '{target_ta}'"
+            })
+            continue
+
+        try:
+            mk_res = await db.execute(select(MataKuliah).where(MataKuliah.id == orig.mata_kuliah_id))
+            mk = mk_res.scalar_one_or_none()
+            mk_kode = mk.kode if mk else "MK"
+            mk_nama = mk.nama if mk else (orig.identitas.get("nama_mata_kuliah") if orig.identitas else "Mata Kuliah")
+
+            clean_ta = "".join(c for c in target_ta if c.isalnum() or c in "-_")
+            base_kode = f"RPS-{mk_kode}-{orig.semester}-{clean_ta}" if clean_ta else f"RPS-{mk_kode}-{orig.semester}"
+            chk_kode = await db.execute(select(RPS).where(RPS.kode == base_kode))
+            if chk_kode.scalar_one_or_none():
+                final_kode = f"{base_kode}-{uuid.uuid4().hex[:4].upper()}"
+            else:
+                final_kode = base_kode
+
+            identitas = copy.deepcopy(orig.identitas) if orig.identitas else {}
+            identitas["tahun_akademik"] = target_ta
+
+            new_rps = RPS(
+                kode=final_kode,
+                mata_kuliah_id=orig.mata_kuliah_id,
+                prodi_id=orig.prodi_id,
+                semester=orig.semester,
+                tahun_akademik=target_ta,
+                dosen_pengampu=copy.deepcopy(orig.dosen_pengampu) or [],
+                identitas=identitas,
+                deskripsi_mata_kuliah=orig.deskripsi_mata_kuliah or "",
+                bahan_kajian=copy.deepcopy(orig.bahan_kajian) or [],
+                cpmk=copy.deepcopy(orig.cpmk) or [],
+                sub_cpmk=copy.deepcopy(orig.sub_cpmk) or [],
+                rencana_pembelajaran=copy.deepcopy(orig.rencana_pembelajaran) or [],
+                metode_pembelajaran=copy.deepcopy(orig.metode_pembelajaran) or [],
+                media_pembelajaran=copy.deepcopy(orig.media_pembelajaran) if orig.media_pembelajaran else None,
+                penilaian=copy.deepcopy(orig.penilaian) or [],
+                referensi=copy.deepcopy(orig.referensi) if orig.referensi else None,
+                sdgs=copy.deepcopy(orig.sdgs) or [],
+                status=data.target_status or "draft",
+                obe_validated=orig.obe_validated or False,
+                obe_validation_result=copy.deepcopy(orig.obe_validation_result) if orig.obe_validation_result else None,
+                obe_score=orig.obe_score,
+            )
+            db.add(new_rps)
+            existing_mk_ids.add(orig.mata_kuliah_id)
+            copied.append({
+                "source_id": orig.id,
+                "source_kode": orig.kode,
+                "nama": mk_nama,
+                "target_kode": final_kode,
+                "status": data.target_status or "draft",
+            })
+        except Exception as e:
+            errors.append({
+                "source_id": orig.id,
+                "kode": orig.kode,
+                "error": str(e),
+            })
+
+    await db.commit()
+    return {
+        "success": True,
+        "total": len(items),
         "copied": len(copied),
         "skipped": len(skipped),
         "errors": len(errors),

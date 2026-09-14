@@ -286,6 +286,13 @@ class RPSBulkCopyRequest(BaseModel):
         from_attributes = True
 
 
+class RPSCopySelectedRequest(BaseModel):
+    rps_ids: List[int]
+    target_tahun_akademik: str
+    target_status: Optional[str] = "draft"
+    skip_existing: Optional[bool] = True
+
+
 # AI Generation Schemas
 class RPSGenerateRequest(BaseModel):
     mata_kuliah_id: int
