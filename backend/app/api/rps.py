@@ -9,6 +9,7 @@ from app.schemas import (
     RPSCopyRequest, RPSBulkCopyRequest, RPSCopySelectedRequest,
     JadwalItemExtracted, JadwalSyncRequest, JadwalSyncResponse,
     RPSBulkPublishRequest, RPSBulkPublishResponse,
+    RPSSplitItem, RPSSplitRequest, RPSSplitResponse,
     PaginatedResponse,
 )
 from sqlalchemy import select, func, update
@@ -487,6 +488,125 @@ async def copy_rps(
     await db.commit()
     await db.refresh(new_rps)
     return new_rps
+
+
+@router.post("/{rps_id}/split", response_model=RPSSplitResponse, status_code=status.HTTP_201_CREATED)
+async def split_rps(
+    rps_id: int,
+    data: RPSSplitRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Split an RPS having multiple lecturers or classes into separate individual RPS records for each lecturer/class."""
+    res = await db.execute(select(RPS).where(RPS.id == rps_id))
+    orig = res.scalar_one_or_none()
+    if not orig:
+        raise HTTPException(status_code=404, detail="RPS tidak ditemukan")
+
+    mk_res = await db.execute(select(MataKuliah).where(MataKuliah.id == orig.mata_kuliah_id))
+    mk = mk_res.scalar_one_or_none()
+    mk_kode = mk.kode if mk else "MK"
+
+    # Extract dosen names
+    raw_dosen_list = orig.dosen_pengampu or []
+    if not raw_dosen_list and orig.identitas:
+        raw_dosen_list = orig.identitas.get("dosen_pengampu") or []
+
+    if isinstance(raw_dosen_list, str):
+        raw_dosen_list = [d.strip() for d in re.split(r"[\n,;]+", raw_dosen_list) if d.strip()]
+
+    items_to_split: List[RPSSplitItem] = []
+    if data.split_items and len(data.split_items) > 0:
+        items_to_split = data.split_items
+    else:
+        # Default: split by each lecturer name in raw_dosen_list
+        if not raw_dosen_list or len(raw_dosen_list) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="RPS ini hanya memiliki 1 dosen pengampu atau belum memiliki daftar dosen untuk dipecah.",
+            )
+        for idx, d_name in enumerate(raw_dosen_list):
+            cls_letter = chr(65 + idx) if idx < 26 else str(idx + 1)
+            items_to_split.append(RPSSplitItem(
+                dosen_nama=str(d_name).strip(),
+                kelas=f"Kelas {cls_letter}",
+                kode_suffix=f"KLS{cls_letter}",
+            ))
+
+    clean_ta = "".join(c for c in (orig.tahun_akademik or "") if c.isalnum() or c in "-_")
+    base_prefix = f"RPS-{mk_kode}-{orig.semester}-{clean_ta}" if clean_ta else f"RPS-{mk_kode}-{orig.semester}"
+
+    created_rps_list = []
+
+    for idx, item in enumerate(items_to_split):
+        d_name = item.dosen_nama.strip()
+        if not d_name:
+            continue
+
+        # Generate unique kode for the split variant
+        clean_suffix = re.sub(r"[^a-zA-Z0-9]", "", item.kode_suffix or item.kelas or d_name[:6])
+        if not clean_suffix:
+            clean_suffix = f"V{idx + 1}"
+
+        candidate_kode = f"{base_prefix}-{clean_suffix}"
+        chk = await db.execute(select(RPS).where(RPS.kode == candidate_kode))
+        if chk.scalar_one_or_none():
+            candidate_kode = f"{candidate_kode}-{uuid.uuid4().hex[:4].upper()}"
+
+        # Target status
+        if data.target_status == "draft":
+            target_st = "draft"
+        elif data.target_status == "published":
+            target_st = "published"
+        else:
+            target_st = orig.status or "draft"
+
+        # Clone identitas
+        identitas = copy.deepcopy(orig.identitas or {})
+        identitas["dosen_pengampu"] = [d_name]
+        if item.kelas:
+            identitas["kelas"] = item.kelas
+        identitas["split_from_rps_id"] = orig.id
+
+        new_rps = RPS(
+            kode=candidate_kode,
+            mata_kuliah_id=orig.mata_kuliah_id,
+            prodi_id=orig.prodi_id,
+            semester=orig.semester,
+            tahun_akademik=orig.tahun_akademik,
+            dosen_pengampu=[d_name],
+            identitas=identitas,
+            deskripsi_mata_kuliah=orig.deskripsi_mata_kuliah or "",
+            bahan_kajian=copy.deepcopy(orig.bahan_kajian) or [],
+            cpmk=copy.deepcopy(orig.cpmk) or [],
+            sub_cpmk=copy.deepcopy(orig.sub_cpmk) or [],
+            rencana_pembelajaran=copy.deepcopy(orig.rencana_pembelajaran) or [],
+            metode_pembelajaran=copy.deepcopy(orig.metode_pembelajaran) or [],
+            media_pembelajaran=copy.deepcopy(orig.media_pembelajaran) if orig.media_pembelajaran else None,
+            penilaian=copy.deepcopy(orig.penilaian) or [],
+            referensi=copy.deepcopy(orig.referensi) if orig.referensi else None,
+            sdgs=copy.deepcopy(orig.sdgs) or [],
+            status=target_st,
+            obe_validated=orig.obe_validated or False,
+            obe_validation_result=copy.deepcopy(orig.obe_validation_result) if orig.obe_validation_result else None,
+            obe_score=orig.obe_score,
+        )
+        db.add(new_rps)
+        await db.flush()
+        await db.refresh(new_rps)
+        created_rps_list.append(new_rps)
+
+    if data.delete_original and len(created_rps_list) > 0:
+        await db.delete(orig)
+
+    await db.commit()
+
+    return RPSSplitResponse(
+        success=True,
+        original_id=orig.id,
+        created_count=len(created_rps_list),
+        created_rps=created_rps_list,
+        message=f"Berhasil memecah RPS menjadi {len(created_rps_list)} RPS varian terpisah untuk masing-masing dosen/kelas.",
+    )
 
 
 @router.post("/bulk-copy", response_model=dict, status_code=status.HTTP_201_CREATED)

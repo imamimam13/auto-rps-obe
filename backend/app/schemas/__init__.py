@@ -384,3 +384,23 @@ class RPSBulkPublishResponse(BaseModel):
     total_found: int
     published_count: int
     message: str
+
+
+class RPSSplitItem(BaseModel):
+    dosen_nama: str
+    kelas: Optional[str] = ""
+    kode_suffix: Optional[str] = ""
+
+
+class RPSSplitRequest(BaseModel):
+    split_items: Optional[List[RPSSplitItem]] = None
+    target_status: Optional[str] = "inherit"  # "inherit", "draft", or "published"
+    delete_original: Optional[bool] = False
+
+
+class RPSSplitResponse(BaseModel):
+    success: bool
+    original_id: int
+    created_count: int
+    created_rps: List[RPSResponse]
+    message: str

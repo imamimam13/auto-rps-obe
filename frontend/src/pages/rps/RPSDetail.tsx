@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2, Globe, Loader2, Copy } from 'lucide-react'
+import { ArrowLeft, FileText, CheckSquare, Download, Sparkles, Trash2, Globe, Loader2, Copy, Scissors, Plus, Trash, Users, X } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -61,6 +61,13 @@ export default function RPSDetail() {
   const [periodes, setPeriodes] = useState<any[]>([])
   const [copying, setCopying] = useState(false)
 
+  // Split RPS Modal State
+  const [showSplitModal, setShowSplitModal] = useState(false)
+  const [splitItems, setSplitItems] = useState<{ dosen_nama: string; kelas: string; kode_suffix: string }[]>([])
+  const [splitTargetStatus, setSplitTargetStatus] = useState('inherit')
+  const [splitDeleteOriginal, setSplitDeleteOriginal] = useState(false)
+  const [splitting, setSplitting] = useState(false)
+
   useEffect(() => {
     if (id) loadData()
     api.get('/api/v1/periode/').then(r => {
@@ -100,6 +107,79 @@ export default function RPSDetail() {
       toast.error(formatApiError(e, 'Gagal menyalin RPS'))
     } finally {
       setCopying(false)
+    }
+  }
+
+  function openSplitModal() {
+    let rawList: string[] = []
+    if (Array.isArray(rps?.dosen_pengampu)) {
+      rawList = rps.dosen_pengampu.map((d: any) => typeof d === 'string' ? d : (d?.nama || '')).filter(Boolean)
+    } else if (typeof rps?.dosen_pengampu === 'string' && rps.dosen_pengampu.trim()) {
+      rawList = rps.dosen_pengampu.split(/[\n,;]+/).map((s: string) => s.trim()).filter(Boolean)
+    }
+
+    if (rawList.length === 0) {
+      rawList = ['Dosen Pengampu 1', 'Dosen Pengampu 2']
+    } else if (rawList.length === 1) {
+      rawList = [rawList[0], rawList[0]]
+    }
+
+    const items = rawList.map((dName, idx) => {
+      const clsLetter = String.fromCharCode(65 + (idx % 26))
+      return {
+        dosen_nama: dName,
+        kelas: `Kelas ${clsLetter}`,
+        kode_suffix: `KLS${clsLetter}`,
+      }
+    })
+    setSplitItems(items)
+    setSplitTargetStatus(rps?.status || 'published')
+    setSplitDeleteOriginal(false)
+    setShowSplitModal(true)
+  }
+
+  function addSplitItem() {
+    const nextIdx = splitItems.length
+    const clsLetter = String.fromCharCode(65 + (nextIdx % 26))
+    setSplitItems([...splitItems, {
+      dosen_nama: '',
+      kelas: `Kelas ${clsLetter}`,
+      kode_suffix: `KLS${clsLetter}`,
+    }])
+  }
+
+  function removeSplitItem(index: number) {
+    if (splitItems.length <= 1) {
+      toast.error('Minimal harus ada 2 varian untuk memecah RPS')
+      return
+    }
+    setSplitItems(splitItems.filter((_, i) => i !== index))
+  }
+
+  async function handleSplitSubmit() {
+    if (splitItems.some(item => !item.dosen_nama.trim())) {
+      toast.error('Semua nama dosen pada daftar harus diisi')
+      return
+    }
+    setSplitting(true)
+    try {
+      const payload = {
+        split_items: splitItems.map(item => ({
+          dosen_nama: item.dosen_nama.trim(),
+          kelas: item.kelas.trim(),
+          kode_suffix: item.kode_suffix.trim(),
+        })),
+        target_status: splitTargetStatus,
+        delete_original: splitDeleteOriginal,
+      }
+      const res = await api.post(`/api/v1/rps/${id}/split`, payload)
+      toast.success(res.data.message || `Berhasil memecah menjadi ${res.data.created_count} RPS!`)
+      setShowSplitModal(false)
+      navigate('/rps')
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Gagal memecah RPS'))
+    } finally {
+      setSplitting(false)
     }
   }
 
@@ -438,8 +518,17 @@ export default function RPSDetail() {
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {canEditRPS && (
             <button
+              onClick={openSplitModal}
+              className="macos-button flex items-center gap-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white font-medium px-3 py-1.5 rounded-apple-md shadow-xs"
+              title="Pecah RPS menjadi dokumen terpisah untuk setiap dosen pengampu atau kelas yang berbeda"
+            >
+              <Scissors className="w-4 h-4" /> Pecah RPS per Dosen
+            </button>
+          )}
+          {canEditRPS && (
+            <button
               onClick={() => setShowCopyModal(true)}
-              className="macos-button flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-apple-md"
+              className="macos-button flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-apple-md shadow-xs"
             >
               <Copy className="w-4 h-4" /> Salin ke Periode Lain
             </button>
@@ -1471,6 +1560,176 @@ export default function RPSDetail() {
               >
                 {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
                 {copying ? 'Menyalin RPS...' : 'Salin RPS Sekarang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pecah RPS per Dosen / Kelas */}
+      {showSplitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-100 overflow-hidden animate-scale-up">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-apple-xl bg-purple-50 text-purple-600">
+                  <Scissors className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900">Pecah RPS per Dosen / Kelas</h3>
+                  <p className="text-[11px] text-gray-500">Buat dokumen RPS terpisah dan independen untuk masing-masing dosen pengampu</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSplitModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-apple-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="p-5 space-y-4 flex-1 overflow-y-auto min-h-0">
+              <div className="p-3 bg-purple-50/60 rounded-apple-xl border border-purple-100 text-xs text-purple-900 space-y-1">
+                <p>
+                  <strong>Mata Kuliah:</strong> {rps?.identitas?.nama_mata_kuliah} ({rps?.identitas?.kode_mata_kuliah || rps?.kode})
+                </p>
+                <p>
+                  <strong>Periode:</strong> {rps?.tahun_akademik} | <strong>Semester:</strong> {rps?.semester}
+                </p>
+                <p className="text-[11px] text-purple-700 pt-1">
+                  💡 Setiap RPS pecahan akan mewarisi seluruh capaian pembelajaran (CPL, CPMK, Sub-CPMK, Rencana Mingguan, dll) dari RPS master ini, sehingga masing-masing dosen dapat mengedit silabus kelasnya sendiri secara bebas tanpa mengganggu dosen lain.
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-gray-800">
+                    Daftar Dosen & Varian Kelas Hasil Pemecahan ({splitItems.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addSplitItem}
+                    className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-apple-md transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Tambah Varian / Kelas
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {splitItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 bg-gray-50/80 rounded-apple-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
+                    >
+                      <div className="sm:col-span-1 text-center font-bold text-xs text-purple-700">
+                        #{idx + 1}
+                      </div>
+                      <div className="sm:col-span-5">
+                        <label className="text-[10px] font-medium text-gray-500 block mb-0.5">Nama Dosen Pengampu *</label>
+                        <input
+                          type="text"
+                          value={item.dosen_nama}
+                          onChange={(e) => {
+                            const next = [...splitItems]
+                            next[idx].dosen_nama = e.target.value
+                            setSplitItems(next)
+                          }}
+                          placeholder="Nama Dosen..."
+                          className="macos-input bg-white text-xs py-1 w-full"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="text-[10px] font-medium text-gray-500 block mb-0.5">Kelas / Seksi</label>
+                        <input
+                          type="text"
+                          value={item.kelas}
+                          onChange={(e) => {
+                            const next = [...splitItems]
+                            next[idx].kelas = e.target.value
+                            setSplitItems(next)
+                          }}
+                          placeholder="Contoh: Kelas A"
+                          className="macos-input bg-white text-xs py-1 w-full"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-medium text-gray-500 block mb-0.5">Suffix Kode</label>
+                        <input
+                          type="text"
+                          value={item.kode_suffix}
+                          onChange={(e) => {
+                            const next = [...splitItems]
+                            next[idx].kode_suffix = e.target.value
+                            setSplitItems(next)
+                          }}
+                          placeholder="KLSA"
+                          className="macos-input bg-white text-xs py-1 w-full font-mono"
+                        />
+                      </div>
+                      <div className="sm:col-span-1 flex justify-end">
+                        {splitItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeSplitItem(idx)}
+                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-apple-md transition-colors"
+                            title="Hapus varian ini"
+                          >
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pengaturan Status & Opsi Tambahan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-700 block mb-1">Status Hasil Pemecahan</label>
+                  <select
+                    className="macos-input bg-white text-xs"
+                    value={splitTargetStatus}
+                    onChange={(e) => setSplitTargetStatus(e.target.value)}
+                  >
+                    <option value="inherit">Samakan dengan RPS Asli ({rps?.status})</option>
+                    <option value="published">Published (Langsung Tayang)</option>
+                    <option value="draft">Draft (Tinjau Ulang Dosen)</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center pt-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={splitDeleteOriginal}
+                      onChange={(e) => setSplitDeleteOriginal(e.target.checked)}
+                      className="w-4 h-4 accent-purple-600 rounded cursor-pointer shrink-0"
+                    />
+                    <span>Hapus RPS gabungan asli setelah dipecah</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-3.5 px-5 bg-gray-50 border-t border-gray-200 shrink-0 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowSplitModal(false)}
+                disabled={splitting}
+                className="macos-button-ghost text-xs px-3.5 py-2"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSplitSubmit}
+                disabled={splitting || splitItems.length === 0}
+                className="macos-button flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-apple-lg shadow-sm"
+              >
+                {splitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
+                {splitting ? 'Memproses Pecah RPS...' : `Pecah Menjadi ${splitItems.length} RPS Terpisah`}
               </button>
             </div>
           </div>
