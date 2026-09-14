@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2, Copy, Loader2, ArrowRight, Calendar, FileSpreadsheet, Upload, RefreshCw, FileUp, CheckCheck, X, Globe, Send, CheckCircle2 } from 'lucide-react'
+import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2, Copy, Loader2, ArrowRight, Calendar, FileSpreadsheet, Upload, RefreshCw, FileUp, CheckCheck, X, Globe, Send, CheckCircle2, BookOpen } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -46,7 +46,18 @@ export default function RPSList() {
     skipped: { kode: string; nama: string }[]
   } | null>(null)
 
-  const [bulkConfig, setBulkConfig] = useState({
+  const [bulkConfig, setBulkConfig] = useState<{
+    target_type: 'empty_rps' | 'all_mk'
+    prodi_id: string
+    tahun_akademik: string
+    semester: string
+    filter_mk_periode: string
+    additional_context: string
+    skip_existing: boolean
+    auto_retry: boolean
+    max_retries: number
+  }>({
+    target_type: 'empty_rps',
     prodi_id: 'all',
     tahun_akademik: '2025/2026',
     semester: '',
@@ -511,9 +522,15 @@ export default function RPSList() {
   }
 
   async function openBulkModal() {
-    if (prodis.length === 0) {
-      await loadProdis()
-    }
+    if (prodis.length === 0) await loadProdis()
+    if (periodes.length === 0) await loadPeriodes()
+    const act = periodes.find(p => p.is_active)
+    setBulkConfig(prev => ({
+      ...prev,
+      target_type: 'empty_rps',
+      prodi_id: prodiFilter || 'all',
+      tahun_akademik: periodeFilter || act?.nama || (periodes[0]?.nama || '2025/2026 Genap'),
+    }))
     setShowBulkModal(true)
   }
 
@@ -524,7 +541,156 @@ export default function RPSList() {
     setBulkProgress(null)
 
     try {
-      // 1. Fetch target mata kuliah (Selected Prodi or ALL Prodis)
+      if (bulkConfig.target_type === 'empty_rps') {
+        // Mode 1: Sweep and fill existing empty RPS records
+        let rpsUrl = `/api/v1/rps/?size=1000&limit=1000`
+        if (bulkConfig.prodi_id && bulkConfig.prodi_id !== 'all') {
+          rpsUrl += `&prodi_id=${bulkConfig.prodi_id}`
+        }
+        if (bulkConfig.semester) {
+          rpsUrl += `&semester=${bulkConfig.semester}`
+        }
+        const rpsRes = await api.get(rpsUrl)
+        const allRpsInDb: any[] = rpsRes.data.items || []
+
+        const targetPeriodNorm = normalizePeriodStr(bulkConfig.tahun_akademik)
+
+        const emptyRpsList = allRpsInDb.filter(r => {
+          if (targetPeriodNorm) {
+            const ta = normalizePeriodStr(r.tahun_akademik || r.identitas?.tahun_akademik)
+            if (!ta.includes(targetPeriodNorm) && !targetPeriodNorm.includes(ta)) return false
+          }
+          return isRpsEmpty(r)
+        })
+
+        if (emptyRpsList.length === 0) {
+          toast.success(`Semua RPS pada kriteria ini sudah memiliki materi/silabus lengkap. Tidak ada RPS kosong yang perlu diisi.`)
+          setBulkGenerating(false)
+          return
+        }
+
+        const maxPasses = bulkConfig.auto_retry ? Math.max(1, bulkConfig.max_retries || 3) : 1
+        let currentBatch = [...emptyRpsList]
+        const done: any[] = []
+        let failedQueue: any[] = []
+
+        for (let pass = 1; pass <= maxPasses; pass++) {
+          if (bulkStopRef.current || currentBatch.length === 0) break
+
+          const passErrors: any[] = []
+          const nextFailedQueue: any[] = []
+          const passTitle = pass === 1 ? `Pass 1 (Utama)` : `Pass ${pass} (Auto-Retry)`
+
+          for (let i = 0; i < currentBatch.length; i++) {
+            if (bulkStopRef.current) {
+              setBulkStopped(true)
+              break
+            }
+
+            const item = currentBatch[i]
+            const mkName = item.identitas?.nama_mata_kuliah || item.kode || `RPS #${item.id}`
+            setBulkProgress({
+              currentPass: pass,
+              maxPasses,
+              current: done.length + i + 1,
+              total: emptyRpsList.length,
+              currentName: mkName,
+              statusMessage: `${passTitle} [${i + 1}/${currentBatch.length}] — ${mkName}`,
+              done: [...done],
+              errors: [...passErrors],
+              skipped: [],
+            })
+
+            try {
+              const startRes = await api.post(`/api/v1/generate/async/rps/${item.id}`, {
+                additional_context: bulkConfig.additional_context || '',
+              })
+              const taskId = startRes.data.task_id
+
+              let isDone = false
+              for (let attempt = 0; attempt < 300; attempt++) {
+                if (bulkStopRef.current) break
+                await new Promise(r => setTimeout(r, 2000))
+                const pollRes = await api.get(`/api/v1/generate/task/${taskId}`)
+                if (pollRes.data.status === 'completed') {
+                  isDone = true
+                  break
+                }
+                if (pollRes.data.status === 'failed') {
+                  throw new Error(pollRes.data.error || 'Gagal generate AI')
+                }
+                if (pollRes.data.progress) {
+                  setBulkProgress(prev => prev ? {
+                    ...prev,
+                    statusMessage: `${passTitle} [${i + 1}/${currentBatch.length}] — ${mkName} (${pollRes.data.progress})`
+                  } : prev)
+                }
+              }
+
+              if (isDone) {
+                done.push({
+                  kode: item.kode,
+                  nama: mkName,
+                  rps_id: item.id,
+                })
+              } else {
+                throw new Error('Proses AI dibatalkan atau timeout')
+              }
+            } catch (e: any) {
+              const errMsg = e.response?.data?.detail || e.message || 'Gagal generate'
+              passErrors.push({
+                id: item.id,
+                kode: item.kode,
+                nama: mkName,
+                prodi_id: item.prodi_id,
+                semester: item.semester,
+                error: errMsg
+              })
+              nextFailedQueue.push(item)
+            }
+
+            setBulkProgress({
+              currentPass: pass,
+              maxPasses,
+              current: done.length + (i + 1),
+              total: emptyRpsList.length,
+              currentName: mkName,
+              statusMessage: `${passTitle} [${i + 1}/${currentBatch.length}] — ${mkName}`,
+              done: [...done],
+              errors: [...passErrors],
+              skipped: [],
+            })
+          }
+
+          failedQueue = nextFailedQueue
+          if (failedQueue.length === 0 || bulkStopRef.current) break
+
+          if (pass < maxPasses && bulkConfig.auto_retry) {
+            setBulkProgress(prev => prev ? {
+              ...prev,
+              statusMessage: `⏸ Cooldown... Mengulang ${failedQueue.length} RPS gagal pada Loop ${pass + 1}...`
+            } : prev)
+            await new Promise(r => setTimeout(r, 1500))
+          }
+          currentBatch = [...failedQueue]
+        }
+
+        setBulkProgress(prev => prev ? {
+          ...prev,
+          currentName: '',
+          statusMessage: bulkStopRef.current ? '⏹ Proses dihentikan oleh pengguna.' : '✅ Seluruh siklus bulk RPS telah selesai.'
+        } : prev)
+
+        if (failedQueue.length === 0) {
+          toast.success(`Selesai! ${done.length} RPS berhasil dilengkapi silabusnya oleh AI.`)
+        } else {
+          toast.error(`Selesai: ${done.length} berhasil, ${failedQueue.length} RPS gagal setelah ${maxPasses} pass retry.`)
+        }
+        loadData()
+        return
+      }
+
+      // Mode 2: Generate from Master Mata Kuliah
       let url = `/api/v1/mata-kuliah/?size=1000&limit=1000`
       if (bulkConfig.prodi_id && bulkConfig.prodi_id !== 'all') {
         url += `&prodi_id=${bulkConfig.prodi_id}`
@@ -544,7 +710,6 @@ export default function RPSList() {
         return
       }
 
-      // 2. Check existing RPS records per mata kuliah specifically by period
       const existingMap = new Map<number, Set<string>>()
       if (bulkConfig.skip_existing) {
         let rpsUrl = `/api/v1/rps/?size=1000&limit=1000`
@@ -570,14 +735,12 @@ export default function RPSList() {
       const skipped: any[] = []
       let failedQueue: any[] = []
 
-      // Separate into skipped vs work items
       const toProcess: any[] = []
       for (const mk of allMkList) {
         let isAlreadyExists = false
         if (bulkConfig.skip_existing && existingMap.has(mk.id)) {
           const periodsForMk = existingMap.get(mk.id)!
           if (targetPeriodNorm) {
-            // ONLY skip if an RPS exists for THIS mata kuliah with the SAME target period
             isAlreadyExists = periodsForMk.has(targetPeriodNorm)
           } else {
             isAlreadyExists = periodsForMk.size > 0
@@ -611,7 +774,6 @@ export default function RPSList() {
       const maxPasses = bulkConfig.auto_retry ? Math.max(1, bulkConfig.max_retries || 3) : 1
       let currentBatch = [...toProcess]
 
-      // 3. Multi-Pass Automated Loop
       for (let pass = 1; pass <= maxPasses; pass++) {
         if (bulkStopRef.current || currentBatch.length === 0) break
 
@@ -659,9 +821,6 @@ export default function RPSList() {
             })
           } catch (e: any) {
             let errMsg = e.response?.data?.detail || e.message || 'Gagal generate'
-            if (e.response?.status === 504 || (typeof errMsg === 'string' && errMsg.includes('504'))) {
-              errMsg = 'Gateway Timeout (504): Server proxy Nginx memutus koneksi (>60s). Atur proxy_read_timeout 600s di Nginx.'
-            }
             const errObj = { id: mk.id, kode: mk.kode, nama: mk.nama, prodi_id: mk.prodi_id, semester: mk.semester, error: errMsg }
             passErrors.push(errObj)
             nextFailedQueue.push(mk)
@@ -681,13 +840,8 @@ export default function RPSList() {
         }
 
         failedQueue = nextFailedQueue
+        if (failedQueue.length === 0 || bulkStopRef.current) break
 
-        // If no items failed or stop was requested, loop finishes
-        if (failedQueue.length === 0 || bulkStopRef.current) {
-          break
-        }
-
-        // If we have retries left, pause briefly before next pass
         if (pass < maxPasses && bulkConfig.auto_retry) {
           setBulkProgress(prev => prev ? {
             ...prev,
@@ -699,7 +853,6 @@ export default function RPSList() {
         currentBatch = [...failedQueue]
       }
 
-      // 4. Finished all loops
       setBulkProgress(prev => prev ? {
         ...prev,
         currentName: '',
@@ -1047,6 +1200,45 @@ export default function RPSList() {
             {!bulkGenerating && !bulkProgress && (
               <div className="space-y-3.5 pt-2">
                 <div>
+                  <label className="macos-label">Target Bulk AI *</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div
+                      onClick={() => setBulkConfig({ ...bulkConfig, target_type: 'empty_rps' })}
+                      className={`p-3 rounded-apple-xl border cursor-pointer transition-all ${
+                        bulkConfig.target_type === 'empty_rps'
+                          ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20 shadow-xs'
+                          : 'bg-gray-50/60 border-gray-200 hover:bg-gray-100/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+                        <span className="text-xs font-semibold text-gray-900">Lengkapi RPS Kosong</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                        Isi silabus 16 pertemuan & CPMK untuk seluruh RPS berstatus <b>⚠️ Belum Ada Materi</b>.
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => setBulkConfig({ ...bulkConfig, target_type: 'all_mk' })}
+                      className={`p-3 rounded-apple-xl border cursor-pointer transition-all ${
+                        bulkConfig.target_type === 'all_mk'
+                          ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-500/20 shadow-xs'
+                          : 'bg-gray-50/60 border-gray-200 hover:bg-gray-100/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span className="text-xs font-semibold text-gray-900">Dari Master Mata Kuliah</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                        Buat dokumen RPS baru dari daftar master mata kuliah yang belum punya RPS.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
                   <label className="macos-label">Pilih Program Studi *</label>
                   <select
                     className="macos-input"
@@ -1084,7 +1276,7 @@ export default function RPSList() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className={`grid ${bulkConfig.target_type === 'all_mk' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                   <div>
                     <label className="macos-label">Filter Semester (Opsional)</label>
                     <input
@@ -1097,21 +1289,23 @@ export default function RPSList() {
                       max={14}
                     />
                   </div>
-                  <div>
-                    <label className="macos-label">Filter Periode MK (Opsional)</label>
-                    <select
-                      className="macos-input"
-                      value={bulkConfig.filter_mk_periode}
-                      onChange={(e) => setBulkConfig({ ...bulkConfig, filter_mk_periode: e.target.value })}
-                    >
-                      <option value="all">Semua Periode MK</option>
-                      {periodes.map((p) => (
-                        <option key={p.id} value={p.nama}>
-                          {p.nama}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {bulkConfig.target_type === 'all_mk' && (
+                    <div>
+                      <label className="macos-label">Filter Periode MK (Opsional)</label>
+                      <select
+                        className="macos-input"
+                        value={bulkConfig.filter_mk_periode}
+                        onChange={(e) => setBulkConfig({ ...bulkConfig, filter_mk_periode: e.target.value })}
+                      >
+                        <option value="all">Semua Periode MK</option>
+                        {periodes.map((p) => (
+                          <option key={p.id} value={p.nama}>
+                            {p.nama}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="macos-label">Konteks Tambahan (Opsional)</label>
@@ -1124,15 +1318,17 @@ export default function RPSList() {
                 </div>
 
                 <div className="p-3 bg-indigo-50/60 rounded-apple-lg border border-indigo-100/80 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={bulkConfig.skip_existing}
-                      onChange={e => setBulkConfig({ ...bulkConfig, skip_existing: e.target.checked })}
-                      className="w-4 h-4 accent-indigo-600 rounded"
-                    />
-                    <span className="text-xs font-medium text-gray-800">Lewati mata kuliah yang sudah ada RPS-nya</span>
-                  </label>
+                  {bulkConfig.target_type === 'all_mk' && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={bulkConfig.skip_existing}
+                        onChange={e => setBulkConfig({ ...bulkConfig, skip_existing: e.target.checked })}
+                        className="w-4 h-4 accent-indigo-600 rounded"
+                      />
+                      <span className="text-xs font-medium text-gray-800">Lewati mata kuliah yang sudah ada RPS-nya</span>
+                    </label>
+                  )}
 
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
