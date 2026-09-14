@@ -337,8 +337,16 @@ export default function RPSList() {
     if (prodis.length === 0) await loadProdis()
     if (periodes.length === 0) await loadPeriodes()
     const act = periodes.find(p => p.is_active)
+    
+    // Choose sensible default source period from filter or existing RPS data
+    let src = periodeFilter
+    if (!src) {
+      const distinctInRps = Array.from(new Set(rpsList.map(r => r.tahun_akademik || r.identitas?.tahun_akademik).filter(Boolean)))
+      src = distinctInRps[0] || (periodes[0]?.nama || '')
+    }
+
     setBulkCopyConfig({
-      source_tahun_akademik: periodeFilter || (periodes[0]?.nama || ''),
+      source_tahun_akademik: src,
       target_tahun_akademik: act?.nama || '',
       prodi_id: prodiFilter || 'all',
       statuses: ['draft', 'review', 'approved', 'published'],
@@ -645,6 +653,11 @@ export default function RPSList() {
       toast.error('Gagal menghapus RPS')
     }
   }
+
+  const allAvailablePeriodes = Array.from(new Set([
+    ...periodes.map(p => p.nama),
+    ...rpsList.map(r => r.tahun_akademik || r.identitas?.tahun_akademik).filter(Boolean),
+  ]))
 
   const filtered = rpsList.filter((r) => {
     if (periodeFilter) {
@@ -1207,11 +1220,14 @@ export default function RPSList() {
                       onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, source_tahun_akademik: e.target.value })}
                     >
                       <option value="">-- Pilih Periode Sumber --</option>
-                      {periodes.map((p) => (
-                        <option key={p.id} value={p.nama}>
-                          {p.nama} {p.is_active ? '(Aktif)' : ''}
-                        </option>
-                      ))}
+                      {allAvailablePeriodes.map((pName) => {
+                        const pObj = periodes.find(p => p.nama === pName)
+                        return (
+                          <option key={pName} value={pName}>
+                            {pName} {pObj?.is_active ? '(Aktif)' : ''}
+                          </option>
+                        )
+                      })}
                     </select>
                   </div>
                   <div>
@@ -1222,11 +1238,14 @@ export default function RPSList() {
                       onChange={(e) => setBulkCopyConfig({ ...bulkCopyConfig, target_tahun_akademik: e.target.value })}
                     >
                       <option value="">-- Pilih Periode Target --</option>
-                      {periodes.map((p) => (
-                        <option key={p.id} value={p.nama}>
-                          {p.nama} {p.is_active ? '(Aktif)' : ''}
-                        </option>
-                      ))}
+                      {allAvailablePeriodes.map((pName) => {
+                        const pObj = periodes.find(p => p.nama === pName)
+                        return (
+                          <option key={pName} value={pName}>
+                            {pName} {pObj?.is_active ? '(Aktif)' : ''}
+                          </option>
+                        )
+                      })}
                     </select>
                   </div>
                 </div>

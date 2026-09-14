@@ -501,6 +501,7 @@ async def bulk_copy_rps(
     if source_ta.lower() == target_ta.lower():
         raise HTTPException(status_code=400, detail="Periode sumber dan periode target tidak boleh sama")
 
+    # 1. Try exact match first
     query = select(RPS).where(RPS.tahun_akademik == source_ta)
     if data.prodi_id and str(data.prodi_id) != "all":
         try:
@@ -514,6 +515,29 @@ async def bulk_copy_rps(
 
     result = await db.execute(query)
     source_items = result.scalars().all()
+
+    # 2. If no exact match, try flexible matching (e.g. "2024/2025" within "2024/2025 Genap" or vice-versa)
+    if not source_items:
+        year_match = re.search(r"\d{4}/\d{4}|\d{4}", source_ta)
+        year_str = year_match.group(0) if year_match else source_ta
+
+        flex_query = select(RPS).where(
+            (RPS.tahun_akademik.ilike(f"%{source_ta}%")) |
+            (RPS.tahun_akademik == year_str) |
+            (RPS.tahun_akademik.ilike(f"%{year_str}%"))
+        )
+        if data.prodi_id and str(data.prodi_id) != "all":
+            try:
+                pid = int(data.prodi_id)
+                flex_query = flex_query.where(RPS.prodi_id == pid)
+            except ValueError:
+                pass
+
+        if data.statuses and len(data.statuses) > 0:
+            flex_query = flex_query.where(RPS.status.in_(data.statuses))
+
+        flex_res = await db.execute(flex_query)
+        source_items = flex_res.scalars().all()
 
     if not source_items:
         raise HTTPException(
