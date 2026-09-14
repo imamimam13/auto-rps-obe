@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
+from typing import Optional, List, Dict, Any
 from app.core.database import get_db
 from app.models import RPS, Prodi, MataKuliah
 from app.schemas import RPSGenerateRequest, BulkGenerateRequest, OBEValidationRequest, OBEValidationResponse
@@ -357,6 +358,115 @@ async def generate_and_save_one_rps(
             "kode": mk.kode,
             "sdgs": sdgs,
             "bloom_updated": bloom_changed,
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=handle_ai_error(e))
+
+
+@router.post("/rps/{rps_id}", response_model=dict)
+async def generate_and_fill_existing_rps(
+    rps_id: int,
+    additional_context: Optional[str] = Body("", embed=True),
+    db: AsyncSession = Depends(get_db),
+):
+    """Directly run AI generation to fill or populate an existing draft/empty RPS record."""
+    rps_res = await db.execute(select(RPS).where(RPS.id == rps_id))
+    rps = rps_res.scalar_one_or_none()
+    if not rps:
+        raise HTTPException(status_code=404, detail="RPS tidak ditemukan")
+
+    mk_res = await db.execute(select(MataKuliah).where(MataKuliah.id == rps.mata_kuliah_id))
+    mk = mk_res.scalar_one_or_none()
+    if not mk:
+        raise HTTPException(status_code=404, detail="Mata kuliah terkait tidak ditemukan")
+
+    prodi_res = await db.execute(select(Prodi).where(Prodi.id == rps.prodi_id))
+    prodi = prodi_res.scalar_one_or_none()
+    if not prodi:
+        raise HTTPException(status_code=404, detail="Program studi terkait tidak ditemukan")
+
+    mata_kuliah_data = {
+        "kode": mk.kode,
+        "nama": mk.nama,
+        "sks": mk.sks,
+        "sks_teori": mk.sks_teori,
+        "sks_praktik": mk.sks_praktik,
+        "deskripsi": mk.deskripsi or "",
+    }
+
+    all_cpl = prodi.capaian_pembelajaran_lulusan or []
+    course_cpl_codes = mk.cpl_prodi or []
+    cpl_to_use = [c for c in all_cpl if c.get("kode") in course_cpl_codes] if course_cpl_codes else all_cpl
+
+    dosen_list = rps.dosen_pengampu or []
+
+    try:
+        rps_data = await rps_generator_service.generate_complete_rps(
+            visi_prodi=prodi.visi,
+            misi_prodi=prodi.misi,
+            cpl_prodi=cpl_to_use,
+            mata_kuliah=mata_kuliah_data,
+            semester=rps.semester,
+            tahun_akademik=rps.tahun_akademik,
+            additional_context=additional_context or "",
+            dosen_pengampu=dosen_list,
+            ka_prodi=prodi.ka_prodi,
+            koordinator_rmk=prodi.koordinator_rmk,
+        )
+
+        identitas = dict(rps_data.get("identitas") or {})
+        identitas["dosen_pengampu"] = dosen_list
+        identitas["tahun_akademik"] = rps.tahun_akademik
+        identitas["semester"] = rps.semester
+        if rps.identitas and rps.identitas.get("kelas"):
+            identitas["kelas"] = rps.identitas.get("kelas")
+
+        rps.identitas = identitas
+        rps.deskripsi_mata_kuliah = rps_data.get("deskripsi_mata_kuliah") or ""
+        rps.bahan_kajian = rps_data.get("bahan_kajian") or []
+        rps.cpmk = rps_data.get("cpmk", [])
+        rps.sub_cpmk = rps_data.get("sub_cpmk", [])
+        rps.rencana_pembelajaran = rps_data.get("rencana_pembelajaran", [])
+        rps.metode_pembelajaran = rps_data.get("metode_pembelajaran", [])
+        rps.media_pembelajaran = rps_data.get("media_pembelajaran", [])
+        rps.penilaian = rps_data.get("penilaian", [])
+        rps.referensi = rps_data.get("referensi", [])
+        rps.sdgs = rps_data.get("sdgs") or mk.sdgs or []
+
+        flag_modified(rps, "identitas")
+        flag_modified(rps, "bahan_kajian")
+        flag_modified(rps, "cpmk")
+        flag_modified(rps, "sub_cpmk")
+        flag_modified(rps, "rencana_pembelajaran")
+        flag_modified(rps, "metode_pembelajaran")
+        flag_modified(rps, "media_pembelajaran")
+        flag_modified(rps, "penilaian")
+        flag_modified(rps, "referensi")
+        flag_modified(rps, "sdgs")
+
+        await db.commit()
+        await db.refresh(rps)
+
+        # Run SDGs + Bloom analysis in background / async
+        try:
+            import asyncio
+            sdgs_task = _analyze_and_save_sdgs(rps, mk, db)
+            bloom_task = _analyze_and_save_bloom(rps, db)
+            await asyncio.wait_for(
+                asyncio.gather(sdgs_task, bloom_task, return_exceptions=True),
+                timeout=25.0
+            )
+            await db.refresh(rps)
+        except Exception as ex:
+            print(f"[generate_and_fill_existing_rps] Post-analysis warning: {ex}")
+
+        return {
+            "success": True,
+            "rps_id": rps.id,
+            "message": f"Konten RPS '{mk.nama}' berhasil diisi & diselesaikan oleh AI!",
+            "sdgs": rps.sdgs or [],
         }
     except Exception as e:
         import traceback

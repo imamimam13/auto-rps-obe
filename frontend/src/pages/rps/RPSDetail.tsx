@@ -67,6 +67,29 @@ export default function RPSDetail() {
   const [splitTargetStatus, setSplitTargetStatus] = useState('inherit')
   const [splitDeleteOriginal, setSplitDeleteOriginal] = useState(false)
   const [splitting, setSplitting] = useState(false)
+  const [generatingAI, setGeneratingAI] = useState(false)
+
+  async function handleGenerateWithAI() {
+    if (!rps?.id) return
+    const isEmpty = (!rps?.cpmk || rps?.cpmk.length === 0) && (!rps?.rencana_pembelajaran || rps?.rencana_pembelajaran.length === 0)
+    if (!isEmpty) {
+      if (!confirm('RPS ini sudah memiliki data materi / rencana pembelajaran. Apakah Anda yakin ingin meminta AI membuatkan ulang seluruh isi RPS?')) {
+        return
+      }
+    }
+
+    setGeneratingAI(true)
+    const toastId = toast.loading('AI sedang merancang silabus, CPMK, Sub-CPMK, Bahan Kajian & Rencana 16 Minggu...')
+    try {
+      const res = await api.post(`/api/v1/generate/rps/${rps.id}`, { additional_context: '' })
+      toast.success(res.data.message || 'RPS berhasil di-generate lengkap oleh AI!', { id: toastId })
+      loadData()
+    } catch (e: any) {
+      toast.error(formatApiError(e, 'Gagal generate RPS dengan AI'), { id: toastId })
+    } finally {
+      setGeneratingAI(false)
+    }
+  }
 
   useEffect(() => {
     if (id) loadData()
@@ -508,8 +531,19 @@ export default function RPSDetail() {
               </button>
             )}
             {canEditRPS && (
-              <button onClick={openEditModal} className="macos-button flex items-center gap-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-apple-md font-medium">
-                <Sparkles className="w-4 h-4" /> Edit RPS
+              <button
+                onClick={handleGenerateWithAI}
+                disabled={generatingAI}
+                className="macos-button flex items-center gap-1.5 text-xs bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium px-3 py-1.5 rounded-apple-md shadow-sm"
+                title="Isi atau perbarui seluruh silabus (CPMK, Materi, Rencana 16 Minggu) otomatis menggunakan AI"
+              >
+                {generatingAI ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {generatingAI ? 'AI Sedang Bekerja...' : 'Generate Lengkap AI'}
+              </button>
+            )}
+            {canEditRPS && (
+              <button onClick={openEditModal} className="macos-button flex items-center gap-1.5 text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-apple-md font-medium">
+                <FileText className="w-3.5 h-3.5" /> Edit Manual
               </button>
             )}
           </div>
@@ -550,6 +584,30 @@ export default function RPSDetail() {
         </div>
       </div>
 
+      {/* Banner if RPS is Empty Draft */}
+      {(!rps.cpmk || rps.cpmk.length === 0) && (!rps.rencana_pembelajaran || rps.rencana_pembelajaran.length === 0) && (
+        <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border border-purple-200/80 rounded-apple-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-sm animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-purple-600 text-white rounded-apple-xl shrink-0 mt-0.5 shadow-sm">
+              <Sparkles className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-purple-950">RPS ini masih berupa Draft Kosong</h4>
+              <p className="text-xs text-purple-800/80 mt-0.5 leading-relaxed">
+                Identitas dan dosen pengampu sudah siap. Klik tombol di samping untuk membuatkan CPMK, Sub-CPMK, Bahan Kajian, Rencana Mingguan (16 Pertemuan), Asesmen & SDGs lengkap secara otomatis menggunakan AI.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleGenerateWithAI}
+            disabled={generatingAI}
+            className="macos-button flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-apple-xl shadow-md hover:shadow-lg transition-all shrink-0"
+          >
+            {generatingAI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {generatingAI ? 'AI Sedang Menulis RPS...' : 'Generate Lengkap dengan AI'}
+          </button>
+        </div>
+      )}
 
       {/* Identitas */}
       <div className="macos-card p-6">

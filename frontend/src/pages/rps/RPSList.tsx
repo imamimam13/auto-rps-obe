@@ -135,6 +135,43 @@ export default function RPSList() {
     }
   }
 
+  const [generatingSelectedAI, setGeneratingSelectedAI] = useState(false)
+
+  async function handleGenerateSelectedAI() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Apakah Anda yakin ingin meminta AI membuatkan silabus & capaian pembelajaran lengkap untuk ${selectedIds.size} RPS terpilih?`)) {
+      return
+    }
+
+    setGeneratingSelectedAI(true)
+    const list = Array.from(selectedIds)
+    let successCount = 0
+    let failCount = 0
+
+    const toastId = toast.loading(`[1/${list.length}] AI sedang merancang RPS...`)
+
+    for (let i = 0; i < list.length; i++) {
+      const rpsId = list[i]
+      toast.loading(`[${i + 1}/${list.length}] AI sedang merancang RPS...`, { id: toastId })
+      try {
+        await api.post(`/api/v1/generate/rps/${rpsId}`, { additional_context: '' })
+        successCount++
+      } catch (e) {
+        failCount++
+      }
+    }
+
+    if (failCount === 0) {
+      toast.success(`Berhasil! AI telah melengkapi ${successCount} RPS terpilih.`, { id: toastId })
+    } else {
+      toast.error(`Selesai: ${successCount} berhasil di-generate, ${failCount} gagal.`, { id: toastId })
+    }
+
+    setGeneratingSelectedAI(false)
+    setSelectedIds(new Set())
+    loadData()
+  }
+
   async function openJadwalModal() {
     if (prodis.length === 0) await loadProdis()
     if (periodes.length === 0) await loadPeriodes()
@@ -847,15 +884,26 @@ export default function RPSList() {
               Reset Pilihan
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleGenerateSelectedAI}
+              disabled={generatingSelectedAI}
+              className="macos-button text-xs bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold px-3.5 py-1.5 rounded-apple-lg flex items-center gap-1.5 shadow-sm"
+              title="Isi seluruh silabus & materi dengan AI untuk RPS terpilih"
+            >
+              {generatingSelectedAI ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {generatingSelectedAI ? 'AI Sedang Bekerja...' : `Generate AI (${selectedIds.size} RPS)`}
+            </button>
             <button
               onClick={handlePublishSelected}
+              disabled={generatingSelectedAI}
               className="macos-button text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3.5 py-1.5 rounded-apple-lg flex items-center gap-1.5 shadow-sm"
             >
               <Send className="w-3.5 h-3.5" /> Publish {selectedIds.size} Terpilih
             </button>
             <button
               onClick={openSelectedCopy}
+              disabled={generatingSelectedAI}
               className="macos-button text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3.5 py-1.5 rounded-apple-lg flex items-center gap-1.5 shadow-sm"
             >
               <Copy className="w-3.5 h-3.5" /> Salin {selectedIds.size} Terpilih ke Periode Baru
