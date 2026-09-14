@@ -24,6 +24,7 @@ export default function RPSList() {
   const [rpsList, setRpsList] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [contentFilter, setContentFilter] = useState<'all' | 'empty' | 'filled'>('all')
   const [prodiFilter, setProdiFilter] = useState('')
   const [periodeFilter, setPeriodeFilter] = useState('')
   const [periodes, setPeriodes] = useState<any[]>([])
@@ -755,6 +756,14 @@ export default function RPSList() {
     }
   }
 
+  function isRpsEmpty(r: any): boolean {
+    const hasCpmk = Array.isArray(r.cpmk) && r.cpmk.length > 0
+    const hasRencana = Array.isArray(r.rencana_pembelajaran) && r.rencana_pembelajaran.length > 0
+    const hasDeskripsi = typeof r.deskripsi_mata_kuliah === 'string' && r.deskripsi_mata_kuliah.trim().length > 0
+    const hasBahanKajian = Array.isArray(r.bahan_kajian) && r.bahan_kajian.length > 0
+    return !hasCpmk && !hasRencana && !hasDeskripsi && !hasBahanKajian
+  }
+
   const allAvailablePeriodes = Array.from(new Set([
     ...periodes.map(p => p.nama),
     ...rpsList.map(r => r.tahun_akademik || r.identitas?.tahun_akademik).filter(Boolean),
@@ -767,6 +776,9 @@ export default function RPSList() {
                       periodeFilter.toLowerCase().includes(ta.toLowerCase())
       if (!matchTa) return false
     }
+
+    if (contentFilter === 'empty' && !isRpsEmpty(r)) return false
+    if (contentFilter === 'filled' && isRpsEmpty(r)) return false
 
     if (!search) return true
     const searchLower = search.toLowerCase()
@@ -852,6 +864,11 @@ export default function RPSList() {
           <option value="review">Review</option>
           <option value="approved">Approved</option>
           <option value="published">Published</option>
+        </select>
+        <select value={contentFilter} onChange={(e: any) => setContentFilter(e.target.value)} className="macos-input max-w-[200px]">
+          <option value="all">Semua Kelengkapan</option>
+          <option value="empty">⚠️ Belum Ada Silabus/AI</option>
+          <option value="filled">✓ Silabus Lengkap</option>
         </select>
 
         {canEditRPS && filtered.length > 0 && (
@@ -955,10 +972,21 @@ export default function RPSList() {
                     {rps.obe_validated && ` · OBE: ${rps.obe_score}/100`}
                   </p>
                 </div>
-                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${statusColors[rps.status] || 'bg-gray-50 text-gray-600'}`}>
-                  <StatusIcon className="w-3 h-3" />
-                  {rps.status}
-                </span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[rps.status] || 'bg-gray-50 text-gray-600'}`}>
+                    <StatusIcon className="w-3 h-3" />
+                    {rps.status}
+                  </span>
+                  {isRpsEmpty(rps) ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80" title="Silabus / CPMK / Materi AI belum dibuat">
+                      ⚠️ Belum Ada Materi
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80" title="Silabus & CPMK lengkap">
+                      ✓ Materi Lengkap
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => handleExport(rps.id, 'pdf')} className="macos-button-ghost px-2.5 py-1.5 text-xs" title="Export PDF">
                     <Download className="w-3.5 h-3.5" />
