@@ -779,22 +779,23 @@ def extract_and_group_jadwal(rows: List[List[str]]) -> List[Dict[str, Any]]:
     header = [h.lower().strip() for h in rows[header_idx]]
     col_map = {}
     for i, h in enumerate(header):
-        if "kode" in h and "kode" not in col_map:
-            col_map["kode"] = i
-        elif ("nama" in h or "mata kuliah" in h) and "nama" not in col_map:
-            col_map["nama"] = i
-        elif "sks" in h and "sks" not in col_map:
-            col_map["sks"] = i
-        elif ("semester" in h or "smt" in h or "sem" in h) and "semester" not in col_map:
-            col_map["semester"] = i
-        elif ("kurikulum" in h or "prodi" in h or "program studi" in h) and "kurikulum" not in col_map:
-            col_map["kurikulum"] = i
-        elif ("team" in h or "tim" in h) and "team" not in col_map:
-            col_map["team"] = i
-        elif ("dosen" in h or "pengampu" in h) and "dosen" not in col_map:
-            col_map["dosen"] = i
-        elif "kelas" in h and "kelas" not in col_map:
-            col_map["kelas"] = i
+        hl = h.lower().replace("_", " ").strip()
+        if any(k in hl for k in ["kode mk", "kode_mk", "kodemk", "kode mata kuliah", "kd mk", "kode"]):
+            if "kode" not in col_map: col_map["kode"] = i
+        elif any(k in hl for k in ["nama mata kuliah", "nama mk", "nama_mk", "mata kuliah", "matakuliah", "nama"]):
+            if "nama" not in col_map: col_map["nama"] = i
+        elif any(k in hl for k in ["sks", "bobot", "credit"]):
+            if "sks" not in col_map: col_map["sks"] = i
+        elif any(k in hl for k in ["semester", "smt", "sem"]):
+            if "semester" not in col_map: col_map["semester"] = i
+        elif any(k in hl for k in ["kurikulum", "prodi", "program studi", "jurusan"]):
+            if "kurikulum" not in col_map: col_map["kurikulum"] = i
+        elif any(k in hl for k in ["team teaching", "tim teaching", "dosen team", "team", "tim", "dosen 2", "dosen kedua"]):
+            if "team" not in col_map: col_map["team"] = i
+        elif any(k in hl for k in ["dosen pengampu", "dosen", "pengampu", "nama dosen", "dosen 1", "dosen utama"]):
+            if "dosen" not in col_map: col_map["dosen"] = i
+        elif any(k in hl for k in ["kelas", "jenis kelas", "seksi", "paralel"]):
+            if "kelas" not in col_map: col_map["kelas"] = i
 
     # Fallbacks for missing columns
     if "kode" not in col_map and len(header) > 0: col_map["kode"] = 0
@@ -804,9 +805,21 @@ def extract_and_group_jadwal(rows: List[List[str]]) -> List[Dict[str, Any]]:
     grouped: Dict[str, Dict[str, Any]] = {}
     data_rows = rows[header_idx + 1:]
 
+    def split_dosen_names(raw: str) -> List[str]:
+        if not raw or raw in ["-", "None", "none", "null", ""]:
+            return []
+        # Split by newline, semicolon, or slash (avoid splitting standard degree commas like M.Kom., S.T.)
+        parts = re.split(r"[\n;\/]+", raw)
+        result = []
+        for p in parts:
+            clean = p.strip().strip("-").strip()
+            if clean and len(clean) > 2 and clean.lower() not in ["none", "null", "tidak ada", "-", "belum ada"]:
+                result.append(clean)
+        return result
+
     for r in data_rows:
         kode = r[col_map["kode"]].strip() if "kode" in col_map and col_map["kode"] < len(r) else ""
-        if not kode or kode.lower() in ["kode", "kode mk", "no", "-"]:
+        if not kode or kode.lower() in ["kode", "kode mk", "no", "-", "none"]:
             continue
 
         nama = r[col_map["nama"]].strip() if "nama" in col_map and col_map["nama"] < len(r) else ""
@@ -817,14 +830,13 @@ def extract_and_group_jadwal(rows: List[List[str]]) -> List[Dict[str, Any]]:
         sem = int(sem_raw) if sem_raw.isdigit() else 1
 
         kur = r[col_map["kurikulum"]].strip() if "kurikulum" in col_map and col_map["kurikulum"] < len(r) else ""
-        dosen = r[col_map["dosen"]].strip() if "dosen" in col_map and col_map["dosen"] < len(r) else ""
-        team = r[col_map["team"]].strip() if "team" in col_map and col_map["team"] < len(r) else ""
+        dosen_raw = r[col_map["dosen"]].strip() if "dosen" in col_map and col_map["dosen"] < len(r) else ""
+        team_raw = r[col_map["team"]].strip() if "team" in col_map and col_map["team"] < len(r) else ""
         kelas = r[col_map["kelas"]].strip() if "kelas" in col_map and col_map["kelas"] < len(r) else ""
 
         # Derive clean prodi name from Kurikulum string (e.g. "MANAJEMEN GENAP 2025/2026" -> "MANAJEMEN")
         prodi_name = kur
         if kur:
-            # Strip year and semester tokens
             clean_p = re.sub(r"\b(ganjil|genap|pendek|20\d\d/20\d\d|20\d\d)\b", "", kur, flags=re.IGNORECASE).strip()
             if clean_p:
                 prodi_name = clean_p
@@ -849,17 +861,17 @@ def extract_and_group_jadwal(rows: List[List[str]]) -> List[Dict[str, Any]]:
         if kelas and kelas not in item["kelas_list"]:
             item["kelas_list"].append(kelas)
 
-        if dosen and dosen not in ["-", "None", "none", "null", ""]:
-            if dosen not in item["dosen_pengampu"]:
-                item["dosen_pengampu"].append(dosen)
-            if dosen not in item["semua_dosen"]:
-                item["semua_dosen"].append(dosen)
+        for d in split_dosen_names(dosen_raw):
+            if d not in item["dosen_pengampu"]:
+                item["dosen_pengampu"].append(d)
+            if d not in item["semua_dosen"]:
+                item["semua_dosen"].append(d)
 
-        if team and team not in ["-", "None", "none", "null", ""]:
-            if team not in item["team_teaching"]:
-                item["team_teaching"].append(team)
-            if team not in item["semua_dosen"]:
-                item["semua_dosen"].append(team)
+        for t in split_dosen_names(team_raw):
+            if t not in item["team_teaching"]:
+                item["team_teaching"].append(t)
+            if t not in item["semua_dosen"]:
+                item["semua_dosen"].append(t)
 
     return list(grouped.values())
 

@@ -304,21 +304,33 @@ export default function RPSList() {
     }
   }
 
-  function downloadJadwalTemplate() {
-    const csvContent = "No,Hari,Jam Mulai,Jam Selesai,Ruangan,Kode MK,Nama Mata Kuliah,SKS,Semester,Kurikulum,Dosen Pengampu,Dosen Team Teaching,Jenis Kelas\n" +
-      "1,SENIN,07:30,10:00,B205,3KA102,PENGANTAR AKUNTANSI 2,3,2,MANAJEMEN GENAP 2025/2026,SURIANTO,-,REGULER\n" +
-      "2,SENIN,08:30,10:30,A303,2KB001,Bahasa Inggris,3,4,TEKNIK INDUSTRI GENAP 2025/2026,A. IMAM ZULFIKAR MUSTAMAN,-,REGULER\n" +
-      "3,SELASA,10:00,12:30,B301,3KP211,STATISTIKA BISNIS,3,4,MANAJEMEN GENAP 2025/2026,PERDY KARURU,Muh. Arifai,REGULER\n"
+  function downloadJadwalTemplate(type: 'simple' | 'siakad' = 'simple') {
+    let csvContent = ''
+    let filename = 'Template_Jadwal_Dosen_Standar.csv'
+
+    if (type === 'siakad') {
+      filename = 'Template_Jadwal_Format_SIAKAD.csv'
+      csvContent = "No,Hari,Jam Mulai,Jam Selesai,Ruangan,Kode MK,Nama Mata Kuliah,SKS,Semester,Kurikulum,Dosen Pengampu,Dosen Team Teaching,Jenis Kelas,Kuota,Terisi,Status\n" +
+        "1,SENIN,07:30,10:00,B205,3KA102,PENGANTAR AKUNTANSI 2,3,2,MANAJEMEN GENAP 2025/2026,SURIANTO,-,REGULER,40,28,Aktif\n" +
+        "2,SENIN,08:30,10:30,A303,2KB001,Bahasa Inggris,3,4,TEKNIK INDUSTRI GENAP 2025/2026,A. IMAM ZULFIKAR MUSTAMAN,-,REGULER,30,11,Aktif\n" +
+        "3,SELASA,10:00,12:30,B301,3KP211,STATISTIKA BISNIS,3,4,MANAJEMEN GENAP 2025/2026,PERDY KARURU,Muh. Arifai,REGULER,41,41,Aktif\n"
+    } else {
+      filename = 'Template_Jadwal_Dosen_Sederhana.csv'
+      csvContent = "KODE_MK,NAMA_MATA_KULIAH,PROGRAM_STUDI,SEMESTER,SKS,KELAS,DOSEN_PENGAMPU,DOSEN_TEAM_TEACHING\n" +
+        "TI101,Pemrograman Web,Teknik Informatika,3,3,A,Dr. Budi Santoso M.Kom.,-\n" +
+        "TI101,Pemrograman Web,Teknik Informatika,3,3,B,Siti Rahma M.Cs.,-\n" +
+        "3KA102,PENGANTAR AKUNTANSI 2,MANAJEMEN,2,3,REGULER,SURIANTO,BASO R\n"
+    }
 
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', 'Template_Jadwal_Kuliah_Dosen.csv')
+    link.setAttribute('download', filename)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    toast.success('Template jadwal berhasil diunduh!')
+    toast.success(`Template ${type === 'siakad' ? 'SIAKAD' : 'Sederhana'} berhasil diunduh!`)
   }
 
   async function openBulkCopy() {
@@ -1528,12 +1540,23 @@ export default function RPSList() {
                   </button>
                 </div>
 
-                <button
-                  onClick={downloadJadwalTemplate}
-                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium"
-                >
-                  <Download className="w-3.5 h-3.5" /> Unduh Template Acuan (.csv)
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">Template:</span>
+                  <button
+                    onClick={() => downloadJadwalTemplate('simple')}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium bg-blue-50/60 hover:bg-blue-100/80 px-2.5 py-1 rounded-apple-md transition-colors"
+                    title="Unduh template standar sederhana (Kode MK, Nama MK, Prodi, Dosen)"
+                  >
+                    <Download className="w-3 h-3" /> Template Standar
+                  </button>
+                  <button
+                    onClick={() => downloadJadwalTemplate('siakad')}
+                    className="text-xs text-emerald-600 hover:text-emerald-800 flex items-center gap-1 font-medium bg-emerald-50/60 hover:bg-emerald-100/80 px-2.5 py-1 rounded-apple-md transition-colors"
+                    title="Unduh template format SIAKAD (16 kolom dengan Kurikulum, Jam, Ruang dll)"
+                  >
+                    <Download className="w-3 h-3" /> Template SIAKAD
+                  </button>
+                </div>
               </div>
 
               {jadwalInputMode === 'upload' ? (
