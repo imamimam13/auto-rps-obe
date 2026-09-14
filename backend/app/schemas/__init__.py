@@ -358,6 +358,8 @@ class JadwalSyncRequest(BaseModel):
     prodi_id: Optional[Union[int, str]] = None
     items: List[JadwalItemExtracted]
     auto_create_rps_draft: Optional[bool] = False
+    target_status: Optional[str] = "published"  # "draft" or "published"
+    auto_update_semester: Optional[bool] = True
 
 
 class JadwalSyncResponse(BaseModel):
@@ -368,3 +370,17 @@ class JadwalSyncResponse(BaseModel):
     skipped: int
     not_found_rps: int
     detail: List[Dict[str, Any]]
+
+
+class RPSBulkPublishRequest(BaseModel):
+    target_tahun_akademik: Optional[str] = None
+    prodi_id: Optional[Union[int, str]] = None
+    only_with_dosen: Optional[bool] = True
+    rps_ids: Optional[List[int]] = None
+
+
+class RPSBulkPublishResponse(BaseModel):
+    success: bool
+    total_found: int
+    published_count: int
+    message: str

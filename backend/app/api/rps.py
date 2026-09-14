@@ -8,6 +8,7 @@ from app.schemas import (
     RPSCreate, RPSUpdate, RPSResponse,
     RPSCopyRequest, RPSBulkCopyRequest, RPSCopySelectedRequest,
     JadwalItemExtracted, JadwalSyncRequest, JadwalSyncResponse,
+    RPSBulkPublishRequest, RPSBulkPublishResponse,
     PaginatedResponse,
 )
 from sqlalchemy import select, func, update
@@ -1067,12 +1068,29 @@ async def sync_jadwal_dosen(
         # Check existing RPS in target period
         rps_record = rps_by_mk_id.get(matched_mk.id)
 
+        # Update MataKuliah semester if provided and auto_update_semester is enabled
+        auto_update_sem = getattr(data, "auto_update_semester", True)
+        if auto_update_sem and item.semester and item.semester > 0:
+            if matched_mk.semester != item.semester:
+                matched_mk.semester = item.semester
+                db.add(matched_mk)
+
+        target_status_req = (getattr(data, "target_status", "published") or "published").lower()
+
         if rps_record:
-            # 1. Update dosen_pengampu on existing RPS
+            # 1. Update dosen_pengampu and semester on existing RPS
             rps_record.dosen_pengampu = dosen_list
             identitas = dict(rps_record.identitas or {})
             identitas["dosen_pengampu"] = dosen_list
+            if auto_update_sem and item.semester and item.semester > 0:
+                rps_record.semester = item.semester
+                identitas["semester"] = item.semester
             rps_record.identitas = identitas
+
+            # Update status to published if requested and dosen is present
+            if target_status_req == "published" and dosen_list:
+                rps_record.status = "published"
+
             flag_modified(rps_record, "identitas")
             flag_modified(rps_record, "dosen_pengampu")
 
@@ -1083,10 +1101,10 @@ async def sync_jadwal_dosen(
                 "rps_kode": rps_record.kode,
                 "status": "updated",
                 "dosen": dosen_list,
-                "message": f"Dosen pengampu berhasil disinkronkan: {', '.join(dosen_list)}",
+                "message": f"Dosen pengampu berhasil disinkronkan: {', '.join(dosen_list)}" + (f" (Status: {rps_record.status})" if target_status_req == "published" else ""),
             })
         else:
-            # 2. RPS not yet created for target period -> Auto-create Draft RPS!
+            # 2. RPS not yet created for target period -> Auto-create RPS!
             if data.auto_create_rps_draft is not False:
                 try:
                     # Look for previous RPS for this MK to inherit learning outcomes/weekly plans
@@ -1105,12 +1123,14 @@ async def sync_jadwal_dosen(
 
                     p_obj = prodis.get(matched_mk.prodi_id)
                     prodi_label = p_obj.nama if p_obj else (item.prodi_nama or "")
+                    new_rps_status = "published" if (target_status_req == "published" and dosen_list) else "draft"
 
                     if prev_rps:
                         # Clone from previous RPS
                         identitas = copy.deepcopy(prev_rps.identitas or {})
                         identitas["tahun_akademik"] = target_ta
                         identitas["dosen_pengampu"] = dosen_list
+                        identitas["semester"] = matched_mk.semester
                         if prodi_label:
                             identitas["prodi"] = prodi_label
 
@@ -1132,13 +1152,13 @@ async def sync_jadwal_dosen(
                             penilaian=copy.deepcopy(prev_rps.penilaian) or [],
                             referensi=copy.deepcopy(prev_rps.referensi) if prev_rps.referensi else None,
                             sdgs=copy.deepcopy(prev_rps.sdgs) or [],
-                            status="draft",
+                            status=new_rps_status,
                             obe_validated=prev_rps.obe_validated or False,
                             obe_validation_result=copy.deepcopy(prev_rps.obe_validation_result) if prev_rps.obe_validation_result else None,
                             obe_score=prev_rps.obe_score,
                         )
                     else:
-                        # Create fresh Draft RPS
+                        # Create fresh RPS
                         identitas = {
                             "kode_mata_kuliah": matched_mk.kode,
                             "nama_mata_kuliah": matched_mk.nama,
@@ -1156,7 +1176,7 @@ async def sync_jadwal_dosen(
                             tahun_akademik=target_ta,
                             dosen_pengampu=dosen_list,
                             identitas=identitas,
-                            status="draft",
+                            status=new_rps_status,
                         )
 
                     db.add(new_rps)
@@ -1169,7 +1189,7 @@ async def sync_jadwal_dosen(
                         "rps_kode": new_rps.kode,
                         "status": "created",
                         "dosen": dosen_list,
-                        "message": f"Draft RPS baru berhasil dibuat & dosen disinkronkan: {', '.join(dosen_list)}",
+                        "message": f"RPS baru berhasil dibuat & dosen disinkronkan: {', '.join(dosen_list)} (Status: {new_rps_status})",
                     })
                 except Exception as ex:
                     not_found_count += 1
@@ -1177,7 +1197,7 @@ async def sync_jadwal_dosen(
                         "kode": kode,
                         "nama": matched_mk.nama,
                         "status": "rps_create_error",
-                        "message": f"Gagal membuat Draft RPS otomatis: {str(ex)}",
+                        "message": f"Gagal membuat RPS otomatis: {str(ex)}",
                         "dosen": dosen_list,
                     })
             else:
@@ -1200,4 +1220,56 @@ async def sync_jadwal_dosen(
         skipped=skipped_count,
         not_found_rps=not_found_count,
         detail=detail,
+    )
+
+
+@router.post("/bulk-publish", response_model=RPSBulkPublishResponse)
+async def bulk_publish_rps(
+    data: RPSBulkPublishRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Bulk publish RPS records that are in draft or other non-published status, especially those with lecturers assigned."""
+    query = select(RPS).where(RPS.status != "published")
+
+    if data.rps_ids and len(data.rps_ids) > 0:
+        query = query.where(RPS.id.in_(data.rps_ids))
+
+    if data.target_tahun_akademik and data.target_tahun_akademik.strip() and data.target_tahun_akademik != "all":
+        query = query.where(RPS.tahun_akademik == data.target_tahun_akademik.strip())
+
+    if data.prodi_id and str(data.prodi_id) != "all":
+        try:
+            pid = int(data.prodi_id)
+            query = query.where(RPS.prodi_id == pid)
+        except Exception:
+            pass
+
+    res = await db.execute(query)
+    rps_records = res.scalars().all()
+
+    published_count = 0
+    for r in rps_records:
+        dosen = r.dosen_pengampu or []
+        if not dosen and r.identitas:
+            dosen = r.identitas.get("dosen_pengampu") or []
+
+        has_dosen = False
+        if isinstance(dosen, list) and len(dosen) > 0:
+            has_dosen = any(bool(str(d).strip()) for d in dosen)
+        elif isinstance(dosen, str) and dosen.strip():
+            has_dosen = True
+
+        if data.only_with_dosen and not has_dosen:
+            continue
+
+        r.status = "published"
+        published_count += 1
+
+    await db.commit()
+
+    return RPSBulkPublishResponse(
+        success=True,
+        total_found=len(rps_records),
+        published_count=published_count,
+        message=f"Berhasil mempublikasikan {published_count} dari {len(rps_records)} RPS ke status Published.",
     )

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2, Copy, Loader2, ArrowRight, Calendar, FileSpreadsheet, Upload, RefreshCw, FileUp, CheckCheck, X } from 'lucide-react'
+import { FileText, Search, Filter, CheckCircle, Clock, AlertCircle, Download, Sparkles, Trash2, Copy, Loader2, ArrowRight, Calendar, FileSpreadsheet, Upload, RefreshCw, FileUp, CheckCheck, X, Globe, Send, CheckCircle2 } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -55,6 +55,102 @@ export default function RPSList() {
     auto_retry: true,
     max_retries: 3,
   })
+
+  // Selected RPS for Bulk Action State
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [showSelectedCopyModal, setShowSelectedCopyModal] = useState(false)
+  const [selectedCopyPeriode, setSelectedCopyPeriode] = useState('')
+  const [selectedCopyStatus, setSelectedCopyStatus] = useState('draft')
+  const [selectedCopySkip, setSelectedCopySkip] = useState(true)
+  const [selectedCopying, setSelectedCopying] = useState(false)
+
+  // Schedule / Jadwal Sync Modal State
+  const [showJadwalModal, setShowJadwalModal] = useState(false)
+  const [jadwalTargetPeriode, setJadwalTargetPeriode] = useState('')
+  const [jadwalProdiId, setJadwalProdiId] = useState('all')
+  const [jadwalFile, setJadwalFile] = useState<File | null>(null)
+  const [jadwalRawText, setJadwalRawText] = useState('')
+  const [jadwalInputMode, setJadwalInputMode] = useState<'upload' | 'paste'>('upload')
+  const [jadwalParsing, setJadwalParsing] = useState(false)
+  const [jadwalExtracted, setJadwalExtracted] = useState<any[]>([])
+  const [jadwalSyncing, setJadwalSyncing] = useState(false)
+  const [jadwalSyncResult, setJadwalSyncResult] = useState<any>(null)
+  const [jadwalSearch, setJadwalSearch] = useState('')
+  const [jadwalAutoCreate, setJadwalAutoCreate] = useState(true)
+  const [jadwalTargetStatus, setJadwalTargetStatus] = useState<'published' | 'draft'>('published')
+  const [jadwalAutoUpdateSemester, setJadwalAutoUpdateSemester] = useState(true)
+
+  // Bulk Publish Modal State
+  const [showBulkPublishModal, setShowBulkPublishModal] = useState(false)
+  const [bulkPublishPeriode, setBulkPublishPeriode] = useState('')
+  const [bulkPublishProdiId, setBulkPublishProdiId] = useState('all')
+  const [bulkPublishOnlyWithDosen, setBulkPublishOnlyWithDosen] = useState(true)
+  const [bulkPublishing, setBulkPublishing] = useState(false)
+
+  async function openBulkPublishModal() {
+    if (prodis.length === 0) await loadProdis()
+    if (periodes.length === 0) await loadPeriodes()
+    const act = periodes.find(p => p.is_active)
+    setBulkPublishPeriode(periodeFilter || act?.nama || (periodes[0]?.nama || ''))
+    setBulkPublishProdiId(prodiFilter || 'all')
+    setBulkPublishOnlyWithDosen(true)
+    setShowBulkPublishModal(true)
+  }
+
+  async function handleBulkPublishSubmit() {
+    setBulkPublishing(true)
+    try {
+      const payload = {
+        target_tahun_akademik: bulkPublishPeriode === 'all' || !bulkPublishPeriode ? null : bulkPublishPeriode.trim(),
+        prodi_id: bulkPublishProdiId === 'all' ? null : bulkPublishProdiId,
+        only_with_dosen: bulkPublishOnlyWithDosen,
+      }
+      const res = await api.post('/api/v1/rps/bulk-publish', payload)
+      toast.success(res.data.message || `Berhasil mempublikasikan ${res.data.published_count} RPS!`)
+      setShowBulkPublishModal(false)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal mempublikasikan RPS')
+    } finally {
+      setBulkPublishing(false)
+    }
+  }
+
+  async function handlePublishSelected() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Apakah Anda yakin ingin mempublikasikan (set status Published) untuk ${selectedIds.size} RPS terpilih?`)) {
+      return
+    }
+    try {
+      const payload = {
+        rps_ids: Array.from(selectedIds),
+        only_with_dosen: false,
+      }
+      const res = await api.post('/api/v1/rps/bulk-publish', payload)
+      toast.success(res.data.message || `Berhasil mempublikasikan ${res.data.published_count} RPS!`)
+      setSelectedIds(new Set())
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal mempublikasikan RPS terpilih')
+    }
+  }
+
+  async function openJadwalModal() {
+    if (prodis.length === 0) await loadProdis()
+    if (periodes.length === 0) await loadPeriodes()
+    const act = periodes.find(p => p.is_active)
+    setJadwalTargetPeriode(periodeFilter || act?.nama || (periodes[0]?.nama || '2025/2026 Genap'))
+    setJadwalProdiId(prodiFilter || 'all')
+    setJadwalFile(null)
+    setJadwalRawText('')
+    setJadwalExtracted([])
+    setJadwalSyncResult(null)
+    setJadwalSearch('')
+    setJadwalAutoCreate(true)
+    setJadwalTargetStatus('published')
+    setJadwalAutoUpdateSemester(true)
+    setShowJadwalModal(true)
+  }
 
   function normalizePeriodStr(s?: string): string {
     if (!s) return ''
@@ -142,14 +238,6 @@ export default function RPSList() {
     }
   }
 
-  // Checkbox multi-select state
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  const [showSelectedCopyModal, setShowSelectedCopyModal] = useState(false)
-  const [selectedCopyPeriode, setSelectedCopyPeriode] = useState('')
-  const [selectedCopyStatus, setSelectedCopyStatus] = useState('draft')
-  const [selectedCopySkip, setSelectedCopySkip] = useState(true)
-  const [selectedCopying, setSelectedCopying] = useState(false)
-
   function toggleSelectAll() {
     if (selectedIds.size === filtered.length) {
       setSelectedIds(new Set())
@@ -203,35 +291,6 @@ export default function RPSList() {
     } finally {
       setSelectedCopying(false)
     }
-  }
-
-  // Schedule / Jadwal Sync Modal State
-  const [showJadwalModal, setShowJadwalModal] = useState(false)
-  const [jadwalTargetPeriode, setJadwalTargetPeriode] = useState('')
-  const [jadwalProdiId, setJadwalProdiId] = useState('all')
-  const [jadwalFile, setJadwalFile] = useState<File | null>(null)
-  const [jadwalRawText, setJadwalRawText] = useState('')
-  const [jadwalInputMode, setJadwalInputMode] = useState<'upload' | 'paste'>('upload')
-  const [jadwalParsing, setJadwalParsing] = useState(false)
-  const [jadwalExtracted, setJadwalExtracted] = useState<any[]>([])
-  const [jadwalSyncing, setJadwalSyncing] = useState(false)
-  const [jadwalSyncResult, setJadwalSyncResult] = useState<any>(null)
-  const [jadwalSearch, setJadwalSearch] = useState('')
-  const [jadwalAutoCreate, setJadwalAutoCreate] = useState(true)
-
-  async function openJadwalModal() {
-    if (prodis.length === 0) await loadProdis()
-    if (periodes.length === 0) await loadPeriodes()
-    const act = periodes.find(p => p.is_active)
-    setJadwalTargetPeriode(periodeFilter || act?.nama || (periodes[0]?.nama || '2025/2026 Genap'))
-    setJadwalProdiId(prodiFilter || 'all')
-    setJadwalFile(null)
-    setJadwalRawText('')
-    setJadwalExtracted([])
-    setJadwalSyncResult(null)
-    setJadwalSearch('')
-    setJadwalAutoCreate(true)
-    setShowJadwalModal(true)
   }
 
   async function handleParseJadwal() {
@@ -291,6 +350,8 @@ export default function RPSList() {
         prodi_id: jadwalProdiId === 'all' ? null : jadwalProdiId,
         items: jadwalExtracted,
         auto_create_rps_draft: jadwalAutoCreate,
+        target_status: jadwalTargetStatus,
+        auto_update_semester: jadwalAutoUpdateSemester,
       }
       const res = await api.post('/api/v1/rps/sync-jadwal-dosen', payload)
       setJadwalSyncResult(res.data)
@@ -707,6 +768,13 @@ export default function RPSList() {
               <Calendar className="w-4 h-4" /> Sinkron Dosen Jadwal
             </button>
             <button
+              onClick={openBulkPublishModal}
+              className="macos-button flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
+              title="Publish semua RPS berstatus Draft yang sudah memiliki dosen"
+            >
+              <Send className="w-4 h-4" /> Publish Massal
+            </button>
+            <button
               onClick={openBulkCopy}
               className="macos-button flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
             >
@@ -781,10 +849,16 @@ export default function RPSList() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={handlePublishSelected}
+              className="macos-button text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3.5 py-1.5 rounded-apple-lg flex items-center gap-1.5 shadow-sm"
+            >
+              <Send className="w-3.5 h-3.5" /> Publish {selectedIds.size} Terpilih
+            </button>
+            <button
               onClick={openSelectedCopy}
               className="macos-button text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3.5 py-1.5 rounded-apple-lg flex items-center gap-1.5 shadow-sm"
             >
-              <Copy className="w-3.5 h-3.5" /> Salin {selectedIds.size} RPS Terpilih ke Periode Baru
+              <Copy className="w-3.5 h-3.5" /> Salin {selectedIds.size} Terpilih ke Periode Baru
             </button>
           </div>
         </div>
@@ -1530,6 +1604,34 @@ export default function RPSList() {
                 </div>
               </div>
 
+              {/* Konfigurasi Status Hasil & Update Semester */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-apple-xl border border-gray-200/80">
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-800 block mb-1">Status RPS Hasil Sinkronisasi</label>
+                  <select
+                    className="macos-input bg-white text-xs py-1.5"
+                    value={jadwalTargetStatus}
+                    onChange={(e: any) => setJadwalTargetStatus(e.target.value)}
+                  >
+                    <option value="published">Published (Langsung Publikasi jika memiliki dosen)</option>
+                    <option value="draft">Draft (Disimpan sebagai draf)</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col justify-center space-y-1 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-800">
+                    <input
+                      type="checkbox"
+                      checked={jadwalAutoUpdateSemester}
+                      onChange={(e) => setJadwalAutoUpdateSemester(e.target.checked)}
+                      className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0"
+                    />
+                    <span>Perbarui <strong className="text-gray-950">Semester MK & RPS</strong> dari Excel</span>
+                  </label>
+                  <p className="text-[10px] text-gray-500 ml-6">Otomatis memperbaiki data MK yang sebelumnya salah semester (misal default 1)</p>
+                </div>
+              </div>
+
               {/* Checkbox Auto-Create MK & Draft RPS */}
               <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-blue-950 bg-blue-100/60 hover:bg-blue-100/90 p-2.5 rounded-apple-xl border border-blue-200/70 transition-all">
                 <input
@@ -1539,7 +1641,7 @@ export default function RPSList() {
                   className="w-4 h-4 accent-blue-600 rounded cursor-pointer shrink-0"
                 />
                 <span>
-                  <strong className="text-blue-900">Otomatis Daftarkan MK & Buat Draft RPS</strong> jika belum ada di database (menyalin CPL/silabus lama jika ada)
+                  <strong className="text-blue-900">Otomatis Daftarkan MK & Buat RPS</strong> jika belum ada di database (menyalin CPL/silabus lama jika ada)
                 </span>
               </label>
 
@@ -1777,6 +1879,105 @@ export default function RPSList() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Publish Massal RPS Berdosen */}
+      {showBulkPublishModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-apple-2xl shadow-apple-2xl w-full max-w-lg flex flex-col border border-gray-100 overflow-hidden animate-scale-up">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-apple-xl bg-indigo-50 text-indigo-600">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-semibold text-gray-900">Publish Massal RPS</h3>
+                  <p className="text-[11px] text-gray-500">Ubah status RPS Draft menjadi Published secara massal</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBulkPublishModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-apple-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Periode Akademik Target</label>
+                <select
+                  className="macos-input bg-white text-xs w-full"
+                  value={bulkPublishPeriode}
+                  onChange={(e) => setBulkPublishPeriode(e.target.value)}
+                >
+                  <option value="all">Semua Periode</option>
+                  {allAvailablePeriodes.map((pName) => {
+                    const pObj = periodes.find(p => p.nama === pName)
+                    return (
+                      <option key={pName} value={pName}>
+                        {pName} {pObj?.is_active ? '(Aktif)' : ''}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Program Studi</label>
+                <select
+                  className="macos-input bg-white text-xs w-full"
+                  value={bulkPublishProdiId}
+                  onChange={(e) => setBulkPublishProdiId(e.target.value)}
+                >
+                  <option value="all">Semua Program Studi</option>
+                  {prodis.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nama} ({p.kode})</option>
+                  ))}
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-indigo-950 bg-indigo-50/80 hover:bg-indigo-50 p-3 rounded-apple-xl border border-indigo-100 transition-all">
+                <input
+                  type="checkbox"
+                  checked={bulkPublishOnlyWithDosen}
+                  onChange={(e) => setBulkPublishOnlyWithDosen(e.target.checked)}
+                  className="w-4 h-4 accent-indigo-600 rounded cursor-pointer shrink-0"
+                />
+                <span>
+                  Hanya publikasikan RPS yang <strong className="text-indigo-900">sudah memiliki Dosen Pengampu</strong>
+                </span>
+              </label>
+
+              <div className="p-3 bg-amber-50 rounded-apple-xl border border-amber-200/70 text-[11px] text-amber-800 space-y-1">
+                <p className="font-semibold flex items-center gap-1 text-amber-900">
+                  <AlertCircle className="w-3.5 h-3.5" /> Informasi Publikasi
+                </p>
+                <p>
+                  Semua RPS draft yang cocok dengan kriteria di atas akan langsung berstatus <strong>Published</strong> (tayang di sistem) sehingga dapat dilihat dan digunakan oleh dosen & mahasiswa.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 px-5 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowBulkPublishModal(false)}
+                disabled={bulkPublishing}
+                className="macos-button-ghost text-xs px-3.5 py-2"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleBulkPublishSubmit}
+                disabled={bulkPublishing}
+                className="macos-button flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2 rounded-apple-lg shadow-sm"
+              >
+                {bulkPublishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {bulkPublishing ? 'Mempublikasikan...' : 'Publikasikan Sekarang'}
+              </button>
             </div>
           </div>
         </div>
