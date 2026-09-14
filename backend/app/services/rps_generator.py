@@ -250,7 +250,18 @@ class RPSGeneratorService:
             # Enforce actual lecturer names or default/hyphen — clear AI hallucinations
             dosen_names = ""
             if dosen_pengampu:
-                dosen_names = ", ".join([str(d.get("nama", "")).strip() for d in dosen_pengampu if d.get("nama")])
+                names_list = []
+                if isinstance(dosen_pengampu, list):
+                    for d in dosen_pengampu:
+                        if isinstance(d, dict):
+                            n = str(d.get("nama") or d.get("name") or "").strip()
+                            if n:
+                                names_list.append(n)
+                        elif isinstance(d, str) and d.strip():
+                            names_list.append(d.strip())
+                elif isinstance(dosen_pengampu, str) and dosen_pengampu.strip():
+                    names_list.append(dosen_pengampu.strip())
+                dosen_names = ", ".join(names_list)
             
             if dosen_names:
                 identitas["koordinator_pengembang_rps"] = dosen_names
