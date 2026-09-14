@@ -332,26 +332,23 @@ async def generate_and_save_one_rps(
         await db.commit()
         await db.refresh(rps)
 
-        # ── Auto-run SDGs + Bloom analysis concurrently with safety timeout ───
+        # ── Auto-run SDGs + Bloom analysis sequentially with safety error handling ───
         sdgs = rps.sdgs or []
         bloom_changed = False
         try:
-            import asyncio
-            sdgs_task = _analyze_and_save_sdgs(rps, mk, db)
-            bloom_task = _analyze_and_save_bloom(rps, db)
-            results = await asyncio.wait_for(
-                asyncio.gather(sdgs_task, bloom_task, return_exceptions=True),
-                timeout=25.0
-            )
-            if isinstance(results[0], list):
-                sdgs = results[0]
-            if isinstance(results[1], bool):
-                bloom_changed = results[1]
-            await db.refresh(rps)
-        except asyncio.TimeoutError:
-            print(f"[rps-one] Post-analysis timed out for RPS {rps.id}, continuing with generated data")
+            sdgs = await _analyze_and_save_sdgs(rps, mk, db)
         except Exception as e:
-            print(f"[rps-one] Post-analysis warning: {e}")
+            print(f"[rps-one] SDGs analysis warning: {e}")
+
+        try:
+            bloom_changed = await _analyze_and_save_bloom(rps, db)
+        except Exception as e:
+            print(f"[rps-one] Bloom analysis warning: {e}")
+
+        try:
+            await db.refresh(rps)
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -451,18 +448,21 @@ async def generate_and_fill_existing_rps(
         await db.commit()
         await db.refresh(rps)
 
-        # Run SDGs + Bloom analysis in background / async
+        # Run SDGs + Bloom analysis sequentially
         try:
-            import asyncio
-            sdgs_task = _analyze_and_save_sdgs(rps, mk, db)
-            bloom_task = _analyze_and_save_bloom(rps, db)
-            await asyncio.wait_for(
-                asyncio.gather(sdgs_task, bloom_task, return_exceptions=True),
-                timeout=25.0
-            )
-            await db.refresh(rps)
+            await _analyze_and_save_sdgs(rps, mk, db)
         except Exception as ex:
-            print(f"[generate_and_fill_existing_rps] Post-analysis warning: {ex}")
+            print(f"[generate_and_fill_existing_rps] SDGs warning: {ex}")
+
+        try:
+            await _analyze_and_save_bloom(rps, db)
+        except Exception as ex:
+            print(f"[generate_and_fill_existing_rps] Bloom warning: {ex}")
+
+        try:
+            await db.refresh(rps)
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -575,15 +575,20 @@ async def _run_async_fill_rps(task_id: str, rps_id: int, additional_context: str
 
             ai_tasks[task_id]["progress"] = "Melakukan analisis SDGs & Taksonomi Bloom..."
             try:
-                sdgs_task = _analyze_and_save_sdgs(rps, mk, db)
-                bloom_task = _analyze_and_save_bloom(rps, db)
-                await asyncio.wait_for(
-                    asyncio.gather(sdgs_task, bloom_task, return_exceptions=True),
-                    timeout=20.0
-                )
-                await db.refresh(rps)
+                await _analyze_and_save_sdgs(rps, mk, db)
             except Exception as e:
-                print(f"[rps-fill-async] Post-analysis warning: {e}")
+                print(f"[rps-fill-async] SDGs analysis warning: {e}")
+
+            try:
+                await _analyze_and_save_bloom(rps, db)
+            except Exception as e:
+                print(f"[rps-fill-async] Bloom analysis warning: {e}")
+
+            try:
+                await db.commit()
+                await db.refresh(rps)
+            except Exception:
+                pass
 
             ai_tasks[task_id] = {
                 "status": "completed",

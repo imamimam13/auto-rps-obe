@@ -105,7 +105,7 @@ export default function RPSDetail() {
 
       const result = await pollAITask(taskId, toastId)
       toast.success(result.message || 'RPS berhasil dirancang lengkap oleh AI!', { id: toastId })
-      loadData()
+      await loadData()
     } catch (e: any) {
       toast.error(formatApiError(e, 'Gagal generate RPS dengan AI'), { id: toastId })
     } finally {
