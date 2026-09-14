@@ -1232,6 +1232,31 @@ async def sync_jadwal_dosen(
                     prev_res = await db.execute(prev_rps_query)
                     prev_rps = prev_res.scalars().first()
 
+                    # Fallback: If no RPS found by ID (e.g. course code changed from 3KA312 to 3KA327), search by Course Name
+                    if not prev_rps and matched_mk.nama:
+                        clean_target_name = matched_mk.nama.strip().lower()
+                        alt_mk_res = await db.execute(
+                            select(MataKuliah.id).where(
+                                func.lower(MataKuliah.nama) == clean_target_name,
+                                MataKuliah.id != matched_mk.id,
+                            )
+                        )
+                        alt_mk_ids = alt_mk_res.scalars().all()
+                        if alt_mk_ids:
+                            alt_rps_res = await db.execute(
+                                select(RPS)
+                                .where(RPS.mata_kuliah_id.in_(alt_mk_ids))
+                                .order_by(RPS.id.desc())
+                            )
+                            alt_candidates = alt_rps_res.scalars().all()
+                            for cand in alt_candidates:
+                                # Prioritize one that already has CPMK or weekly plans
+                                if (cand.cpmk and len(cand.cpmk) > 0) or (cand.rencana_pembelajaran and len(cand.rencana_pembelajaran) > 0):
+                                    prev_rps = cand
+                                    break
+                            if not prev_rps and alt_candidates:
+                                prev_rps = alt_candidates[0]
+
                     clean_ta = re.sub(r"[^a-zA-Z0-9]", "", target_ta)
                     base_kode = f"RPS-{matched_mk.kode}-{matched_mk.semester}-{clean_ta}"
                     final_kode = base_kode
