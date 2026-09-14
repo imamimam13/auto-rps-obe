@@ -69,6 +69,25 @@ export default function RPSDetail() {
   const [splitting, setSplitting] = useState(false)
   const [generatingAI, setGeneratingAI] = useState(false)
 
+  async function pollAITask(taskId: string, toastId: string): Promise<any> {
+    const maxAttempts = 300 // 300 * 2s = 600s (10 menit)
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 2000))
+      const res = await api.get(`/api/v1/generate/task/${taskId}`)
+      const task = res.data
+      if (task.status === 'completed') {
+        return task
+      }
+      if (task.status === 'failed') {
+        throw new Error(task.error || 'Proses AI gagal dijalankan')
+      }
+      if (task.progress) {
+        toast.loading(`🤖 ${task.progress}`, { id: toastId })
+      }
+    }
+    throw new Error('Proses AI memakan waktu lebih dari 10 menit.')
+  }
+
   async function handleGenerateWithAI() {
     if (!rps?.id) return
     const isEmpty = (!rps?.cpmk || rps?.cpmk.length === 0) && (!rps?.rencana_pembelajaran || rps?.rencana_pembelajaran.length === 0)
@@ -79,10 +98,13 @@ export default function RPSDetail() {
     }
 
     setGeneratingAI(true)
-    const toastId = toast.loading('AI sedang merancang silabus, CPMK, Sub-CPMK, Bahan Kajian & Rencana 16 Minggu...')
+    const toastId = toast.loading('Memulai antrian AI di background...')
     try {
-      const res = await api.post(`/api/v1/generate/rps/${rps.id}`, { additional_context: '' })
-      toast.success(res.data.message || 'RPS berhasil di-generate lengkap oleh AI!', { id: toastId })
+      const startRes = await api.post(`/api/v1/generate/async/rps/${rps.id}`, { additional_context: '' })
+      const taskId = startRes.data.task_id
+
+      const result = await pollAITask(taskId, toastId)
+      toast.success(result.message || 'RPS berhasil dirancang lengkap oleh AI!', { id: toastId })
       loadData()
     } catch (e: any) {
       toast.error(formatApiError(e, 'Gagal generate RPS dengan AI'), { id: toastId })

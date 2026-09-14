@@ -148,15 +148,33 @@ export default function RPSList() {
     const list = Array.from(selectedIds)
     let successCount = 0
     let failCount = 0
-
-    const toastId = toast.loading(`[1/${list.length}] AI sedang merancang RPS...`)
+    const toastId = toast.loading(`[1/${list.length}] Memulai antrian AI...`)
 
     for (let i = 0; i < list.length; i++) {
       const rpsId = list[i]
       toast.loading(`[${i + 1}/${list.length}] AI sedang merancang RPS...`, { id: toastId })
       try {
-        await api.post(`/api/v1/generate/rps/${rpsId}`, { additional_context: '' })
-        successCount++
+        const startRes = await api.post(`/api/v1/generate/async/rps/${rpsId}`, { additional_context: '' })
+        const taskId = startRes.data.task_id
+
+        // Poll task
+        let done = false
+        for (let attempt = 0; attempt < 300; attempt++) {
+          await new Promise((r) => setTimeout(r, 2000))
+          const pollRes = await api.get(`/api/v1/generate/task/${taskId}`)
+          if (pollRes.data.status === 'completed') {
+            done = true
+            break
+          }
+          if (pollRes.data.status === 'failed') {
+            throw new Error(pollRes.data.error || 'Gagal generate AI')
+          }
+          if (pollRes.data.progress) {
+            toast.loading(`[${i + 1}/${list.length}] ${pollRes.data.progress}`, { id: toastId })
+          }
+        }
+        if (done) successCount++
+        else failCount++
       } catch (e) {
         failCount++
       }

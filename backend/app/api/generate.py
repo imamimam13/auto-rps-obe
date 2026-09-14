@@ -2,13 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request,
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 from typing import Optional, List, Dict, Any
-from app.core.database import get_db
+from app.core.database import get_db, AsyncSessionLocal
 from app.models import RPS, Prodi, MataKuliah
 from app.schemas import RPSGenerateRequest, BulkGenerateRequest, OBEValidationRequest, OBEValidationResponse
 from app.services.rps_generator import rps_generator_service
 from sqlalchemy import select
 import json
 import uuid
+import time
+import asyncio
 
 router = APIRouter(prefix="/generate", tags=["AI Generation"])
 
@@ -472,6 +474,162 @@ async def generate_and_fill_existing_rps(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=handle_ai_error(e))
+
+
+# ── In-Memory Background AI Task Manager (Zero-Timeout Architecture) ──────────
+ai_tasks: Dict[str, Dict[str, Any]] = {}
+
+
+def _cleanup_old_ai_tasks():
+    now = time.time()
+    to_delete = [tid for tid, t in ai_tasks.items() if now - t.get("created_at", now) > 3600]
+    for tid in to_delete:
+        ai_tasks.pop(tid, None)
+
+
+async def _run_async_fill_rps(task_id: str, rps_id: int, additional_context: str):
+    """Background worker for filling existing RPS asynchronously."""
+    _cleanup_old_ai_tasks()
+    async with AsyncSessionLocal() as db:
+        try:
+            rps_res = await db.execute(select(RPS).where(RPS.id == rps_id))
+            rps = rps_res.scalar_one_or_none()
+            if not rps:
+                ai_tasks[task_id] = {"status": "failed", "error": "RPS tidak ditemukan", "rps_id": rps_id}
+                return
+
+            mk_res = await db.execute(select(MataKuliah).where(MataKuliah.id == rps.mata_kuliah_id))
+            mk = mk_res.scalar_one_or_none()
+            if not mk:
+                ai_tasks[task_id] = {"status": "failed", "error": "Mata kuliah tidak ditemukan", "rps_id": rps_id}
+                return
+
+            prodi_res = await db.execute(select(Prodi).where(Prodi.id == rps.prodi_id))
+            prodi = prodi_res.scalar_one_or_none()
+            if not prodi:
+                ai_tasks[task_id] = {"status": "failed", "error": "Program studi tidak ditemukan", "rps_id": rps_id}
+                return
+
+            mata_kuliah_data = {
+                "kode": mk.kode,
+                "nama": mk.nama,
+                "sks": mk.sks,
+                "sks_teori": mk.sks_teori,
+                "sks_praktik": mk.sks_praktik,
+                "deskripsi": mk.deskripsi or "",
+            }
+
+            all_cpl = prodi.capaian_pembelajaran_lulusan or []
+            course_cpl_codes = mk.cpl_prodi or []
+            cpl_to_use = [c for c in all_cpl if c.get("kode") in course_cpl_codes] if course_cpl_codes else all_cpl
+            dosen_list = rps.dosen_pengampu or []
+
+            ai_tasks[task_id]["progress"] = "AI sedang menyusun silabus 16 minggu, CPMK & Bahan Kajian..."
+
+            rps_data = await rps_generator_service.generate_complete_rps(
+                visi_prodi=prodi.visi,
+                misi_prodi=prodi.misi,
+                cpl_prodi=cpl_to_use,
+                mata_kuliah=mata_kuliah_data,
+                semester=rps.semester,
+                tahun_akademik=rps.tahun_akademik,
+                additional_context=additional_context or "",
+                dosen_pengampu=dosen_list,
+                ka_prodi=prodi.ka_prodi,
+                koordinator_rmk=prodi.koordinator_rmk,
+            )
+
+            identitas = dict(rps_data.get("identitas") or {})
+            identitas["dosen_pengampu"] = dosen_list
+            identitas["tahun_akademik"] = rps.tahun_akademik
+            identitas["semester"] = rps.semester
+            if rps.identitas and rps.identitas.get("kelas"):
+                identitas["kelas"] = rps.identitas.get("kelas")
+
+            rps.identitas = identitas
+            rps.deskripsi_mata_kuliah = rps_data.get("deskripsi_mata_kuliah") or ""
+            rps.bahan_kajian = rps_data.get("bahan_kajian") or []
+            rps.cpmk = rps_data.get("cpmk", [])
+            rps.sub_cpmk = rps_data.get("sub_cpmk", [])
+            rps.rencana_pembelajaran = rps_data.get("rencana_pembelajaran", [])
+            rps.metode_pembelajaran = rps_data.get("metode_pembelajaran", [])
+            rps.media_pembelajaran = rps_data.get("media_pembelajaran", [])
+            rps.penilaian = rps_data.get("penilaian", [])
+            rps.referensi = rps_data.get("referensi", [])
+            rps.sdgs = rps_data.get("sdgs") or mk.sdgs or []
+
+            flag_modified(rps, "identitas")
+            flag_modified(rps, "deskripsi_mata_kuliah")
+            flag_modified(rps, "bahan_kajian")
+            flag_modified(rps, "cpmk")
+            flag_modified(rps, "sub_cpmk")
+            flag_modified(rps, "rencana_pembelajaran")
+            flag_modified(rps, "metode_pembelajaran")
+            flag_modified(rps, "media_pembelajaran")
+            flag_modified(rps, "penilaian")
+            flag_modified(rps, "referensi")
+            flag_modified(rps, "sdgs")
+
+            await db.commit()
+            await db.refresh(rps)
+
+            ai_tasks[task_id]["progress"] = "Melakukan analisis SDGs & Taksonomi Bloom..."
+            try:
+                sdgs_task = _analyze_and_save_sdgs(rps, mk, db)
+                bloom_task = _analyze_and_save_bloom(rps, db)
+                await asyncio.wait_for(
+                    asyncio.gather(sdgs_task, bloom_task, return_exceptions=True),
+                    timeout=20.0
+                )
+                await db.refresh(rps)
+            except Exception as e:
+                print(f"[rps-fill-async] Post-analysis warning: {e}")
+
+            ai_tasks[task_id] = {
+                "status": "completed",
+                "rps_id": rps.id,
+                "progress": "Selesai!",
+                "message": f"RPS '{mk.nama}' berhasil dirancang lengkap oleh AI!",
+                "data": {
+                    "id": rps.id,
+                    "kode": rps.kode,
+                    "sdgs": rps.sdgs or [],
+                }
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            ai_tasks[task_id] = {
+                "status": "failed",
+                "error": handle_ai_error(e),
+                "rps_id": rps_id,
+            }
+
+
+@router.post("/async/rps/{rps_id}")
+async def generate_rps_async(
+    rps_id: int,
+    additional_context: Optional[str] = Body("", embed=True),
+):
+    """Start asynchronous RPS generation. Returns task_id immediately (zero timeout)."""
+    task_id = str(uuid.uuid4())
+    ai_tasks[task_id] = {
+        "status": "processing",
+        "progress": "Mempersiapkan data dan menghubungi AI...",
+        "rps_id": rps_id,
+        "created_at": time.time(),
+    }
+    asyncio.create_task(_run_async_fill_rps(task_id, rps_id, additional_context or ""))
+    return {"task_id": task_id, "status": "processing"}
+
+
+@router.get("/task/{task_id}")
+async def get_ai_task_status(task_id: str):
+    """Check status of a background AI generation task."""
+    task = ai_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task tidak ditemukan atau sudah kadaluarsa")
+    return task
 
 
 @router.post("/bulk-rps", response_model=dict)
