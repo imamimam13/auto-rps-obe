@@ -93,6 +93,26 @@ async def get_rps_for_siakad(
 
     rencana = rps.rencana_pembelajaran or []
     has_full_materials = len(rencana) >= 14
+    cpmk_list = rps.cpmk or []
+    penilaian_list = rps.penilaian or []
+
+    # Map rencana_pembelajaran into normalized mingguan format for SIAKAD
+    mingguan = []
+    for item in rencana:
+        if isinstance(item, dict):
+            mingguan.append({
+                "minggu": item.get("minggu") or item.get("pertemuan") or len(mingguan) + 1,
+                "sub_cpmk": item.get("sub_cpmk") or item.get("kemampuan_akhir") or "",
+                "materi": item.get("materi_pembelajaran") or item.get("bahan_kajian") or item.get("materi") or "",
+                "bentuk_pembelajaran": item.get("bentuk_pembelajaran") or item.get("metode_pembelajaran") or "Kuliah Interaktif",
+                "alokasi_waktu": item.get("alokasi_waktu") or f"{mk.sks or 3}x50 Menit",
+                "pengalaman_belajar": item.get("pengalaman_belajar") or "",
+                "kriteria_penilaian": item.get("kriteria_penilaian") or item.get("indikator") or item.get("teknik_penilaian") or "",
+                "bobot_nilai": item.get("bobot_penilaian") or item.get("bobot") or item.get("bobot_nilai") or 5,
+                "is_uts": item.get("is_uts") or (item.get("minggu") == 8 or item.get("pertemuan") == 8),
+                "is_uas": item.get("is_uas") or (item.get("minggu") == 16 or item.get("pertemuan") == 16),
+                "cpmk": item.get("cpmk") or item.get("cpmk_kode") or ""
+            })
 
     return {
         "status": "success",
@@ -102,6 +122,18 @@ async def get_rps_for_siakad(
         "rps_status": rps.status,
         "has_full_materials": has_full_materials,
         "total_meetings": len(rencana),
+        "kode_mk": mk.kode_mk,
+        "nama_mk": mk.nama_mk,
+        "sks": mk.sks,
+        "semester": rps.semester or mk.semester,
+        "tahun_akademik": rps.tahun_akademik,
+        "deskripsi": rps.deskripsi_mata_kuliah or "",
+        "cpmk": cpmk_list,
+        "bobot_penilaian": penilaian_list,
+        "mingguan": mingguan if mingguan else rencana,
+        "rencana_pembelajaran": rencana,
+        "sdgs": rps.sdgs or [],
+        "referensi": rps.referensi or [],
         "mata_kuliah": {
             "id": mk.id,
             "kode_mk": mk.kode_mk,
@@ -112,13 +144,12 @@ async def get_rps_for_siakad(
             "dosen_pengampu": rps.dosen_pengampu or [],
         },
         "obe_summary": {
-            "cpmk_count": len(rps.cpmk or []),
+            "cpmk_count": len(cpmk_list),
             "sub_cpmk_count": len(rps.sub_cpmk or []),
             "sdgs": rps.sdgs or [],
-            "cpmk_list": rps.cpmk or [],
-            "penilaian": rps.penilaian or [],
+            "cpmk_list": cpmk_list,
+            "penilaian": penilaian_list,
         },
-        "rencana_pembelajaran": rencana,
         "urls": {
             "preview_url": f"/rps-preview/{rps.id}",
             "preview_by_code_url": f"/rps-preview/by-mk?kode={mk.kode_mk}",
