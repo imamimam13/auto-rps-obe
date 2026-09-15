@@ -112,6 +112,210 @@ def _format_rps_response(rps: RPS, mk: MataKuliah):
     }
 
 
+async def _execute_whole_shebang_auto_generate(
+    db: AsyncSession,
+    kode_mk: str,
+    nama_mk: str,
+    sks: int = 3,
+    semester: int = 1,
+    tahun_akademik: str = "2025/2026 Genap",
+    prodi_nama: str = "Program Studi",
+    prodi_kode: str = "",
+    dosen_pengampu: Optional[Union[List[str], List[Dict[str, Any]], str]] = None,
+    cpl_list: Optional[List[Union[str, Dict[str, Any]]]] = None,
+    force_regenerate: bool = False
+):
+    clean_kode_mk = kode_mk.strip()
+    clean_nama_mk = (nama_mk or f"Mata Kuliah {clean_kode_mk}").strip()
+    clean_prodi_nama = (prodi_nama or "Program Studi").strip()
+
+    # 1. Find or Auto-Create Prodi
+    prodi_res = await db.execute(
+        select(Prodi).where(func.lower(Prodi.nama) == clean_prodi_nama.lower())
+    )
+    prodi = prodi_res.scalars().first()
+
+    if not prodi and prodi_kode:
+        prodi_res_code = await db.execute(
+            select(Prodi).where(func.lower(Prodi.kode) == prodi_kode.strip().lower())
+        )
+        prodi = prodi_res_code.scalars().first()
+
+    if not prodi:
+        cpl_defaults = cpl_list or [
+            {"kode": "CPL-01", "deskripsi": "Menunjukkan ketakwaan kepada Tuhan YME, etika profesi, dan integritas akademik.", "kategori": "Sikap"},
+            {"kode": "CPL-02", "deskripsi": f"Menguasai konsep teoritis, prinsip keilmuan, dan metode pemecahan masalah dalam bidang {clean_prodi_nama}.", "kategori": "Pengetahuan"},
+            {"kode": "CPL-03", "deskripsi": "Mampu merancang, menganalisis, dan memvalidasi solusi inovatif berbasis teknologi.", "kategori": "Keterampilan Khusus"},
+            {"kode": "CPL-04", "deskripsi": "Mampu berkomunikasi efektif, bekerjasama dalam tim multidisiplin, dan mandiri.", "kategori": "Keterampilan Umum"}
+        ]
+        
+        base_code = prodi_kode.strip().upper() if prodi_kode else (clean_prodi_nama[:4].upper() if clean_prodi_nama else "PRODI")
+        existing_code_res = await db.execute(select(Prodi).where(Prodi.kode == base_code))
+        if existing_code_res.scalars().first():
+            base_code = f"{base_code[:3]}-{uuid.uuid4().hex[:3].upper()}"
+
+        prodi = Prodi(
+            kode=base_code,
+            nama=clean_prodi_nama,
+            fakultas="Fakultas",
+            visi=f"Menjadi Program Studi {clean_prodi_nama} yang unggul, berdaya saing global, dan berintegritas tinggi.",
+            misi=f"1. Menyelenggarakan pendidikan OBE bermutu tinggi.\n2. Mengembangkan penelitian dan inovasi iptek di bidang {clean_prodi_nama}.\n3. Melaksanakan pengabdian kepada masyarakat.",
+            tujuan=f"Menghasilkan lulusan {clean_prodi_nama} yang kompeten, profesional, dan berdaya saing global.",
+            capaian_pembelajaran_lulusan=cpl_defaults
+        )
+        db.add(prodi)
+        await db.flush()
+
+    # 2. Find or Auto-Create MataKuliah under this Prodi
+    mk_res = await db.execute(
+        select(MataKuliah).where(func.lower(MataKuliah.kode) == clean_kode_mk.lower())
+    )
+    mk = mk_res.scalars().first()
+
+    if not mk:
+        mk = MataKuliah(
+            kode=clean_kode_mk,
+            nama=clean_nama_mk,
+            sks=sks or 3,
+            semester=semester or 1,
+            prodi_id=prodi.id,
+            deskripsi=f"Mata kuliah {clean_nama_mk} ({clean_kode_mk}) diselenggarakan dengan kerangka Outcome-Based Education (OBE) mencakup penguasaan teori, studi kasus terapan, dan proyek komprehensif."
+        )
+        db.add(mk)
+        await db.flush()
+
+    # 3. Check existing RPS
+    rps_res = await db.execute(
+        select(RPS)
+        .where(RPS.mata_kuliah_id == mk.id)
+        .order_by(RPS.updated_at.desc(), RPS.id.desc())
+    )
+    rps = rps_res.scalars().first()
+
+    has_full_materials = rps and len(rps.rencana_pembelajaran or []) >= 14
+
+    if rps and has_full_materials and not force_regenerate:
+        return _format_rps_response(rps, mk)
+
+    # 4. Generate Full OBE RPS (AI / Template Generator)
+    cpl_data = prodi.capaian_pembelajaran_lulusan or []
+    cpl_formatted = []
+    for c in cpl_data:
+        if isinstance(c, dict):
+            cpl_formatted.append(f"{c.get('kode', 'CPL')}: {c.get('deskripsi', '')}")
+        else:
+            cpl_formatted.append(str(c))
+
+    prodi_data = {
+        "id": prodi.id,
+        "nama": prodi.nama,
+        "kode": prodi.kode,
+        "visi": prodi.visi or "",
+        "misi": prodi.misi or "",
+        "cpl": cpl_data
+    }
+    mk_data = {
+        "id": mk.id,
+        "kode": mk.kode,
+        "nama": mk.nama,
+        "sks": mk.sks,
+        "deskripsi": mk.deskripsi or ""
+    }
+
+    try:
+        generated_data = await rps_generator_service.generate_full_rps(
+            mata_kuliah=mk_data,
+            prodi_data=prodi_data,
+            semester=semester or mk.semester or 1,
+            tahun_akademik=tahun_akademik or "2025/2026 Genap",
+            dosen_pengampu=dosen_pengampu or [],
+            cpl_prodi=cpl_formatted
+        )
+    except Exception as gen_err:
+        print(f"[WholeShebang Auto-Generate] AI fallback used: {gen_err}")
+        generated_data = {
+            "identitas": {
+                "nama_mata_kuliah": clean_nama_mk,
+                "kode_mata_kuliah": clean_kode_mk,
+                "sks": sks or 3,
+                "semester": semester or 1,
+                "tahun_akademik": tahun_akademik or "2025/2026 Genap",
+                "prodi": clean_prodi_nama
+            },
+            "deskripsi_mata_kuliah": f"Mata kuliah {clean_nama_mk} membekali mahasiswa dengan keahlian komprehensif, pemecahan masalah, dan portofolio berbasis OBE.",
+            "bahan_kajian": ["Konsep Fundamental", "Metodologi & Analisis", "Implementasi Praktis", "Evaluasi & Studi Kasus"],
+            "cpmk": [
+                {"kode": "CPMK-1", "deskripsi": f"Mampu memahami dan menjelaskan konsep fundamental {clean_nama_mk}.", "bobot": 20, "taksonomi_bloom": "C2"},
+                {"kode": "CPMK-2", "deskripsi": f"Mampu menganalisis masalah dan menerapkan metode terstruktur dalam {clean_nama_mk}.", "bobot": 30, "taksonomi_bloom": "C4"},
+                {"kode": "CPMK-3", "deskripsi": "Mampu merancang dan mengembangkan proyek terintegrasi.", "bobot": 35, "taksonomi_bloom": "C6"},
+                {"kode": "CPMK-4", "deskripsi": "Mampu menunjukkan sikap profesional dan kerjasama tim.", "bobot": 15, "taksonomi_bloom": "A3"}
+            ],
+            "sub_cpmk": [
+                {"kode": "Sub-CPMK-1", "cpmk_kode": "CPMK-1", "deskripsi": "Mengidentifikasi landasan teori dan prinsip dasar", "indikator": ["Ketepatan pemahaman"]},
+                {"kode": "Sub-CPMK-2", "cpmk_kode": "CPMK-2", "deskripsi": "Menganalisis skenario studi kasus", "indikator": ["Ketepatan analisis"]},
+                {"kode": "Sub-CPMK-3", "cpmk_kode": "CPMK-3", "deskripsi": "Mengembangkan luaran proyek akhir", "indikator": ["Kualitas karya"]},
+                {"kode": "Sub-CPMK-4", "cpmk_kode": "CPMK-4", "deskripsi": "Mempresentasikan hasil evaluasi secara efektif", "indikator": ["Komunikasi"]}
+            ],
+            "rencana_pembelajaran": [
+                {"minggu": i, "sub_cpmk": f"Penguasaan materi topik minggu ke-{i}", "materi_pembelajaran": f"Materi Pokok Pertemuan {i}: Kajian Terapan {clean_nama_mk}", "bentuk_pembelajaran": "Kuliah Interaktif & Diskusi", "alokasi_waktu": f"{sks or 3}x50 Menit", "pengalaman_belajar": "Mempelajari modul dan berdiskusi", "kriteria_penilaian": "Keaktifan & Tugas", "bobot_penilaian": 5}
+                for i in range(1, 17)
+            ],
+            "penilaian": [
+                {"komponen": "Kehadiran & Partisipasi", "bobot": 10, "teknik": "Observasi", "kriteria": "Presensi & Keaktifan"},
+                {"komponen": "Tugas Terstruktur", "bobot": 20, "teknik": "Penugasan", "kriteria": "Rubrik Tugas"},
+                {"komponen": "Project-Based Learning", "bobot": 30, "teknik": "Unjuk Kerja", "kriteria": "Rubrik Proyek"},
+                {"komponen": "UTS", "bobot": 20, "teknik": "Ujian Tertulis/CBT", "kriteria": "Tes Objektif"},
+                {"komponen": "UAS", "bobot": 20, "teknik": "Ujian Akhir/Portofolio", "kriteria": "Rubrik UAS"}
+            ],
+            "referensi": {"utama": [f"Buku Ajar Utama: {clean_nama_mk} (2025)"], "pendukung": ["Jurnal Ilmiah & Studi Kasus Terkini"]},
+            "sdgs": [4, 8, 9]
+        }
+
+    # Format dosen pengampu into list of dicts
+    dosen_list_formatted = []
+    if dosen_pengampu:
+        if isinstance(dosen_pengampu, list):
+            for d in dosen_pengampu:
+                if isinstance(d, dict):
+                    dosen_list_formatted.append(d)
+                elif isinstance(d, str) and d.strip():
+                    dosen_list_formatted.append({"nama": d.strip()})
+        elif isinstance(dosen_pengampu, str) and dosen_pengampu.strip():
+            dosen_list_formatted.append({"nama": dosen_pengampu.strip()})
+
+    # 5. Save/Update RPS in Database
+    if not rps:
+        rps = RPS(
+            kode=generate_rps_kode(),
+            mata_kuliah_id=mk.id,
+            prodi_id=prodi.id,
+            semester=semester or mk.semester or 1,
+            tahun_akademik=tahun_akademik or "2025/2026 Genap",
+            dosen_pengampu=dosen_list_formatted,
+            status="published"
+        )
+        db.add(rps)
+
+    rps.identitas = generated_data.get("identitas")
+    rps.deskripsi_mata_kuliah = generated_data.get("deskripsi_mata_kuliah") or ""
+    rps.bahan_kajian = generated_data.get("bahan_kajian") or []
+    rps.cpmk = generated_data.get("cpmk") or []
+    rps.sub_cpmk = generated_data.get("sub_cpmk") or []
+    rps.rencana_pembelajaran = generated_data.get("rencana_pembelajaran") or []
+    rps.media_pembelajaran = generated_data.get("media_pembelajaran") or {}
+    rps.penilaian = generated_data.get("penilaian") or []
+    rps.referensi = generated_data.get("referensi") or {}
+    rps.sdgs = generated_data.get("sdgs") or [4, 8, 9]
+    rps.status = "published"
+    if dosen_list_formatted:
+        rps.dosen_pengampu = dosen_list_formatted
+
+    await db.commit()
+    await db.refresh(rps)
+
+    return _format_rps_response(rps, mk)
+
+
 @router.get("/rps/{kode_mk}")
 async def get_rps_for_siakad(
     kode_mk: str,
@@ -119,13 +323,14 @@ async def get_rps_for_siakad(
     prodi_nama: Optional[str] = Query(None),
     sks: Optional[int] = Query(3),
     semester: Optional[int] = Query(1),
-    auto_create: bool = Query(True),
+    tahun_akademik: Optional[str] = Query("2025/2026 Genap"),
+    auto_generate: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     _key: str = Depends(verify_siakad_api_key)
 ):
     """
     Get full structured RPS data & URLs for a course by its kode_mk.
-    If course does not exist and auto_create is True, it automatically registers the Prodi & Mata Kuliah!
+    If auto_generate is True and RPS is not found, it automatically registers Prodi, Mata Kuliah, and GENERATES THE RPS!
     """
     cleaned_code = kode_mk.strip()
     
@@ -140,55 +345,25 @@ async def get_rps_for_siakad(
         )
         mk = mk_res2.scalar_one_or_none()
         
-    if not mk:
-        if not auto_create:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Mata kuliah dengan kode '{cleaned_code}' belum terdaftar di Auto RPS OBE."
+    if not mk or auto_generate:
+        # If auto_generate is enabled or not found, run whole shebang
+        if auto_generate or nama_mk:
+            return await _execute_whole_shebang_auto_generate(
+                db=db,
+                kode_mk=cleaned_code,
+                nama_mk=nama_mk or (mk.nama if mk else f"Mata Kuliah {cleaned_code}"),
+                sks=sks or (mk.sks if mk else 3),
+                semester=semester or (mk.semester if mk else 1),
+                tahun_akademik=tahun_akademik or "2025/2026 Genap",
+                prodi_nama=prodi_nama or "Program Studi",
+                force_regenerate=False
             )
-        
-        # Auto-create Prodi if not exists
-        clean_prodi_nama = (prodi_nama or "Program Studi").strip()
-        clean_nama_mk = (nama_mk or f"Mata Kuliah {cleaned_code}").strip()
-        
-        prodi_res = await db.execute(
-            select(Prodi).where(func.lower(Prodi.nama) == clean_prodi_nama.lower())
-        )
-        prodi = prodi_res.scalars().first()
-        if not prodi:
-            prodi_code = clean_prodi_nama[:4].upper()
-            existing_code_res = await db.execute(select(Prodi).where(Prodi.kode == prodi_code))
-            if existing_code_res.scalars().first():
-                prodi_code = f"{prodi_code[:3]}-{uuid.uuid4().hex[:3].upper()}"
-            
-            prodi = Prodi(
-                kode=prodi_code,
-                nama=clean_prodi_nama,
-                fakultas="Fakultas",
-                visi=f"Menjadi Program Studi {clean_prodi_nama} yang unggul dan berintegritas tinggi.",
-                misi=f"1. Menyelenggarakan pendidikan OBE bermutu tinggi.\n2. Mengembangkan penelitian dan pengabdian masyarakat.",
-                capaian_pembelajaran_lulusan=[
-                    {"kode": "CPL-01", "deskripsi": "Menunjukkan ketakwaan kepada Tuhan YME dan integritas.", "kategori": "Sikap"},
-                    {"kode": "CPL-02", "deskripsi": f"Menguasai konsep teoritis keilmuan {clean_prodi_nama}.", "kategori": "Pengetahuan"},
-                    {"kode": "CPL-03", "deskripsi": "Mampu merancang dan menganalisis solusi inovatif.", "kategori": "Keterampilan Khusus"},
-                    {"kode": "CPL-04", "deskripsi": "Mampu berkomunikasi efektif dan bekerja dalam tim.", "kategori": "Keterampilan Umum"}
-                ]
-            )
-            db.add(prodi)
-            await db.flush()
 
-        # Auto-create MataKuliah under this Prodi
-        mk = MataKuliah(
-            kode=cleaned_code,
-            nama=clean_nama_mk,
-            sks=sks or 3,
-            semester=semester or 1,
-            prodi_id=prodi.id,
-            deskripsi=f"Mata kuliah {clean_nama_mk} ({cleaned_code}) tersinkronisasi otomatis dari SIAKAD."
+    if not mk:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Mata kuliah dengan kode '{cleaned_code}' belum terdaftar di Auto RPS OBE."
         )
-        db.add(mk)
-        await db.commit()
-        await db.refresh(mk)
 
     # 2. Find Latest Published or Available RPS
     rps_result = await db.execute(
@@ -203,6 +378,17 @@ async def get_rps_for_siakad(
     rps = rps_result.scalars().first()
     
     if not rps:
+        if auto_generate:
+            return await _execute_whole_shebang_auto_generate(
+                db=db,
+                kode_mk=mk.kode,
+                nama_mk=mk.nama,
+                sks=mk.sks,
+                semester=mk.semester,
+                tahun_akademik=tahun_akademik or "2025/2026 Genap",
+                prodi_nama=prodi_nama or "Program Studi",
+                force_regenerate=False
+            )
         return {
             "status": "not_found",
             "has_rps": False,
@@ -247,7 +433,6 @@ async def bulk_sync_courses_from_siakad(
         clean_name = c.nama_mk.strip()
         clean_prodi = (c.prodi_nama or "Program Studi").strip()
 
-        # Find or create Prodi
         prodi_res = await db.execute(select(Prodi).where(func.lower(Prodi.nama) == clean_prodi.lower()))
         prodi = prodi_res.scalars().first()
         if not prodi:
@@ -266,7 +451,6 @@ async def bulk_sync_courses_from_siakad(
             db.add(prodi)
             await db.flush()
 
-        # Find or create MataKuliah
         mk_res = await db.execute(select(MataKuliah).where(func.lower(MataKuliah.kode) == clean_code.lower()))
         mk = mk_res.scalars().first()
         if not mk:
@@ -321,194 +505,16 @@ async def auto_generate_rps_from_siakad(
     3. Generates complete 16-week OBE RPS (CPMK, Sub-CPMK, Bloom, SDGs, Rubrik Penilaian).
     4. Saves to database and returns full published RPS.
     """
-    clean_kode_mk = req.kode_mk.strip()
-    clean_nama_mk = req.nama_mk.strip()
-    clean_prodi_nama = req.prodi_nama.strip() if req.prodi_nama else "Program Studi"
-
-    # 1. Find or Auto-Create Prodi
-    prodi_res = await db.execute(
-        select(Prodi).where(func.lower(Prodi.nama) == clean_prodi_nama.lower())
+    return await _execute_whole_shebang_auto_generate(
+        db=db,
+        kode_mk=req.kode_mk,
+        nama_mk=req.nama_mk,
+        sks=req.sks or 3,
+        semester=req.semester or 1,
+        tahun_akademik=req.tahun_akademik or "2025/2026 Genap",
+        prodi_nama=req.prodi_nama or "Program Studi",
+        prodi_kode=req.prodi_kode or "",
+        dosen_pengampu=req.dosen_pengampu or [],
+        cpl_list=req.cpl_list,
+        force_regenerate=req.force_regenerate or False
     )
-    prodi = prodi_res.scalars().first()
-
-    if not prodi and req.prodi_kode:
-        prodi_res_code = await db.execute(
-            select(Prodi).where(func.lower(Prodi.kode) == req.prodi_kode.strip().lower())
-        )
-        prodi = prodi_res_code.scalars().first()
-
-    if not prodi:
-        cpl_defaults = req.cpl_list or [
-            {"kode": "CPL-01", "deskripsi": "Menunjukkan ketakwaan kepada Tuhan YME, etika profesi, dan integritas akademik.", "kategori": "Sikap"},
-            {"kode": "CPL-02", "deskripsi": f"Menguasai konsep teoritis, prinsip keilmuan, dan metode pemecahan masalah dalam bidang {clean_prodi_nama}.", "kategori": "Pengetahuan"},
-            {"kode": "CPL-03", "deskripsi": "Mampu merancang, menganalisis, dan memvalidasi solusi inovatif berbasis teknologi.", "kategori": "Keterampilan Khusus"},
-            {"kode": "CPL-04", "deskripsi": "Mampu berkomunikasi efektif, bekerjasama dalam tim multidisiplin, dan mandiri.", "kategori": "Keterampilan Umum"}
-        ]
-        
-        base_code = req.prodi_kode.strip().upper() if req.prodi_kode else (clean_prodi_nama[:4].upper() if clean_prodi_nama else "PRODI")
-        existing_code_res = await db.execute(select(Prodi).where(Prodi.kode == base_code))
-        if existing_code_res.scalars().first():
-            base_code = f"{base_code[:3]}-{uuid.uuid4().hex[:3].upper()}"
-
-        prodi = Prodi(
-            kode=base_code,
-            nama=clean_prodi_nama,
-            fakultas="Fakultas",
-            visi=f"Menjadi Program Studi {clean_prodi_nama} yang unggul, berdaya saing global, dan berintegritas tinggi.",
-            misi=f"1. Menyelenggarakan pendidikan OBE bermutu tinggi.\n2. Mengembangkan penelitian dan inovasi iptek di bidang {clean_prodi_nama}.\n3. Melaksanakan pengabdian kepada masyarakat.",
-            tujuan=f"Menghasilkan lulusan {clean_prodi_nama} yang kompeten, profesional, dan berdaya saing global.",
-            capaian_pembelajaran_lulusan=cpl_defaults
-        )
-        db.add(prodi)
-        await db.flush()
-
-    # 2. Find or Auto-Create MataKuliah
-    mk_res = await db.execute(
-        select(MataKuliah).where(func.lower(MataKuliah.kode) == clean_kode_mk.lower())
-    )
-    mk = mk_res.scalars().first()
-
-    if not mk:
-        mk = MataKuliah(
-            kode=clean_kode_mk,
-            nama=clean_nama_mk,
-            sks=req.sks or 3,
-            semester=req.semester or 1,
-            prodi_id=prodi.id,
-            deskripsi=f"Mata kuliah {clean_nama_mk} ({clean_kode_mk}) diselenggarakan dengan kerangka Outcome-Based Education (OBE) mencakup penguasaan teori, studi kasus terapan, dan proyek komprehensif."
-        )
-        db.add(mk)
-        await db.flush()
-
-    # 3. Check existing RPS
-    rps_res = await db.execute(
-        select(RPS)
-        .where(RPS.mata_kuliah_id == mk.id)
-        .order_by(RPS.updated_at.desc(), RPS.id.desc())
-    )
-    rps = rps_res.scalars().first()
-
-    has_full_materials = rps and len(rps.rencana_pembelajaran or []) >= 14
-
-    # If already exists with full materials and not force_regenerate, return existing
-    if rps and has_full_materials and not req.force_regenerate:
-        return _format_rps_response(rps, mk)
-
-    # 4. Generate Full RPS using AI / Generator Service
-    cpl_list = prodi.capaian_pembelajaran_lulusan or []
-    cpl_formatted = []
-    for c in cpl_list:
-        if isinstance(c, dict):
-            cpl_formatted.append(f"{c.get('kode', 'CPL')}: {c.get('deskripsi', '')}")
-        else:
-            cpl_formatted.append(str(c))
-
-    prodi_data = {
-        "id": prodi.id,
-        "nama": prodi.nama,
-        "kode": prodi.kode,
-        "visi": prodi.visi or "",
-        "misi": prodi.misi or "",
-        "cpl": cpl_list
-    }
-    mk_data = {
-        "id": mk.id,
-        "kode": mk.kode,
-        "nama": mk.nama,
-        "sks": mk.sks,
-        "deskripsi": mk.deskripsi or ""
-    }
-
-    try:
-        generated_data = await rps_generator_service.generate_full_rps(
-            mata_kuliah=mk_data,
-            prodi_data=prodi_data,
-            semester=req.semester or mk.semester or 1,
-            tahun_akademik=req.tahun_akademik or "2025/2026 Genap",
-            dosen_pengampu=req.dosen_pengampu or [],
-            cpl_prodi=cpl_formatted
-        )
-    except Exception as gen_err:
-        print(f"[WholeShebang Auto-Generate] AI error, using fallback template: {gen_err}")
-        # Build robust structured fallback if AI times out
-        generated_data = {
-            "identitas": {
-                "nama_mata_kuliah": clean_nama_mk,
-                "kode_mata_kuliah": clean_kode_mk,
-                "sks": req.sks or 3,
-                "semester": req.semester or 1,
-                "tahun_akademik": req.tahun_akademik or "2025/2026 Genap",
-                "prodi": clean_prodi_nama
-            },
-            "deskripsi_mata_kuliah": f"Mata kuliah {clean_nama_mk} membekali mahasiswa dengan keahlian komprehensif, pemecahan masalah, dan portofolio berbasis OBE.",
-            "bahan_kajian": ["Konsep Fundamental", "Metodologi & Analisis", "Implementasi Praktis", "Evaluasi & Studi Kasus"],
-            "cpmk": [
-                {"kode": "CPMK-1", "deskripsi": f"Mampu memahami dan menjelaskan konsep fundamental {clean_nama_mk}.", "bobot": 20, "taksonomi_bloom": "C2"},
-                {"kode": "CPMK-2", "deskripsi": f"Mampu menganalisis masalah dan menerapkan metode terstruktur dalam {clean_nama_mk}.", "bobot": 30, "taksonomi_bloom": "C4"},
-                {"kode": "CPMK-3", "deskripsi": "Mampu merancang dan mengembangkan proyek terintegrasi.", "bobot": 35, "taksonomi_bloom": "C6"},
-                {"kode": "CPMK-4", "deskripsi": "Mampu menunjukkan sikap profesional dan kerjasama tim.", "bobot": 15, "taksonomi_bloom": "A3"}
-            ],
-            "sub_cpmk": [
-                {"kode": "Sub-CPMK-1", "cpmk_kode": "CPMK-1", "deskripsi": "Mengidentifikasi landasan teori dan prinsip dasar", "indikator": ["Ketepatan pemahaman"]},
-                {"kode": "Sub-CPMK-2", "cpmk_kode": "CPMK-2", "deskripsi": "Menganalisis skenario studi kasus", "indikator": ["Ketepatan analisis"]},
-                {"kode": "Sub-CPMK-3", "cpmk_kode": "CPMK-3", "deskripsi": "Mengembangkan luaran proyek akhir", "indikator": ["Kualitas karya"]},
-                {"kode": "Sub-CPMK-4", "cpmk_kode": "CPMK-4", "deskripsi": "Mempresentasikan hasil evaluasi secara efektif", "indikator": ["Komunikasi"]}
-            ],
-            "rencana_pembelajaran": [
-                {"minggu": i, "sub_cpmk": f"Penguasaan materi topik minggu ke-{i}", "materi_pembelajaran": f"Materi Pokok Pertemuan {i}: Kajian Terapan {clean_nama_mk}", "bentuk_pembelajaran": "Kuliah Interaktif & Diskusi", "alokasi_waktu": f"{req.sks or 3}x50 Menit", "pengalaman_belajar": "Mempelajari modul dan berdiskusi", "kriteria_penilaian": "Keaktifan & Tugas", "bobot_penilaian": 5}
-                for i in range(1, 17)
-            ],
-            "penilaian": [
-                {"komponen": "Kehadiran & Partisipasi", "bobot": 10, "teknik": "Observasi", "kriteria": "Presensi & Keaktifan"},
-                {"komponen": "Tugas Terstruktur", "bobot": 20, "teknik": "Penugasan", "kriteria": "Rubrik Tugas"},
-                {"komponen": "Project-Based Learning", "bobot": 30, "teknik": "Unjuk Kerja", "kriteria": "Rubrik Proyek"},
-                {"komponen": "UTS", "bobot": 20, "teknik": "Ujian Tertulis/CBT", "kriteria": "Tes Objektif"},
-                {"komponen": "UAS", "bobot": 20, "teknik": "Ujian Akhir/Portofolio", "kriteria": "Rubrik UAS"}
-            ],
-            "referensi": {"utama": [f"Buku Ajar Utama: {clean_nama_mk} (2025)"], "pendukung": ["Jurnal Ilmiah & Studi Kasus Terkini"]},
-            "sdgs": [4, 8, 9]
-        }
-
-    # Format dosen pengampu into list of dicts
-    dosen_list_formatted = []
-    if req.dosen_pengampu:
-        if isinstance(req.dosen_pengampu, list):
-            for d in req.dosen_pengampu:
-                if isinstance(d, dict):
-                    dosen_list_formatted.append(d)
-                elif isinstance(d, str) and d.strip():
-                    dosen_list_formatted.append({"nama": d.strip()})
-        elif isinstance(req.dosen_pengampu, str) and req.dosen_pengampu.strip():
-            dosen_list_formatted.append({"nama": req.dosen_pengampu.strip()})
-
-    # 5. Save/Update RPS in Database
-    if not rps:
-        rps = RPS(
-            kode=generate_rps_kode(),
-            mata_kuliah_id=mk.id,
-            prodi_id=prodi.id,
-            semester=req.semester or mk.semester or 1,
-            tahun_akademik=req.tahun_akademik or "2025/2026 Genap",
-            dosen_pengampu=dosen_list_formatted,
-            status="published"
-        )
-        db.add(rps)
-
-    rps.identitas = generated_data.get("identitas")
-    rps.deskripsi_mata_kuliah = generated_data.get("deskripsi_mata_kuliah") or ""
-    rps.bahan_kajian = generated_data.get("bahan_kajian") or []
-    rps.cpmk = generated_data.get("cpmk") or []
-    rps.sub_cpmk = generated_data.get("sub_cpmk") or []
-    rps.rencana_pembelajaran = generated_data.get("rencana_pembelajaran") or []
-    rps.media_pembelajaran = generated_data.get("media_pembelajaran") or {}
-    rps.penilaian = generated_data.get("penilaian") or []
-    rps.referensi = generated_data.get("referensi") or {}
-    rps.sdgs = generated_data.get("sdgs") or [4, 8, 9]
-    rps.status = "published"
-    if dosen_list_formatted:
-        rps.dosen_pengampu = dosen_list_formatted
-
-    await db.commit()
-    await db.refresh(rps)
-
-    return _format_rps_response(rps, mk)
