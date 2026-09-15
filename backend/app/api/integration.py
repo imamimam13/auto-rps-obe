@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from typing import Optional, List, Dict, Any, Union
 from app.core.database import get_db
 from app.core.config import settings
-from app.models import RPS, MataKuliah, Prodi
+from app.models import RPS, MataKuliah, Prodi, Periode
 from app.services.rps_generator import rps_generator_service
 import uuid
 
@@ -112,13 +112,26 @@ def _format_rps_response(rps: RPS, mk: MataKuliah):
     }
 
 
+async def _get_default_active_periode(db: AsyncSession) -> Optional[str]:
+    """Fetch currently active academic period name from DB."""
+    try:
+        active_per_res = await db.execute(select(Periode).where(Periode.is_active == True))
+        active_periode = active_per_res.scalars().first()
+        if not active_periode:
+            latest_per_res = await db.execute(select(Periode).order_by(Periode.id.desc()).limit(1))
+            active_periode = latest_per_res.scalars().first()
+        return active_periode.nama if active_periode else None
+    except Exception:
+        return None
+
+
 async def _execute_whole_shebang_auto_generate(
     db: AsyncSession,
     kode_mk: str,
     nama_mk: str,
     sks: int = 3,
     semester: int = 1,
-    tahun_akademik: str = "2025/2026 Genap",
+    tahun_akademik: Optional[str] = None,
     prodi_nama: str = "Program Studi",
     prodi_kode: str = "",
     dosen_pengampu: Optional[Union[List[str], List[Dict[str, Any]], str]] = None,
@@ -128,6 +141,10 @@ async def _execute_whole_shebang_auto_generate(
     clean_kode_mk = kode_mk.strip()
     clean_nama_mk = (nama_mk or f"Mata Kuliah {clean_kode_mk}").strip()
     clean_prodi_nama = (prodi_nama or "Program Studi").strip()
+
+    # 0. Dynamically resolve Active Periode from DB if not provided or placeholder
+    active_per_name = await _get_default_active_periode(db)
+    target_tahun_akademik = tahun_akademik.strip() if tahun_akademik and tahun_akademik.strip() else (active_per_name or "2025/2026 Ganjil")
 
     # 1. Find or Auto-Create Prodi
     prodi_res = await db.execute(
@@ -178,11 +195,17 @@ async def _execute_whole_shebang_auto_generate(
             nama=clean_nama_mk,
             sks=sks or 3,
             semester=semester or 1,
+            periode=target_tahun_akademik,
             prodi_id=prodi.id,
             deskripsi=f"Mata kuliah {clean_nama_mk} ({clean_kode_mk}) diselenggarakan dengan kerangka Outcome-Based Education (OBE) mencakup penguasaan teori, studi kasus terapan, dan proyek komprehensif."
         )
         db.add(mk)
         await db.flush()
+    else:
+        if semester:
+            mk.semester = semester
+        if target_tahun_akademik:
+            mk.periode = target_tahun_akademik
 
     # 3. Check existing RPS
     rps_res = await db.execute(
@@ -195,6 +218,13 @@ async def _execute_whole_shebang_auto_generate(
     has_full_materials = rps and len(rps.rencana_pembelajaran or []) >= 14
 
     if rps and has_full_materials and not force_regenerate:
+        # If RPS exists, ensure semester and active periode are synced
+        if target_tahun_akademik and rps.tahun_akademik != target_tahun_akademik:
+            rps.tahun_akademik = target_tahun_akademik
+            if rps.identitas and isinstance(rps.identitas, dict):
+                rps.identitas["tahun_akademik"] = target_tahun_akademik
+            await db.commit()
+            await db.refresh(rps)
         return _format_rps_response(rps, mk)
 
     # 4. Generate Full OBE RPS (AI / Template Generator)
@@ -227,7 +257,7 @@ async def _execute_whole_shebang_auto_generate(
             mata_kuliah=mk_data,
             prodi_data=prodi_data,
             semester=semester or mk.semester or 1,
-            tahun_akademik=tahun_akademik or "2025/2026 Genap",
+            tahun_akademik=target_tahun_akademik,
             dosen_pengampu=dosen_pengampu or [],
             cpl_prodi=cpl_formatted
         )
@@ -239,7 +269,7 @@ async def _execute_whole_shebang_auto_generate(
                 "kode_mata_kuliah": clean_kode_mk,
                 "sks": sks or 3,
                 "semester": semester or 1,
-                "tahun_akademik": tahun_akademik or "2025/2026 Genap",
+                "tahun_akademik": target_tahun_akademik,
                 "prodi": clean_prodi_nama
             },
             "deskripsi_mata_kuliah": f"Mata kuliah {clean_nama_mk} membekali mahasiswa dengan keahlian komprehensif, pemecahan masalah, dan portofolio berbasis OBE.",
@@ -290,13 +320,17 @@ async def _execute_whole_shebang_auto_generate(
             mata_kuliah_id=mk.id,
             prodi_id=prodi.id,
             semester=semester or mk.semester or 1,
-            tahun_akademik=tahun_akademik or "2025/2026 Genap",
+            tahun_akademik=target_tahun_akademik,
             dosen_pengampu=dosen_list_formatted,
             status="published"
         )
         db.add(rps)
 
-    rps.identitas = generated_data.get("identitas")
+    rps.identitas = generated_data.get("identitas") or {}
+    if isinstance(rps.identitas, dict):
+        rps.identitas["tahun_akademik"] = target_tahun_akademik
+        rps.identitas["semester"] = semester or mk.semester or 1
+
     rps.deskripsi_mata_kuliah = generated_data.get("deskripsi_mata_kuliah") or ""
     rps.bahan_kajian = generated_data.get("bahan_kajian") or []
     rps.cpmk = generated_data.get("cpmk") or []
@@ -306,6 +340,8 @@ async def _execute_whole_shebang_auto_generate(
     rps.penilaian = generated_data.get("penilaian") or []
     rps.referensi = generated_data.get("referensi") or {}
     rps.sdgs = generated_data.get("sdgs") or [4, 8, 9]
+    rps.semester = semester or mk.semester or 1
+    rps.tahun_akademik = target_tahun_akademik
     rps.status = "published"
     if dosen_list_formatted:
         rps.dosen_pengampu = dosen_list_formatted
@@ -323,7 +359,7 @@ async def get_rps_for_siakad(
     prodi_nama: Optional[str] = Query(None),
     sks: Optional[int] = Query(3),
     semester: Optional[int] = Query(1),
-    tahun_akademik: Optional[str] = Query("2025/2026 Genap"),
+    tahun_akademik: Optional[str] = Query(None),
     auto_generate: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     _key: str = Depends(verify_siakad_api_key)
@@ -346,7 +382,6 @@ async def get_rps_for_siakad(
         mk = mk_res2.scalar_one_or_none()
         
     if not mk or auto_generate:
-        # If auto_generate is enabled or not found, run whole shebang
         if auto_generate or nama_mk:
             return await _execute_whole_shebang_auto_generate(
                 db=db,
@@ -354,7 +389,7 @@ async def get_rps_for_siakad(
                 nama_mk=nama_mk or (mk.nama if mk else f"Mata Kuliah {cleaned_code}"),
                 sks=sks or (mk.sks if mk else 3),
                 semester=semester or (mk.semester if mk else 1),
-                tahun_akademik=tahun_akademik or "2025/2026 Genap",
+                tahun_akademik=tahun_akademik,
                 prodi_nama=prodi_nama or "Program Studi",
                 force_regenerate=False
             )
@@ -385,7 +420,7 @@ async def get_rps_for_siakad(
                 nama_mk=mk.nama,
                 sks=mk.sks,
                 semester=mk.semester,
-                tahun_akademik=tahun_akademik or "2025/2026 Genap",
+                tahun_akademik=tahun_akademik,
                 prodi_nama=prodi_nama or "Program Studi",
                 force_regenerate=False
             )
@@ -426,6 +461,7 @@ async def bulk_sync_courses_from_siakad(
     """
     Bulk import/sync courses from SIAKAD into Auto RPS OBE under their respective Prodi.
     """
+    active_per_name = await _get_default_active_periode(db)
     synced_count = 0
     created_count = 0
     for c in req.courses:
@@ -459,6 +495,7 @@ async def bulk_sync_courses_from_siakad(
                 nama=clean_name,
                 sks=c.sks or 3,
                 semester=c.semester or 1,
+                periode=active_per_name or "2025/2026 Ganjil",
                 prodi_id=prodi.id,
                 deskripsi=f"Mata kuliah {clean_name} tersinkronisasi otomatis dari SIAKAD."
             )
@@ -468,6 +505,8 @@ async def bulk_sync_courses_from_siakad(
             mk.nama = clean_name
             mk.sks = c.sks or mk.sks
             mk.semester = c.semester or mk.semester
+            if active_per_name:
+                mk.periode = active_per_name
             synced_count += 1
 
     await db.commit()
@@ -484,7 +523,7 @@ class AutoGenerateFromSiakadRequest(BaseModel):
     nama_mk: str
     sks: Optional[int] = 3
     semester: Optional[int] = 1
-    tahun_akademik: Optional[str] = "2025/2026 Genap"
+    tahun_akademik: Optional[str] = None
     prodi_nama: Optional[str] = "Program Studi"
     prodi_kode: Optional[str] = ""
     dosen_pengampu: Optional[Union[List[str], List[Dict[str, Any]], str]] = []
@@ -503,7 +542,8 @@ async def auto_generate_rps_from_siakad(
     1. Finds or auto-creates Prodi with Visi/Misi & CPL.
     2. Finds or auto-creates MataKuliah.
     3. Generates complete 16-week OBE RPS (CPMK, Sub-CPMK, Bloom, SDGs, Rubrik Penilaian).
-    4. Saves to database and returns full published RPS.
+    4. Automatically binds to the active Periode from DB.
+    5. Saves to database and returns full published RPS.
     """
     return await _execute_whole_shebang_auto_generate(
         db=db,
@@ -511,7 +551,7 @@ async def auto_generate_rps_from_siakad(
         nama_mk=req.nama_mk,
         sks=req.sks or 3,
         semester=req.semester or 1,
-        tahun_akademik=req.tahun_akademik or "2025/2026 Genap",
+        tahun_akademik=req.tahun_akademik,
         prodi_nama=req.prodi_nama or "Program Studi",
         prodi_kode=req.prodi_kode or "",
         dosen_pengampu=req.dosen_pengampu or [],
