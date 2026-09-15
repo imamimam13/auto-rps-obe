@@ -98,6 +98,23 @@ export default function RPSList() {
   const [bulkPublishProdiId, setBulkPublishProdiId] = useState('all')
   const [bulkPublishOnlyWithDosen, setBulkPublishOnlyWithDosen] = useState(true)
   const [bulkPublishing, setBulkPublishing] = useState(false)
+  const [upgradingSdgs, setUpgradingSdgs] = useState(false)
+
+  async function handleUpgradeAllSdgs() {
+    if (!confirm('Apakah Anda ingin meng-upgrade dan menyinkronkan seluruh RPS lama ke format standar SDGs & Taksonomi Bloom (OBE)?')) {
+      return
+    }
+    setUpgradingSdgs(true)
+    try {
+      const res = await api.post('/api/v1/rps/upgrade-all-sdgs')
+      toast.success(res.data.message || `Berhasil meng-upgrade ${res.data.upgraded_count} RPS!`)
+      loadData()
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || e.message || 'Gagal upgrade SDGs RPS')
+    } finally {
+      setUpgradingSdgs(false)
+    }
+  }
 
   async function openBulkPublishModal() {
     if (prodis.length === 0) await loadProdis()
@@ -981,6 +998,14 @@ export default function RPSList() {
         </div>
         {canEditRPS && (
           <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleUpgradeAllSdgs}
+              disabled={upgradingSdgs}
+              className="macos-button flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"
+              title="Upgrade seluruh data RPS lama ke standar SDGs dan Taksonomi Bloom (OBE)"
+            >
+              {upgradingSdgs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Upgrade SDGs & Bloom
+            </button>
             <button
               onClick={openJadwalModal}
               className="macos-button flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3.5 py-2.5 rounded-apple-lg shadow-sm"

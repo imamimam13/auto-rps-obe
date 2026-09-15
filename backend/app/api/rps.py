@@ -136,6 +136,70 @@ async def get_public_rps_by_code(kode_mk: str, db: AsyncSession = Depends(get_db
     return rps
 
 
+@router.post("/upgrade-all-sdgs")
+async def upgrade_all_legacy_rps(
+    force_all: bool = Query(False),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Auto-upgrade all legacy RPS in database to the latest OBE + SDGs + Bloom Taxonomy standard.
+    """
+    res = await db.execute(select(RPS))
+    all_rps = res.scalars().all()
+    upgraded_count = 0
+
+    for rps in all_rps:
+        changed = False
+        # 1. Populate SDGs if missing
+        if force_all or not rps.sdgs or len(rps.sdgs) == 0:
+            mk_res = await db.execute(select(MataKuliah).where(MataKuliah.id == rps.mata_kuliah_id))
+            mk = mk_res.scalar_one_or_none()
+            if mk and mk.sdgs and len(mk.sdgs) > 0:
+                rps.sdgs = mk.sdgs
+            else:
+                rps.sdgs = [4, 8, 9]
+                if mk and not mk.sdgs:
+                    mk.sdgs = [4, 8, 9]
+            flag_modified(rps, "sdgs")
+            changed = True
+
+        # 2. Populate Taksonomi Bloom on CPMK if missing
+        if rps.cpmk and isinstance(rps.cpmk, list):
+            updated_cpmk = []
+            cpmk_changed = False
+            for idx, c in enumerate(rps.cpmk):
+                if isinstance(c, dict):
+                    if not c.get("taksonomi_bloom") and not c.get("bloom_level"):
+                        bloom_defaults = ["C2", "C3", "C4", "C5", "C6"]
+                        assigned_bloom = bloom_defaults[idx % len(bloom_defaults)]
+                        c["taksonomi_bloom"] = assigned_bloom
+                        c["bloom_level"] = f"{assigned_bloom} - Standard OBE"
+                        cpmk_changed = True
+                    updated_cpmk.append(c)
+                else:
+                    updated_cpmk.append(c)
+            if cpmk_changed:
+                rps.cpmk = updated_cpmk
+                flag_modified(rps, "cpmk")
+                changed = True
+
+        # 3. Ensure status is published if has full materials
+        if (rps.rencana_pembelajaran and len(rps.rencana_pembelajaran) >= 14) and rps.status != "published":
+            rps.status = "published"
+            changed = True
+
+        if changed:
+            upgraded_count += 1
+
+    await db.commit()
+    return {
+        "status": "success",
+        "message": f"Berhasil meng-upgrade {upgraded_count} RPS lama ke format OBE + SDGs + Bloom Taxonomy terkini!",
+        "upgraded_count": upgraded_count,
+        "total_rps": len(all_rps)
+    }
+
+
 @router.get("/{rps_id}", response_model=RPSResponse)
 async def get_rps(rps_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(RPS).where(RPS.id == rps_id))
