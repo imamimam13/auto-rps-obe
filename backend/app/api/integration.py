@@ -115,12 +115,17 @@ def _format_rps_response(rps: RPS, mk: MataKuliah):
 @router.get("/rps/{kode_mk}")
 async def get_rps_for_siakad(
     kode_mk: str,
+    nama_mk: Optional[str] = Query(None),
+    prodi_nama: Optional[str] = Query(None),
+    sks: Optional[int] = Query(3),
+    semester: Optional[int] = Query(1),
+    auto_create: bool = Query(True),
     db: AsyncSession = Depends(get_db),
     _key: str = Depends(verify_siakad_api_key)
 ):
     """
     Get full structured RPS data & URLs for a course by its kode_mk.
-    Used by SIAKAD to embed or render RPS inside course & schedule pages.
+    If course does not exist and auto_create is True, it automatically registers the Prodi & Mata Kuliah!
     """
     cleaned_code = kode_mk.strip()
     
@@ -136,10 +141,54 @@ async def get_rps_for_siakad(
         mk = mk_res2.scalar_one_or_none()
         
     if not mk:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Mata kuliah dengan kode '{cleaned_code}' belum terdaftar di Auto RPS OBE."
+        if not auto_create:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Mata kuliah dengan kode '{cleaned_code}' belum terdaftar di Auto RPS OBE."
+            )
+        
+        # Auto-create Prodi if not exists
+        clean_prodi_nama = (prodi_nama or "Program Studi").strip()
+        clean_nama_mk = (nama_mk or f"Mata Kuliah {cleaned_code}").strip()
+        
+        prodi_res = await db.execute(
+            select(Prodi).where(func.lower(Prodi.nama) == clean_prodi_nama.lower())
         )
+        prodi = prodi_res.scalars().first()
+        if not prodi:
+            prodi_code = clean_prodi_nama[:4].upper()
+            existing_code_res = await db.execute(select(Prodi).where(Prodi.kode == prodi_code))
+            if existing_code_res.scalars().first():
+                prodi_code = f"{prodi_code[:3]}-{uuid.uuid4().hex[:3].upper()}"
+            
+            prodi = Prodi(
+                kode=prodi_code,
+                nama=clean_prodi_nama,
+                fakultas="Fakultas",
+                visi=f"Menjadi Program Studi {clean_prodi_nama} yang unggul dan berintegritas tinggi.",
+                misi=f"1. Menyelenggarakan pendidikan OBE bermutu tinggi.\n2. Mengembangkan penelitian dan pengabdian masyarakat.",
+                capaian_pembelajaran_lulusan=[
+                    {"kode": "CPL-01", "deskripsi": "Menunjukkan ketakwaan kepada Tuhan YME dan integritas.", "kategori": "Sikap"},
+                    {"kode": "CPL-02", "deskripsi": f"Menguasai konsep teoritis keilmuan {clean_prodi_nama}.", "kategori": "Pengetahuan"},
+                    {"kode": "CPL-03", "deskripsi": "Mampu merancang dan menganalisis solusi inovatif.", "kategori": "Keterampilan Khusus"},
+                    {"kode": "CPL-04", "deskripsi": "Mampu berkomunikasi efektif dan bekerja dalam tim.", "kategori": "Keterampilan Umum"}
+                ]
+            )
+            db.add(prodi)
+            await db.flush()
+
+        # Auto-create MataKuliah under this Prodi
+        mk = MataKuliah(
+            kode=cleaned_code,
+            nama=clean_nama_mk,
+            sks=sks or 3,
+            semester=semester or 1,
+            prodi_id=prodi.id,
+            deskripsi=f"Mata kuliah {clean_nama_mk} ({cleaned_code}) tersinkronisasi otomatis dari SIAKAD."
+        )
+        db.add(mk)
+        await db.commit()
+        await db.refresh(mk)
 
     # 2. Find Latest Published or Available RPS
     rps_result = await db.execute(
@@ -157,7 +206,7 @@ async def get_rps_for_siakad(
         return {
             "status": "not_found",
             "has_rps": False,
-            "message": f"Mata kuliah '{mk.nama}' ({mk.kode}) ditemukan, tetapi RPS belum dibuat.",
+            "message": f"Mata kuliah '{mk.nama}' ({mk.kode}) terdaftar di Prodi, tetapi RPS belum dibuat.",
             "mata_kuliah": {
                 "id": mk.id,
                 "kode_mk": mk.kode,
@@ -169,6 +218,81 @@ async def get_rps_for_siakad(
         }
 
     return _format_rps_response(rps, mk)
+
+
+class SyncCourseItem(BaseModel):
+    kode_mk: str
+    nama_mk: str
+    sks: Optional[int] = 3
+    semester: Optional[int] = 1
+    prodi_nama: Optional[str] = "Program Studi"
+    prodi_kode: Optional[str] = ""
+
+class SyncCoursesRequest(BaseModel):
+    courses: List[SyncCourseItem]
+
+@router.post("/sync-courses")
+async def bulk_sync_courses_from_siakad(
+    req: SyncCoursesRequest,
+    db: AsyncSession = Depends(get_db),
+    _key: str = Depends(verify_siakad_api_key)
+):
+    """
+    Bulk import/sync courses from SIAKAD into Auto RPS OBE under their respective Prodi.
+    """
+    synced_count = 0
+    created_count = 0
+    for c in req.courses:
+        clean_code = c.kode_mk.strip()
+        clean_name = c.nama_mk.strip()
+        clean_prodi = (c.prodi_nama or "Program Studi").strip()
+
+        # Find or create Prodi
+        prodi_res = await db.execute(select(Prodi).where(func.lower(Prodi.nama) == clean_prodi.lower()))
+        prodi = prodi_res.scalars().first()
+        if not prodi:
+            p_code = c.prodi_kode.strip().upper() if c.prodi_kode else clean_prodi[:4].upper()
+            prodi = Prodi(
+                kode=p_code,
+                nama=clean_prodi,
+                fakultas="Fakultas",
+                visi=f"Menjadi Program Studi {clean_prodi} yang unggul dan berintegritas tinggi.",
+                misi="1. Menyelenggarakan pendidikan OBE bermutu tinggi.",
+                capaian_pembelajaran_lulusan=[
+                    {"kode": "CPL-01", "deskripsi": "Integritas moral dan etika profesi.", "kategori": "Sikap"},
+                    {"kode": "CPL-02", "deskripsi": "Penguasaan konsep keilmuan mendalam.", "kategori": "Pengetahuan"}
+                ]
+            )
+            db.add(prodi)
+            await db.flush()
+
+        # Find or create MataKuliah
+        mk_res = await db.execute(select(MataKuliah).where(func.lower(MataKuliah.kode) == clean_code.lower()))
+        mk = mk_res.scalars().first()
+        if not mk:
+            mk = MataKuliah(
+                kode=clean_code,
+                nama=clean_name,
+                sks=c.sks or 3,
+                semester=c.semester or 1,
+                prodi_id=prodi.id,
+                deskripsi=f"Mata kuliah {clean_name} tersinkronisasi otomatis dari SIAKAD."
+            )
+            db.add(mk)
+            created_count += 1
+        else:
+            mk.nama = clean_name
+            mk.sks = c.sks or mk.sks
+            mk.semester = c.semester or mk.semester
+            synced_count += 1
+
+    await db.commit()
+    return {
+        "status": "success",
+        "message": f"Sinkronisasi berhasil: {created_count} mata kuliah baru ditambahkan, {synced_count} diperbarui.",
+        "created": created_count,
+        "updated": synced_count
+    }
 
 
 class AutoGenerateFromSiakadRequest(BaseModel):
@@ -221,7 +345,6 @@ async def auto_generate_rps_from_siakad(
             {"kode": "CPL-04", "deskripsi": "Mampu berkomunikasi efektif, bekerjasama dalam tim multidisiplin, dan mandiri.", "kategori": "Keterampilan Umum"}
         ]
         
-        # Ensure unique prodi code
         base_code = req.prodi_kode.strip().upper() if req.prodi_kode else (clean_prodi_nama[:4].upper() if clean_prodi_nama else "PRODI")
         existing_code_res = await db.execute(select(Prodi).where(Prodi.kode == base_code))
         if existing_code_res.scalars().first():
