@@ -35,10 +35,11 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3.1:8b"
     OLLAMA_TIMEOUT: int = 120
 
-    # JWT
+    # JWT & API Keys
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SIAKAD_API_KEY: str = "rps-obe-secret-key-2026"
 
     # CORS
     ALLOWED_ORIGINS: List[str] = ["*"]
