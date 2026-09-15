@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Download, FileText, Sparkles, BookOpen, GraduationCap, CheckCircle, Globe } from 'lucide-react'
 import api from '@/services/api'
 import { getSDGById } from '@/utils/sdgsData'
@@ -25,7 +25,9 @@ interface RPS {
 }
 
 export default function RPSPublicPreview() {
-  const { id } = useParams<{ id: string }>()
+  const { id, code } = useParams<{ id?: string; code?: string }>()
+  const [searchParams] = useSearchParams()
+  const queryKode = searchParams.get('kode') || searchParams.get('kode_mk') || code
   const navigate = useNavigate()
   const [rps, setRps] = useState<RPS | null>(null)
   const [loading, setLoading] = useState(true)
@@ -34,7 +36,7 @@ export default function RPSPublicPreview() {
 
   useEffect(() => {
     fetchRPSDetail()
-  }, [id])
+  }, [id, queryKode])
 
   async function fetchRPSDetail() {
     try {
@@ -52,10 +54,20 @@ export default function RPSPublicPreview() {
         // use default
       }
 
-      const res = await api.get(`/api/v1/rps/${id}`)
-      setRps(res.data)
+      let res
+      if (id && id !== 'by-mk') {
+        res = await api.get(`/api/v1/rps/${id}`)
+      } else if (queryKode) {
+        res = await api.get(`/api/v1/rps/public/by-code/${encodeURIComponent(queryKode)}`)
+      }
+      if (res?.data) {
+        setRps(res.data)
+      } else {
+        setRps(null)
+      }
     } catch (e) {
       console.error('Failed to load RPS details', e)
+      setRps(null)
     } finally {
       setLoading(false)
     }

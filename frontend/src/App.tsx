@@ -92,6 +92,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/rps-preview/:id" element={<RPSPublicPreview />} />
+        <Route path="/rps-preview/by-mk/:code" element={<RPSPublicPreview />} />
+        <Route path="/rps-preview/by-mk" element={<RPSPublicPreview />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/*" element={
           <ProtectedRoute>
