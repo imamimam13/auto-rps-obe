@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings as SettingsIcon, Server, Cpu, RefreshCw, Link, Key, Calendar, Plus, Trash2, Edit2, Check, CheckCircle2, X } from 'lucide-react'
+import { Settings as SettingsIcon, Server, Cpu, RefreshCw, Link, Key, Calendar, Plus, Trash2, Edit2, Check, CheckCircle2, X, Copy, CheckCheck, ShieldCheck, Globe } from 'lucide-react'
 import api from '@/services/api'
 import toast from 'react-hot-toast'
 
@@ -34,6 +34,8 @@ export default function Settings() {
   const [koordinatorRmk, setKoordinatorRmk] = useState('')
   const [kaProdi, setKaProdi] = useState('')
   const [rentangPenilaian, setRentangPenilaian] = useState('')
+  const [siakadApiKey, setSiakadApiKey] = useState('rps-obe-secret-key-2026')
+  const [copiedKey, setCopiedKey] = useState(false)
   const [savingBranding, setSavingBranding] = useState(false)
 
   // Periode state
@@ -176,6 +178,9 @@ export default function Settings() {
       setKoordinatorRmk(res.data.default_koordinator_rmk || '')
       setKaProdi(res.data.default_ka_prodi || '')
       setRentangPenilaian(res.data.brand_rentang_penilaian || '')
+      if (res.data.siakad_api_key) {
+        setSiakadApiKey(res.data.siakad_api_key)
+      }
     } catch {
       // ignored
     }
@@ -232,10 +237,11 @@ export default function Settings() {
         default_koordinator_rmk: koordinatorRmk,
         default_ka_prodi: kaProdi,
         brand_rentang_penilaian: rentangPenilaian,
+        siakad_api_key: siakadApiKey,
       })
-      toast.success('Identitas branding disimpan!')
+      toast.success('Pengaturan berhasil disimpan!')
     } catch {
-      toast.error('Gagal menyimpan branding')
+      toast.error('Gagal menyimpan pengaturan')
     } finally {
       setSavingBranding(false)
     }
@@ -388,6 +394,72 @@ export default function Settings() {
           <button onClick={handleSaveBranding} disabled={savingBranding} className="macos-button w-full py-2 flex items-center justify-center gap-2">
             {savingBranding ? 'Menyimpan...' : 'Simpan Identitas'}
           </button>
+        </div>
+      </div>
+
+      {/* Integrasi SIAKAD PLUS (API Key) */}
+      <div className="macos-card p-6 space-y-4 border border-blue-100 bg-gradient-to-br from-white to-blue-50/30">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-apple-lg bg-blue-100/70 text-blue-700">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                Integrasi SIAKAD PLUS
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded-full">Active</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">Kunci API & endpoint sinkronisasi otomatis untuk modul kelas di SIAKAD.</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSaveBranding}
+            disabled={savingBranding}
+            className="macos-button flex items-center gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-apple-md font-medium"
+          >
+            {savingBranding ? 'Menyimpan...' : 'Simpan Kunci API'}
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="macos-label flex items-center justify-between">
+              <span>SIAKAD API Secret Key (`X-API-Key`)</span>
+              <span className="text-[10px] text-gray-400">Gunakan kunci ini pada file `.env` di SIAKAD</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="macos-input font-mono text-xs bg-white"
+                value={siakadApiKey}
+                onChange={(e) => setSiakadApiKey(e.target.value)}
+                placeholder="rps-obe-secret-key-2026"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(siakadApiKey)
+                  setCopiedKey(true)
+                  toast.success('Kunci API disalin!')
+                  setTimeout(() => setCopiedKey(false), 2000)
+                }}
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-apple text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
+                title="Salin Kunci API"
+              >
+                {copiedKey ? <CheckCheck className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-600" />}
+                {copiedKey ? 'Tersalin' : 'Salin'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-apple-lg border border-gray-200/70 text-xs space-y-1.5 font-mono">
+            <p className="text-[11px] font-semibold text-gray-700 font-sans">📌 Konfigurasi untuk `server/.env` di SIAKAD:</p>
+            <pre className="text-[11px] text-gray-800 bg-white p-2 rounded border border-gray-200 overflow-x-auto select-all">
+{`AUTO_RPS_API_URL=http://localhost:8000/api/v1/integration/siakad
+AUTO_RPS_API_KEY=${siakadApiKey || 'rps-obe-secret-key-2026'}
+VITE_AUTO_RPS_URL=http://localhost:5173`}
+            </pre>
+          </div>
         </div>
       </div>
 

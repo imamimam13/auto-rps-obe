@@ -92,6 +92,8 @@ def save_settings_to_env(updates: dict):
         settings.DEFAULT_KA_PRODI = updates["DEFAULT_KA_PRODI"]
     if "BRAND_RENTANG_PENILAIAN" in updates:
         settings.BRAND_RENTANG_PENILAIAN = updates["BRAND_RENTANG_PENILAIAN"]
+    if "SIAKAD_API_KEY" in updates:
+        settings.SIAKAD_API_KEY = updates["SIAKAD_API_KEY"]
 
     possible_paths = [
         ".env",
