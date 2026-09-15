@@ -74,8 +74,8 @@ def _format_rps_response(rps: RPS, mk: MataKuliah):
         "rps_status": rps.status,
         "has_full_materials": has_full_materials,
         "total_meetings": len(rencana),
-        "kode_mk": mk.kode_mk,
-        "nama_mk": mk.nama_mk,
+        "kode_mk": mk.kode,
+        "nama_mk": mk.nama,
         "sks": mk.sks,
         "semester": rps.semester or mk.semester,
         "tahun_akademik": rps.tahun_akademik,
@@ -88,8 +88,8 @@ def _format_rps_response(rps: RPS, mk: MataKuliah):
         "referensi": rps.referensi or [],
         "mata_kuliah": {
             "id": mk.id,
-            "kode_mk": mk.kode_mk,
-            "nama_mk": mk.nama_mk,
+            "kode_mk": mk.kode,
+            "nama_mk": mk.nama,
             "sks": mk.sks,
             "semester": rps.semester or mk.semester,
             "tahun_akademik": rps.tahun_akademik,
@@ -104,7 +104,7 @@ def _format_rps_response(rps: RPS, mk: MataKuliah):
         },
         "urls": {
             "preview_url": f"/rps-preview/{rps.id}",
-            "preview_by_code_url": f"/rps-preview/by-mk?kode={mk.kode_mk}",
+            "preview_by_code_url": f"/rps-preview/by-mk?kode={mk.kode}",
             "pdf_export_url": f"/api/v1/export/{rps.id}?export_format=pdf",
             "docx_export_url": f"/api/v1/export/{rps.id}?export_format=docx",
             "edit_rps_url": f"/rps/{rps.id}"
@@ -124,14 +124,14 @@ async def get_rps_for_siakad(
     """
     cleaned_code = kode_mk.strip()
     
-    # 1. Find MataKuliah
+    # 1. Find MataKuliah by kode or nama
     mk_result = await db.execute(
-        select(MataKuliah).where(func.lower(MataKuliah.kode_mk) == cleaned_code.lower())
+        select(MataKuliah).where(func.lower(MataKuliah.kode) == cleaned_code.lower())
     )
     mk = mk_result.scalar_one_or_none()
     if not mk:
         mk_res2 = await db.execute(
-            select(MataKuliah).where(func.lower(MataKuliah.nama_mk) == cleaned_code.lower())
+            select(MataKuliah).where(func.lower(MataKuliah.nama) == cleaned_code.lower())
         )
         mk = mk_res2.scalar_one_or_none()
         
@@ -157,11 +157,11 @@ async def get_rps_for_siakad(
         return {
             "status": "not_found",
             "has_rps": False,
-            "message": f"Mata kuliah '{mk.nama_mk}' ({mk.kode_mk}) ditemukan, tetapi RPS belum dibuat.",
+            "message": f"Mata kuliah '{mk.nama}' ({mk.kode}) ditemukan, tetapi RPS belum dibuat.",
             "mata_kuliah": {
                 "id": mk.id,
-                "kode_mk": mk.kode_mk,
-                "nama_mk": mk.nama_mk,
+                "kode_mk": mk.kode,
+                "nama_mk": mk.nama,
                 "sks": mk.sks,
                 "semester": mk.semester,
             },
@@ -203,12 +203,15 @@ async def auto_generate_rps_from_siakad(
 
     # 1. Find or Auto-Create Prodi
     prodi_res = await db.execute(
-        select(Prodi).where(
-            (func.lower(Prodi.nama) == clean_prodi_nama.lower()) |
-            (func.lower(Prodi.kode) == (req.prodi_kode or "").strip().lower())
-        )
+        select(Prodi).where(func.lower(Prodi.nama) == clean_prodi_nama.lower())
     )
     prodi = prodi_res.scalars().first()
+
+    if not prodi and req.prodi_kode:
+        prodi_res_code = await db.execute(
+            select(Prodi).where(func.lower(Prodi.kode) == req.prodi_kode.strip().lower())
+        )
+        prodi = prodi_res_code.scalars().first()
 
     if not prodi:
         cpl_defaults = req.cpl_list or [
@@ -217,35 +220,38 @@ async def auto_generate_rps_from_siakad(
             {"kode": "CPL-03", "deskripsi": "Mampu merancang, menganalisis, dan memvalidasi solusi inovatif berbasis teknologi.", "kategori": "Keterampilan Khusus"},
             {"kode": "CPL-04", "deskripsi": "Mampu berkomunikasi efektif, bekerjasama dalam tim multidisiplin, dan mandiri.", "kategori": "Keterampilan Umum"}
         ]
+        
+        # Ensure unique prodi code
+        base_code = req.prodi_kode.strip().upper() if req.prodi_kode else (clean_prodi_nama[:4].upper() if clean_prodi_nama else "PRODI")
+        existing_code_res = await db.execute(select(Prodi).where(Prodi.kode == base_code))
+        if existing_code_res.scalars().first():
+            base_code = f"{base_code[:3]}-{uuid.uuid4().hex[:3].upper()}"
+
         prodi = Prodi(
-            kode=req.prodi_kode or (clean_prodi_nama[:4].upper() if clean_prodi_nama else "PRODI"),
+            kode=base_code,
             nama=clean_prodi_nama,
-            jenjang="S1",
+            fakultas="Fakultas",
             visi=f"Menjadi Program Studi {clean_prodi_nama} yang unggul, berdaya saing global, dan berintegritas tinggi.",
-            misi=[
-                f"Menyelenggarakan proses pembelajaran Outcome-Based Education (OBE) bermutu tinggi pada bidang {clean_prodi_nama}.",
-                "Mengembangkan penelitian terapan dan inovasi iptek yang bermanfaat bagi masyarakat dan industri.",
-                "Melaksanakan pengabdian kepada masyarakat berbasis kompetensi keilmuan."
-            ],
-            cpl=cpl_defaults
+            misi=f"1. Menyelenggarakan pendidikan OBE bermutu tinggi.\n2. Mengembangkan penelitian dan inovasi iptek di bidang {clean_prodi_nama}.\n3. Melaksanakan pengabdian kepada masyarakat.",
+            tujuan=f"Menghasilkan lulusan {clean_prodi_nama} yang kompeten, profesional, dan berdaya saing global.",
+            capaian_pembelajaran_lulusan=cpl_defaults
         )
         db.add(prodi)
         await db.flush()
 
     # 2. Find or Auto-Create MataKuliah
     mk_res = await db.execute(
-        select(MataKuliah).where(func.lower(MataKuliah.kode_mk) == clean_kode_mk.lower())
+        select(MataKuliah).where(func.lower(MataKuliah.kode) == clean_kode_mk.lower())
     )
     mk = mk_res.scalars().first()
 
     if not mk:
         mk = MataKuliah(
-            kode_mk=clean_kode_mk,
-            nama_mk=clean_nama_mk,
+            kode=clean_kode_mk,
+            nama=clean_nama_mk,
             sks=req.sks or 3,
             semester=req.semester or 1,
             prodi_id=prodi.id,
-            jenis="Wajib",
             deskripsi=f"Mata kuliah {clean_nama_mk} ({clean_kode_mk}) diselenggarakan dengan kerangka Outcome-Based Education (OBE) mencakup penguasaan teori, studi kasus terapan, dan proyek komprehensif."
         )
         db.add(mk)
@@ -266,20 +272,28 @@ async def auto_generate_rps_from_siakad(
         return _format_rps_response(rps, mk)
 
     # 4. Generate Full RPS using AI / Generator Service
+    cpl_list = prodi.capaian_pembelajaran_lulusan or []
+    cpl_formatted = []
+    for c in cpl_list:
+        if isinstance(c, dict):
+            cpl_formatted.append(f"{c.get('kode', 'CPL')}: {c.get('deskripsi', '')}")
+        else:
+            cpl_formatted.append(str(c))
+
     prodi_data = {
         "id": prodi.id,
         "nama": prodi.nama,
         "kode": prodi.kode,
-        "visi": prodi.visi,
-        "misi": prodi.misi,
-        "cpl": prodi.cpl or []
+        "visi": prodi.visi or "",
+        "misi": prodi.misi or "",
+        "cpl": cpl_list
     }
     mk_data = {
         "id": mk.id,
-        "kode": mk.kode_mk,
-        "nama": mk.nama_mk,
+        "kode": mk.kode,
+        "nama": mk.nama,
         "sks": mk.sks,
-        "deskripsi": mk.deskripsi
+        "deskripsi": mk.deskripsi or ""
     }
 
     try:
@@ -289,7 +303,7 @@ async def auto_generate_rps_from_siakad(
             semester=req.semester or mk.semester or 1,
             tahun_akademik=req.tahun_akademik or "2025/2026 Genap",
             dosen_pengampu=req.dosen_pengampu or [],
-            cpl_prodi=[c.get("kode", "") + ": " + c.get("deskripsi", "") if isinstance(c, dict) else str(c) for c in (prodi.cpl or [])]
+            cpl_prodi=cpl_formatted
         )
     except Exception as gen_err:
         print(f"[WholeShebang Auto-Generate] AI error, using fallback template: {gen_err}")

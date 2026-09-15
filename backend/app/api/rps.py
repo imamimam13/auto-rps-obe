@@ -109,12 +109,12 @@ async def list_rps(
 
 @router.get("/public/by-code/{kode_mk}", response_model=RPSResponse)
 async def get_public_rps_by_code(kode_mk: str, db: AsyncSession = Depends(get_db)):
-    # 1. Find MataKuliah by kode_mk
-    mk_result = await db.execute(select(MataKuliah).where(func.lower(MataKuliah.kode_mk) == kode_mk.strip().lower()))
+    # 1. Find MataKuliah by kode or nama
+    mk_result = await db.execute(select(MataKuliah).where(func.lower(MataKuliah.kode) == kode_mk.strip().lower()))
     mk = mk_result.scalar_one_or_none()
     if not mk:
         # Fallback: search by name
-        mk_res2 = await db.execute(select(MataKuliah).where(func.lower(MataKuliah.nama_mk) == kode_mk.strip().lower()))
+        mk_res2 = await db.execute(select(MataKuliah).where(func.lower(MataKuliah.nama) == kode_mk.strip().lower()))
         mk = mk_res2.scalar_one_or_none()
     
     if not mk:
@@ -132,7 +132,7 @@ async def get_public_rps_by_code(kode_mk: str, db: AsyncSession = Depends(get_db
     )
     rps = rps_result.scalars().first()
     if not rps:
-        raise HTTPException(status_code=404, detail=f"Belum ada RPS untuk mata kuliah '{mk.nama_mk}'")
+        raise HTTPException(status_code=404, detail=f"Belum ada RPS untuk mata kuliah '{mk.nama}'")
     return rps
 
 
