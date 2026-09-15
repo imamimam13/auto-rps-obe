@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Sparkles, Search, GraduationCap, FileText, Download, Eye, ArrowRight, X } from 'lucide-react'
 import api from '@/services/api'
 
@@ -38,19 +38,27 @@ interface PeriodeItem {
 }
 
 export default function LandingPage() {
+  const [searchParams] = useSearchParams()
+  const initialQuery = searchParams.get('search') || searchParams.get('q') || searchParams.get('kode') || ''
   const [prodis, setProdis] = useState<Prodi[]>([])
   const [rpsList, setRpsList] = useState<RPSItem[]>([])
   const [periodes, setPeriodes] = useState<PeriodeItem[]>([])
   const [selectedPeriode, setSelectedPeriode] = useState<string>('')
   const [activePeriodeName, setActivePeriodeName] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [prodiSearchQuery, setProdiSearchQuery] = useState('')
   const [selectedProdiId, setSelectedProdiId] = useState<number | null>(null)
   const [campusName, setCampusName] = useState('SEKOLAH TINGGI ILMU EKONOMI WIRA BHAKTI')
   const [campusLogo, setCampusLogo] = useState('')
   const [showProdiSidebar, setShowProdiSidebar] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (initialQuery) {
+      setSearchQuery(initialQuery)
+    }
+  }, [initialQuery])
 
   useEffect(() => {
     fetchInitialData()
@@ -117,7 +125,10 @@ export default function LandingPage() {
     const searchLower = searchQuery.toLowerCase()
     const name = rps.identitas?.nama_mata_kuliah || ''
     const code = rps.identitas?.kode_mata_kuliah || ''
-    return name.toLowerCase().includes(searchLower) || code.toLowerCase().includes(searchLower)
+    const rpsKode = rps.kode || ''
+    return name.toLowerCase().includes(searchLower) || 
+           code.toLowerCase().includes(searchLower) || 
+           rpsKode.toLowerCase().includes(searchLower)
   })
 
   // Download handlers
